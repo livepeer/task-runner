@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/task-runner/task"
 	"github.com/peterbourgon/ff"
 )
 
@@ -19,20 +20,16 @@ type BuildFlags struct {
 }
 
 type cliFlags struct {
-	amqpUri         string
-	apiExchangeName string
-	queueName       string
-
-	memoryRecordsTtl time.Duration
+	subscriberOpts task.SubscriberOptions
 }
 
 func parseFlags() cliFlags {
 	cli := cliFlags{}
 	fs := flag.NewFlagSet("task-runner", flag.ExitOnError)
 
-	fs.StringVar(&cli.amqpUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol.")
-	fs.StringVar(&cli.apiExchangeName, "api-exchange-name", "lp_api_tasks", "Name of exchange where the tasks will be published to.")
-	fs.StringVar(&cli.queueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange.")
+	fs.StringVar(&cli.subscriberOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol.")
+	fs.StringVar(&cli.subscriberOpts.APIExchangeName, "api-exchange-name", "lp_api_tasks", "Name of exchange where the tasks will be published to.")
+	fs.StringVar(&cli.subscriberOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange.")
 
 	flag.Set("logtostderr", "true")
 	glogVFlag := flag.Lookup("v")
@@ -56,8 +53,19 @@ func Run(build BuildFlags) {
 	glog.Infof("Task runner starting... version=%q", build.Version)
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
-	glog.Info("Sleeping... AMQP URL just to have some usage of the cli var and the go compiler does not complain about unused variable: ", cli.amqpUri)
+	subscriber := task.NewSubscriber(cli.subscriberOpts)
+	err := subscriber.Start()
+	if err != nil {
+		glog.Fatalf("Failed to start subscriber: %v", err)
+	}
+
 	<-ctx.Done()
+	shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	glog.Infof("Task runner shutting down...")
+	if err := subscriber.Shutdown(shutCtx); err != nil {
+		glog.Fatalf("Subscriber shutdown error: %v", err)
+	}
 }
 
 func contextUntilSignal(parent context.Context, sigs ...os.Signal) context.Context {
