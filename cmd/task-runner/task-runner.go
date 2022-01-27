@@ -30,6 +30,8 @@ func parseFlags() cliFlags {
 	fs.StringVar(&cli.runnerOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol.")
 	fs.StringVar(&cli.runnerOpts.APIExchangeName, "api-exchange-name", "lp_api_tasks", "Name of exchange where the tasks will be published to.")
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange.")
+	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "", "Base URL for a custom server to use for the Livepeer API")
+	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
 
 	flag.Set("logtostderr", "true")
 	glogVFlag := flag.Lookup("v")
@@ -52,6 +54,7 @@ func Run(build BuildFlags) {
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	cli := parseFlags()
+	cli.runnerOpts.LivepeerAPIOptions.UserAgent = "task-runner/" + build.Version
 	runner := task.NewRunner(cli.runnerOpts)
 
 	err := runner.Start()

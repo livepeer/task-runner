@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	livepeerAPI "github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -17,20 +18,24 @@ type Runner interface {
 }
 
 type RunnerOptions struct {
-	AMQPUri         string
-	APIExchangeName string
-	QueueName       string
+	AMQPUri            string
+	APIExchangeName    string
+	QueueName          string
+	LivepeerAPIOptions livepeerAPI.ClientOptions
 }
 
 func NewRunner(opts RunnerOptions) Runner {
+	lapi := livepeerAPI.NewAPIClient(opts.LivepeerAPIOptions)
 	return &runner{
 		RunnerOptions: opts,
+		lapi:          lapi,
 	}
 }
 
 type runner struct {
 	RunnerOptions
 
+	lapi     *livepeerAPI.Client
 	consumer event.AMQPConsumer
 }
 
@@ -81,7 +86,7 @@ func (s *runner) handleTask(msg amqp.Delivery) error {
 	}
 	switch taskEvt.Task.Type {
 	case "import":
-		return TaskImport(taskEvt.Task)
+		return TaskImport(taskEvt.Task, s.lapi)
 	default:
 		glog.Errorf("Unknown task type=%q id=%s", taskEvt.Task.Type, taskEvt.Task.ID)
 		return nil
