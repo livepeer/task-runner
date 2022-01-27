@@ -20,16 +20,16 @@ type BuildFlags struct {
 }
 
 type cliFlags struct {
-	subscriberOpts task.SubscriberOptions
+	runnerOpts task.RunnerOptions
 }
 
 func parseFlags() cliFlags {
 	cli := cliFlags{}
 	fs := flag.NewFlagSet("task-runner", flag.ExitOnError)
 
-	fs.StringVar(&cli.subscriberOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol.")
-	fs.StringVar(&cli.subscriberOpts.APIExchangeName, "api-exchange-name", "lp_api_tasks", "Name of exchange where the tasks will be published to.")
-	fs.StringVar(&cli.subscriberOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange.")
+	fs.StringVar(&cli.runnerOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol.")
+	fs.StringVar(&cli.runnerOpts.APIExchangeName, "api-exchange-name", "lp_api_tasks", "Name of exchange where the tasks will be published to.")
+	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange.")
 
 	flag.Set("logtostderr", "true")
 	glogVFlag := flag.Lookup("v")
@@ -48,23 +48,23 @@ func parseFlags() cliFlags {
 }
 
 func Run(build BuildFlags) {
-	cli := parseFlags()
-
 	glog.Infof("Task runner starting... version=%q", build.Version)
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
-	subscriber := task.NewSubscriber(cli.subscriberOpts)
-	err := subscriber.Start()
+	cli := parseFlags()
+	runner := task.NewRunner(cli.runnerOpts)
+
+	err := runner.Start()
 	if err != nil {
-		glog.Fatalf("Failed to start subscriber: %v", err)
+		glog.Fatalf("Failed to start runner: %v", err)
 	}
 
 	<-ctx.Done()
 	shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	glog.Infof("Task runner shutting down...")
-	if err := subscriber.Shutdown(shutCtx); err != nil {
-		glog.Fatalf("Subscriber shutdown error: %v", err)
+	if err := runner.Shutdown(shutCtx); err != nil {
+		glog.Fatalf("Runner shutdown error: %v", err)
 	}
 }
 

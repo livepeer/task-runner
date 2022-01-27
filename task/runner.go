@@ -10,32 +10,32 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type Subscriber interface {
+type Runner interface {
 	Start() error
 	Shutdown(ctx context.Context) error
 }
 
-type SubscriberOptions struct {
+type RunnerOptions struct {
 	AMQPUri         string
 	APIExchangeName string
 	QueueName       string
 }
 
-func NewSubscriber(opts SubscriberOptions) Subscriber {
-	return &subscriber{
-		SubscriberOptions: opts,
+func NewRunner(opts RunnerOptions) Runner {
+	return &runner{
+		RunnerOptions: opts,
 	}
 }
 
-type subscriber struct {
-	SubscriberOptions
+type runner struct {
+	RunnerOptions
 
 	consumer event.AMQPConsumer
 }
 
-func (s *subscriber) Start() error {
+func (s *runner) Start() error {
 	if s.consumer != nil {
-		return errors.New("subscriber already started")
+		return errors.New("runner already started")
 	}
 
 	consumer, err := event.NewAMQPConsumer(s.AMQPUri, event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
@@ -65,14 +65,14 @@ func (s *subscriber) Start() error {
 	return nil
 }
 
-func (s *subscriber) handleTask(msg amqp.Delivery) error {
+func (s *runner) handleTask(msg amqp.Delivery) error {
 	glog.Infof("Received task: %s", msg.Body)
 	return nil
 }
 
-func (s *subscriber) Shutdown(ctx context.Context) error {
+func (s *runner) Shutdown(ctx context.Context) error {
 	if s.consumer == nil {
-		return errors.New("subscriber not started")
+		return errors.New("runner not started")
 	}
 	return s.consumer.Shutdown(ctx)
 }
