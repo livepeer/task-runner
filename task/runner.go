@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -67,7 +68,24 @@ func (s *runner) Start() error {
 
 func (s *runner) handleTask(msg amqp.Delivery) error {
 	glog.Infof("Received task: %s", msg.Body)
-	return nil
+	parsedEvt, err := data.ParseEvent(msg.Body)
+	if err != nil {
+		glog.Errorf("Error parsing AMQP message: %w", err)
+		// Return nil err so the event is acked. We shouldn't retry malformed messages.
+		return nil
+	}
+	taskEvt, ok := parsedEvt.(*data.TaskEvent)
+	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTask {
+		glog.Errorf("Unexpected AMQP message type=%q", evType)
+		return nil
+	}
+	switch taskEvt.Task.Type {
+	case "import":
+		return TaskImport(taskEvt.Task)
+	default:
+		glog.Errorf("Unknown task type=%q id=%s", taskEvt.Task.Type, taskEvt.Task.ID)
+		return nil
+	}
 }
 
 func (s *runner) Shutdown(ctx context.Context) error {
