@@ -8,7 +8,7 @@ builddir := ../../build/
 all: build
 
 build:
-	go build -o $(builddir) -ldflags="$(ldflags)" main/analyzer.go
+	go build -o $(builddir) -ldflags="$(ldflags)" main/task-runner.go
 
 run:
-	go run -ldflags="$(ldflags)" main/analyzer.go $(args)
+	go run -ldflags="$(ldflags)" main/task-runner.go $(args)
