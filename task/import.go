@@ -1,6 +1,8 @@
 package task
 
 import (
+	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -8,6 +10,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/livepeer/go-livepeer/drivers"
+	"golang.org/x/sync/errgroup"
+	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
 
 const fileUploadTimeout = 5 * time.Minute
@@ -42,20 +46,42 @@ func TaskImport(tctx *TaskContext) error {
 		return nil
 	}
 
-	// TODO: ObjectStore driver must receive a Reader instead of the entire file buffered in memory.
-	contents, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.Errorf("Error reading file from remote URL err=%q", err)
-		return err
-	}
+	secondaryReader, pipe := io.Pipe()
+	mainReader := io.TeeReader(resp.Body, pipe)
 
-	_, err = osSess.SaveData(ctx, filePath, contents, nil, fileUploadTimeout)
-	if err != nil {
-		glog.Errorf("Error uploading file to object store filePath=%q err=%q", filePath, err)
+	eg, egCtx := errgroup.WithContext(ctx)
+	var probeData *ffprobe.ProbeData
+	eg.Go(func() error {
+		defer pipe.Close()
+		var err error
+		probeData, err = ffprobe.ProbeReader(egCtx, mainReader)
+		if err != nil {
+			glog.Errorf("Error probing file err=%q", err)
+			return err
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		// TODO: ObjectStore driver MUST receive a Reader instead of the entire file buffered in memory.
+		contents, err := ioutil.ReadAll(secondaryReader)
+		if err != nil {
+			glog.Errorf("Error reading file from remote URL err=%q", err)
+			return err
+		}
+
+		_, err = osSess.SaveData(egCtx, filePath, contents, nil, fileUploadTimeout)
+		if err != nil {
+			glog.Errorf("Error uploading file to object store filePath=%q err=%q", filePath, err)
+			return err
+		}
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
 		return err
 	}
 
 	// TODO: Register success on the API
-	glog.Info("Import task success! filePath=%q", filePath)
+	probeJson, _ := json.Marshal(probeData)
+	glog.Info("Import task success! filePath=%q probeData=%+v probeJson=%q", filePath, probeData, probeJson)
 	return nil
 }
