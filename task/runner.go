@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 	livepeerAPI "github.com/livepeer/go-api-client"
@@ -11,6 +12,8 @@ import (
 	"github.com/livepeer/livepeer-data/pkg/event"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
+
+const globalTaskTimeout = 10 * time.Minute
 
 type Runner interface {
 	Start() error
@@ -84,9 +87,17 @@ func (s *runner) handleTask(msg amqp.Delivery) error {
 		glog.Errorf("Unexpected AMQP message type=%q", evType)
 		return nil
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
+	defer cancel()
+	taskCtx, err := buildTaskContext(ctx, taskEvt.Task, s.lapi)
+	if err != nil {
+		return nilIfUnretriable(err)
+	}
+
 	switch taskEvt.Task.Type {
 	case "import":
-		return TaskImport(taskEvt.Task, s.lapi)
+		return TaskImport(taskCtx)
 	default:
 		glog.Errorf("Unknown task type=%q id=%s", taskEvt.Task.Type, taskEvt.Task.ID)
 		return nil
@@ -98,4 +109,36 @@ func (s *runner) Shutdown(ctx context.Context) error {
 		return errors.New("runner not started")
 	}
 	return s.consumer.Shutdown(ctx)
+}
+
+type TaskContext struct {
+	context.Context
+	data.TaskInfo
+	*livepeerAPI.Task
+	*livepeerAPI.Asset
+	*livepeerAPI.ObjectStore
+	lapi *livepeerAPI.Client
+}
+
+func buildTaskContext(ctx context.Context, info data.TaskInfo, lapi *livepeerAPI.Client) (*TaskContext, error) {
+	task, err := lapi.GetTask(info.ID)
+	if err != nil {
+		return nil, err
+	}
+	asset, err := lapi.GetAsset(task.ParentAssetID)
+	if err != nil {
+		return nil, err
+	}
+	objectStore, err := lapi.GetObjectStore(asset.ObjectStoreID)
+	if err != nil {
+		return nil, err
+	}
+	return &TaskContext{ctx, info, task, asset, objectStore, lapi}, nil
+}
+
+func nilIfUnretriable(err error) error {
+	if err == livepeerAPI.ErrNotExists {
+		return nil
+	}
+	return err
 }
