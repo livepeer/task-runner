@@ -84,6 +84,12 @@ func (s *runner) handleTask(msg amqp.Delivery) error {
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
+	err = s.lapi.UpdateTaskProgress(taskID, "Running", 0)
+	if err != nil {
+		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%s", taskType, taskID, err, IsUnretriable(err))
+		return NilIfUnretriable(err)
+	}
+
 	var result interface{}
 	switch taskType {
 	case "import":
