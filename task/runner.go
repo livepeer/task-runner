@@ -76,22 +76,10 @@ func (s *runner) Start() error {
 
 func (s *runner) handleTask(msg amqp.Delivery) error {
 	glog.Infof("Received task: %s", msg.Body)
-	parsedEvt, err := data.ParseEvent(msg.Body)
-	if err != nil {
-		glog.Errorf("Error parsing AMQP message: %w", err)
-		// Return nil err so the event is acked. We shouldn't retry malformed messages.
-		return nil
-	}
-	taskEvt, ok := parsedEvt.(*data.TaskEvent)
-	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTask {
-		glog.Errorf("Unexpected AMQP message type=%q", evType)
-		return nil
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
 	defer cancel()
-	taskCtx, err := buildTaskContext(ctx, taskEvt.Task, s.lapi)
-	if err != nil {
+	taskCtx, err := buildTaskContext(ctx, msg, s.lapi)
+	if taskCtx == nil {
 		return nilIfUnretriable(err)
 	}
 
@@ -99,23 +87,23 @@ func (s *runner) handleTask(msg amqp.Delivery) error {
 		handled bool
 		result  interface{}
 	)
-	switch taskEvt.Task.Type {
+	switch taskCtx.Task.Type {
 	case "import":
 		handled, result, err = TaskImport(taskCtx)
 	default:
-		glog.Errorf("Unknown task type=%q id=%s", taskEvt.Task.Type, taskEvt.Task.ID)
+		glog.Errorf("Unknown task type=%q id=%s", taskCtx.Task.Type, taskCtx.Task.ID)
 		return nil
 	}
 	// TODO: Register success or error on the API. Or rather, send an event with the task
 	// completion to the API
 	if !handled || err != nil {
 		if err == nil {
-			glog.Errorf("Task handler failed to process task id=%s", taskEvt.Task.ID)
+			glog.Errorf("Task handler failed to process task id=%s", taskCtx.Task.ID)
 			err = errors.New("unknown error")
 		}
 		return err
 	}
-	glog.Infof("Task handler completed task id=%s result=%+v", taskEvt.Task.ID, result)
+	glog.Infof("Task handler completed task id=%s result=%+v", taskCtx.Task.ID, result)
 	return nil
 }
 
@@ -135,7 +123,20 @@ type TaskContext struct {
 	lapi *livepeerAPI.Client
 }
 
-func buildTaskContext(ctx context.Context, info data.TaskInfo, lapi *livepeerAPI.Client) (*TaskContext, error) {
+func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.Client) (*TaskContext, error) {
+	parsedEvt, err := data.ParseEvent(msg.Body)
+	if err != nil {
+		glog.Errorf("Error parsing AMQP message: %w", err)
+		// Return nil err so the event is acked. We shouldn't retry malformed messages.
+		return nil, nil
+	}
+	taskEvt, ok := parsedEvt.(*data.TaskEvent)
+	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTask {
+		glog.Errorf("Unexpected AMQP message type=%q", evType)
+		return nil, nil
+	}
+	info := taskEvt.Task
+
 	task, err := lapi.GetTask(info.ID)
 	if err != nil {
 		return nil, err
