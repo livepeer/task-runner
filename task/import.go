@@ -2,6 +2,7 @@ package task
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"path"
@@ -15,7 +16,7 @@ import (
 
 const fileUploadTimeout = 5 * time.Minute
 
-func TaskImport(tctx *TaskContext) (bool, interface{}, error) {
+func TaskImport(tctx *TaskContext) (interface{}, error) {
 	var (
 		ctx    = tctx.Context
 		srcURL = tctx.Params.Import.URL
@@ -27,22 +28,20 @@ func TaskImport(tctx *TaskContext) (bool, interface{}, error) {
 	osDriver, err := drivers.ParseOSURL(osURL, true)
 	if err != nil {
 		glog.Errorf("Error parsing object store url=%s err=%q", osURL, err)
-		return true, nil, err
+		return nil, UnretriableError{err}
 	}
 	osSess := osDriver.NewSession("")
 
 	req, err := http.NewRequestWithContext(ctx, "GET", srcURL, nil)
 	if err != nil {
 		glog.Errorf("Error creating http request url=%s err=%q", srcURL, err)
-		return true, nil, err
+		return nil, UnretriableError{err}
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		glog.Errorf("Error downloading task input err=%v", err)
-		return true, nil, err
+		return nil, UnretriableError{fmt.Errorf("error on import request: %w", err)}
 	} else if resp.StatusCode >= 300 {
-		glog.Errorf("Status error downloading task input status=%d", resp.StatusCode)
-		return true, nil, err
+		return nil, UnretriableError{fmt.Errorf("bad status code from import request: %d %s", resp.StatusCode, resp.Status)}
 	}
 
 	secondaryReader, pipe := io.Pipe()
@@ -69,10 +68,10 @@ func TaskImport(tctx *TaskContext) (bool, interface{}, error) {
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		return false, nil, err
+		return nil, err
 	}
 
 	probeJson, _ := json.Marshal(probeData)
 	glog.Info("Import task success! filePath=%q probeData=%+v probeJson=%q", filePath, probeData, probeJson)
-	return true, probeData, nil
+	return probeData, nil
 }

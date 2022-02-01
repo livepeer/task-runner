@@ -75,35 +75,30 @@ func (s *runner) Start() error {
 }
 
 func (s *runner) handleTask(msg amqp.Delivery) error {
-	glog.Infof("Received task: %s", msg.Body)
 	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
 	defer cancel()
 	taskCtx, err := buildTaskContext(ctx, msg, s.lapi)
-	if taskCtx == nil {
-		return nilIfUnretriable(err)
+	if err != nil {
+		glog.Errorf("Error building task context err=%q unretriable=%s msg=%q", err, IsUnretriable(err), msg.Body)
+		return NilIfUnretriable(err)
 	}
+	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
-	var (
-		handled bool
-		result  interface{}
-	)
-	switch taskCtx.Task.Type {
+	var result interface{}
+	switch taskType {
 	case "import":
-		handled, result, err = TaskImport(taskCtx)
+		result, err = TaskImport(taskCtx)
 	default:
-		glog.Errorf("Unknown task type=%q id=%s", taskCtx.Task.Type, taskCtx.Task.ID)
+		glog.Errorf("Unknown task type=%q id=%s", taskType, taskID)
 		return nil
 	}
 	// TODO: Register success or error on the API. Or rather, send an event with the task
 	// completion to the API
-	if !handled || err != nil {
-		if err == nil {
-			glog.Errorf("Task handler failed to process task id=%s", taskCtx.Task.ID)
-			err = errors.New("unknown error")
-		}
-		return err
+	if err != nil {
+		glog.Errorf("Error executing task type=%q id=%s err=%q unretriable=%s", taskType, taskID, err, IsUnretriable(err))
+		return NilIfUnretriable(err)
 	}
-	glog.Infof("Task handler completed task id=%s result=%+v", taskCtx.Task.ID, result)
+	glog.Infof("Task handler completed task type=%q id=%s result=%+v", taskType, taskID, result)
 	return nil
 }
 
@@ -126,14 +121,11 @@ type TaskContext struct {
 func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.Client) (*TaskContext, error) {
 	parsedEvt, err := data.ParseEvent(msg.Body)
 	if err != nil {
-		glog.Errorf("Error parsing AMQP message: %w", err)
-		// Return nil err so the event is acked. We shouldn't retry malformed messages.
-		return nil, nil
+		return nil, UnretriableError{fmt.Errorf("error parsing AMQP message: %w", err)}
 	}
 	taskEvt, ok := parsedEvt.(*data.TaskEvent)
 	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTask {
-		glog.Errorf("Unexpected AMQP message type=%q", evType)
-		return nil, nil
+		return nil, UnretriableError{fmt.Errorf("unexpected AMQP message type=%q", evType)}
 	}
 	info := taskEvt.Task
 
@@ -150,11 +142,4 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 		return nil, err
 	}
 	return &TaskContext{ctx, info, task, asset, objectStore, lapi}, nil
-}
-
-func nilIfUnretriable(err error) error {
-	if err == livepeerAPI.ErrNotExists {
-		return nil
-	}
-	return err
 }
