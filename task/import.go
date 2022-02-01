@@ -62,14 +62,7 @@ func TaskImport(tctx *TaskContext) error {
 		return nil
 	})
 	eg.Go(func() error {
-		// TODO: ObjectStore driver MUST receive a Reader instead of the entire file buffered in memory.
-		contents, err := ioutil.ReadAll(secondaryReader)
-		if err != nil {
-			glog.Errorf("Error reading file from remote URL err=%q", err)
-			return err
-		}
-
-		_, err = osSess.SaveData(egCtx, filePath, contents, nil, fileUploadTimeout)
+		_, err = osSess.SaveData(egCtx, filePath, secondaryReader, nil, fileUploadTimeout)
 		if err != nil {
 			glog.Errorf("Error uploading file to object store filePath=%q err=%q", filePath, err)
 			return err
