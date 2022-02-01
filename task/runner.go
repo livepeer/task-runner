@@ -95,13 +95,28 @@ func (s *runner) handleTask(msg amqp.Delivery) error {
 		return nilIfUnretriable(err)
 	}
 
+	var (
+		handled bool
+		result  interface{}
+	)
 	switch taskEvt.Task.Type {
 	case "import":
-		return TaskImport(taskCtx)
+		handled, result, err = TaskImport(taskCtx)
 	default:
 		glog.Errorf("Unknown task type=%q id=%s", taskEvt.Task.Type, taskEvt.Task.ID)
 		return nil
 	}
+	// TODO: Register success or error on the API. Or rather, send an event with the task
+	// completion to the API
+	if !handled || err != nil {
+		if err == nil {
+			glog.Errorf("Task handler failed to process task id=%s", taskEvt.Task.ID)
+			err = errors.New("unknown error")
+		}
+		return err
+	}
+	glog.Infof("Task handler completed task id=%s result=%+v", taskEvt.Task.ID, result)
+	return nil
 }
 
 func (s *runner) Shutdown(ctx context.Context) error {
