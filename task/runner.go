@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -39,16 +40,16 @@ func NewRunner(opts RunnerOptions) Runner {
 type runner struct {
 	RunnerOptions
 
-	lapi     *livepeerAPI.Client
-	consumer event.AMQPConsumer
+	lapi *livepeerAPI.Client
+	amqp event.AMQPClient
 }
 
 func (s *runner) Start() error {
-	if s.consumer != nil {
+	if s.amqp != nil {
 		return errors.New("runner already started")
 	}
 
-	consumer, err := event.NewAMQPConsumer(s.AMQPUri, event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
+	amqp, err := event.NewAMQPClient(s.AMQPUri, event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
 		err := c.ExchangeDeclarePassive(s.APIExchangeName, "topic", true, false, false, false, nil)
 		if err != nil {
 			return fmt.Errorf("error ensuring API exchange exists: %w", err)
@@ -66,12 +67,12 @@ func (s *runner) Start() error {
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
-	err = consumer.Consume(s.QueueName, 3, s.handleTask)
+	err = amqp.Consume(s.QueueName, 3, s.handleTask)
 	if err != nil {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
 
-	s.consumer = consumer
+	s.amqp = amqp
 	return nil
 }
 
@@ -91,29 +92,41 @@ func (s *runner) handleTask(msg amqp.Delivery) error {
 		return NilIfUnretriable(err)
 	}
 
-	var result interface{}
-	switch taskType {
+	var output *data.TaskOutput
+	switch strings.ToLower(taskType) {
 	case "import":
+		var result interface{}
 		result, err = TaskImport(taskCtx)
+		if result != nil {
+			output = &data.TaskOutput{Import: result}
+		}
 	default:
 		glog.Errorf("Unknown task type=%q id=%s", taskType, taskID)
 		return nil
 	}
-	// TODO: Register success or error on the API. Or rather, send an event with the task
-	// completion to the API
-	if err != nil {
-		glog.Errorf("Error executing task type=%q id=%s err=%q unretriable=%s", taskType, taskID, err, IsUnretriable(err))
-		return NilIfUnretriable(err)
+	resultMsg := event.AMQPMessage{
+		Exchange: "todo",
+		Key:      "todo",
+		Body: data.NewTaskResultEvent(taskCtx.TaskInfo,
+			&data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)},
+			output),
 	}
-	glog.Infof("Task handler completed task type=%q id=%s result=%+v", taskType, taskID, result)
+	if amqpErr := s.amqp.Publish(ctx, resultMsg); amqpErr != nil {
+		glog.Errorf("Error sending AMQP task result event type=%q id=%s err=%q message=%+v", taskType, taskID, amqpErr, resultMsg)
+		return amqpErr
+	}
+	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%s", taskType, taskID, output, err, IsUnretriable(err))
+	// If we sent the AMQP event above with the result, we always want to return
+	// nil so the current message is acked from the queue. Any retries will be
+	// handled by the API.
 	return nil
 }
 
 func (s *runner) Shutdown(ctx context.Context) error {
-	if s.consumer == nil {
+	if s.amqp == nil {
 		return errors.New("runner not started")
 	}
-	return s.consumer.Shutdown(ctx)
+	return s.amqp.Shutdown(ctx)
 }
 
 type TaskContext struct {
@@ -153,6 +166,6 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 	if err != nil {
 		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
 	}
-	osSession := osDriver.NewSession("")
+	osSession := osDriver.NewSession(asset.PlaybackID)
 	return &TaskContext{ctx, info, task, asset, objectStore, osSession, lapi}, nil
 }
