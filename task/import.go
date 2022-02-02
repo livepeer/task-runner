@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/livepeer/go-livepeer/drivers"
 	"golang.org/x/sync/errgroup"
 	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
@@ -20,17 +19,10 @@ func TaskImport(tctx *TaskContext) (interface{}, error) {
 	var (
 		ctx    = tctx.Context
 		srcURL = tctx.Params.Import.URL
-		osURL  = tctx.ObjectStore.URL
+		osSess = tctx.osSession
 		// TODO: Re-evaluate this file path. Maybe omit the user ID and/or use a playbackID instead of asset ID (primary key)?
 		filePath = path.Join(tctx.Asset.UserID, tctx.Asset.ID, "video.mp4")
 	)
-
-	osDriver, err := drivers.ParseOSURL(osURL, true)
-	if err != nil {
-		glog.Errorf("Error parsing object store url=%s err=%q", osURL, err)
-		return nil, UnretriableError{err}
-	}
-	osSess := osDriver.NewSession("")
 
 	req, err := http.NewRequestWithContext(ctx, "GET", srcURL, nil)
 	if err != nil {

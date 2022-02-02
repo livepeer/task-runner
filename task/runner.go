@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/glog"
 	livepeerAPI "github.com/livepeer/go-api-client"
+	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -121,7 +122,8 @@ type TaskContext struct {
 	*livepeerAPI.Task
 	*livepeerAPI.Asset
 	*livepeerAPI.ObjectStore
-	lapi *livepeerAPI.Client
+	osSession drivers.OSSession
+	lapi      *livepeerAPI.Client
 }
 
 func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.Client) (*TaskContext, error) {
@@ -147,5 +149,10 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 	if err != nil {
 		return nil, err
 	}
-	return &TaskContext{ctx, info, task, asset, objectStore, lapi}, nil
+	osDriver, err := drivers.ParseOSURL(objectStore.URL, true)
+	if err != nil {
+		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
+	}
+	osSession := osDriver.NewSession("")
+	return &TaskContext{ctx, info, task, asset, objectStore, osSession, lapi}, nil
 }
