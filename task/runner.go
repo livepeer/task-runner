@@ -144,8 +144,8 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 	if err != nil {
 		return nil, UnretriableError{fmt.Errorf("error parsing AMQP message: %w", err)}
 	}
-	taskEvt, ok := parsedEvt.(*data.TaskEvent)
-	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTask {
+	taskEvt, ok := parsedEvt.(*data.TaskTriggerEvent)
+	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTaskTrigger {
 		return nil, UnretriableError{fmt.Errorf("unexpected AMQP message type=%q", evType)}
 	}
 	info := taskEvt.Task
