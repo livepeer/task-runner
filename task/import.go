@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/livepeer-data/pkg/data"
 	"golang.org/x/sync/errgroup"
 	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
@@ -20,7 +23,11 @@ const (
 	metadataFileName = "video.json"
 )
 
-func TaskImport(tctx *TaskContext) (interface{}, error) {
+type fileMetadata struct {
+	Ffprobe *ffprobe.ProbeData `json:"ffprobe"`
+}
+
+func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 	var (
 		ctx    = tctx.Context
 		srcURL = tctx.Params.Import.URL
@@ -35,7 +42,9 @@ func TaskImport(tctx *TaskContext) (interface{}, error) {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error on import request: %w", err)
-	} else if resp.StatusCode >= 300 {
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
 		err := fmt.Errorf("bad status code from import request: %d %s", resp.StatusCode, resp.Status)
 		if resp.StatusCode < 500 {
 			err = UnretriableError{err}
@@ -46,27 +55,18 @@ func TaskImport(tctx *TaskContext) (interface{}, error) {
 	secondaryReader, pipe := io.Pipe()
 	mainReader := io.TeeReader(resp.Body, pipe)
 
-	eg, egCtx := errgroup.WithContext(ctx)
 	var (
-		probeData                       *ffprobe.ProbeData
-		metadata                        []byte
-		metadataFilePath, videoFilePath string
+		eg, egCtx     = errgroup.WithContext(ctx)
+		videoFilePath string
+		metadata      *fileMetadata
 	)
 	eg.Go(func() error {
 		defer pipe.Close()
-		var err error
-		probeData, err = ffprobe.ProbeReader(egCtx, mainReader)
+		probeData, err := ffprobe.ProbeReader(egCtx, mainReader)
 		if err != nil {
 			return fmt.Errorf("error probing file: %w", err)
 		}
-		metadata, err = json.Marshal(map[string]interface{}{"ffprobe": probeData})
-		if err != nil {
-			return fmt.Errorf("error marshaling ffprobe data: %w", err)
-		}
-		metadataFilePath, err = osSess.SaveData(egCtx, metadataFileName, bytes.NewReader(metadata), nil, fileUploadTimeout)
-		if err != nil {
-			return fmt.Errorf("error saving metadata file: %w", err)
-		}
+		metadata = &fileMetadata{probeData}
 		return nil
 	})
 	eg.Go(func() error {
@@ -79,10 +79,38 @@ func TaskImport(tctx *TaskContext) (interface{}, error) {
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
-	// TODO: validate if video is really mp4 / supported format
+	rawMetadata, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling ffprobe data: %w", err)
+	}
+	metadataFilePath, err := osSess.SaveData(egCtx, metadataFileName, bytes.NewReader(rawMetadata), nil, fileUploadTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("error saving metadata file: %w", err)
+	}
 
-	glog.V(5).Info("Import task success! id=%s videoFilePath=%q metadataFilePath=%q metadata=%q",
-		tctx.Task.ID, videoFilePath, metadataFilePath, probeData, metadata)
-	// TODO: Return a typed/processed response here instead of raw probe output
-	return probeData, nil
+	// TODO: hash file
+	assetSpec, err := toAssetSpec(filename(req, resp), metadata.Ffprobe, nil)
+	if err != nil {
+		// TODO: Delete uploaded file
+		return nil, err
+	}
+
+	return &data.ImportTaskOutput{
+		VideoFilePath:    videoFilePath,
+		MetadataFilePath: metadataFilePath,
+		Metadata:         metadata,
+		AssetSpec:        assetSpec,
+	}, nil
+}
+
+func filename(req *http.Request, resp *http.Response) string {
+	contentDisposition := resp.Header.Get("Content-Disposition")
+	_, params, _ := mime.ParseMediaType(contentDisposition)
+	if filename, ok := params["filename"]; ok {
+		return filename
+	}
+	if base := path.Base(req.URL.Path); len(base) > 1 {
+		return base
+	}
+	return ""
 }

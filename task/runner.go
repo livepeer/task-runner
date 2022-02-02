@@ -96,10 +96,10 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 	var output *data.TaskOutput
 	switch strings.ToLower(taskType) {
 	case "import":
-		var result interface{}
-		result, err = TaskImport(taskCtx)
-		if result != nil {
-			output = &data.TaskOutput{Import: result}
+		var ito *data.ImportTaskOutput
+		ito, err = TaskImport(taskCtx)
+		if ito != nil {
+			output = &data.TaskOutput{Import: ito}
 		}
 	default:
 		glog.Errorf("Unknown task type=%q id=%s", taskType, taskID)
@@ -108,9 +108,7 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 	resultMsg := event.AMQPMessage{
 		Exchange: r.ExchangeName,
 		Key:      fmt.Sprintf("task.result.%s.%s", taskType, taskID),
-		Body: data.NewTaskResultEvent(taskCtx.TaskInfo,
-			&data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)},
-			output),
+		Body:     data.NewTaskResultEvent(taskCtx.TaskInfo, errorInfo(err), output),
 	}
 	if amqpErr := r.amqp.Publish(ctx, resultMsg); amqpErr != nil {
 		glog.Errorf("Error sending AMQP task result event type=%q id=%s err=%q message=%+v", taskType, taskID, amqpErr, resultMsg)
@@ -169,4 +167,11 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 	}
 	osSession := osDriver.NewSession(asset.PlaybackID)
 	return &TaskContext{ctx, info, task, asset, objectStore, osSession, lapi}, nil
+}
+
+func errorInfo(err error) *data.ErrorInfo {
+	if err == nil {
+		return nil
+	}
+	return &data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)}
 }
