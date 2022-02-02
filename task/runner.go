@@ -23,9 +23,10 @@ type Runner interface {
 }
 
 type RunnerOptions struct {
-	AMQPUri            string
-	APIExchangeName    string
-	QueueName          string
+	AMQPUri      string
+	ExchangeName string
+	QueueName    string
+
 	LivepeerAPIOptions livepeerAPI.ClientOptions
 }
 
@@ -44,21 +45,21 @@ type runner struct {
 	amqp event.AMQPClient
 }
 
-func (s *runner) Start() error {
-	if s.amqp != nil {
+func (r *runner) Start() error {
+	if r.amqp != nil {
 		return errors.New("runner already started")
 	}
 
-	amqp, err := event.NewAMQPClient(s.AMQPUri, event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
-		err := c.ExchangeDeclarePassive(s.APIExchangeName, "topic", true, false, false, false, nil)
+	amqp, err := event.NewAMQPClient(r.AMQPUri, event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
+		err := c.ExchangeDeclare(r.ExchangeName, "topic", true, false, false, false, nil)
 		if err != nil {
 			return fmt.Errorf("error ensuring API exchange exists: %w", err)
 		}
-		_, err = c.QueueDeclare(s.QueueName, true, false, false, false, nil)
+		_, err = c.QueueDeclare(r.QueueName, true, false, false, false, amqp.Table{"x-queue-type": "quorum"})
 		if err != nil {
 			return fmt.Errorf("error declaring task queue: %w", err)
 		}
-		err = c.QueueBind(s.QueueName, "task.#", s.APIExchangeName, false, nil)
+		err = c.QueueBind(r.QueueName, "task.trigger.#", r.ExchangeName, false, nil)
 		if err != nil {
 			return fmt.Errorf("error binding task queue: %w", err)
 		}
@@ -67,26 +68,26 @@ func (s *runner) Start() error {
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
-	err = amqp.Consume(s.QueueName, 3, s.handleTask)
+	err = amqp.Consume(r.QueueName, 3, r.handleTask)
 	if err != nil {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
 
-	s.amqp = amqp
+	r.amqp = amqp
 	return nil
 }
 
-func (s *runner) handleTask(msg amqp.Delivery) error {
+func (r *runner) handleTask(msg amqp.Delivery) error {
 	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
 	defer cancel()
-	taskCtx, err := buildTaskContext(ctx, msg, s.lapi)
+	taskCtx, err := buildTaskContext(ctx, msg, r.lapi)
 	if err != nil {
 		glog.Errorf("Error building task context err=%q unretriable=%s msg=%q", err, IsUnretriable(err), msg.Body)
 		return NilIfUnretriable(err)
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
-	err = s.lapi.UpdateTaskProgress(taskID, "Running", 0)
+	err = r.lapi.UpdateTaskProgress(taskID, "Running", 0)
 	if err != nil {
 		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%s", taskType, taskID, err, IsUnretriable(err))
 		return NilIfUnretriable(err)
@@ -105,20 +106,20 @@ func (s *runner) handleTask(msg amqp.Delivery) error {
 		return nil
 	}
 	resultMsg := event.AMQPMessage{
-		Exchange: "todo",
-		Key:      "todo",
+		Exchange: r.ExchangeName,
+		Key:      fmt.Sprintf("task.result.%s.%s", taskType, taskID),
 		Body: data.NewTaskResultEvent(taskCtx.TaskInfo,
 			&data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)},
 			output),
 	}
-	if amqpErr := s.amqp.Publish(ctx, resultMsg); amqpErr != nil {
+	if amqpErr := r.amqp.Publish(ctx, resultMsg); amqpErr != nil {
 		glog.Errorf("Error sending AMQP task result event type=%q id=%s err=%q message=%+v", taskType, taskID, amqpErr, resultMsg)
 		return amqpErr
 	}
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%s", taskType, taskID, output, err, IsUnretriable(err))
-	// If we sent the AMQP event above with the result, we always want to return
-	// nil so the current message is acked from the queue. Any retries will be
-	// handled by the API.
+	// Since we sent the AMQP task result event above we always want to return a
+	// nil error here. That is so the current message is acked from the queue as
+	// per the AMQPConsumer interface. Any retries will be handled by the API.
 	return nil
 }
 
