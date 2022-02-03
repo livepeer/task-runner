@@ -82,14 +82,14 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 	defer cancel()
 	taskCtx, err := buildTaskContext(ctx, msg, r.lapi)
 	if err != nil {
-		glog.Errorf("Error building task context err=%q unretriable=%s msg=%q", err, IsUnretriable(err), msg.Body)
+		glog.Errorf("Error building task context err=%q unretriable=%v msg=%q", err, IsUnretriable(err), msg.Body)
 		return NilIfUnretriable(err)
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
 	err = r.lapi.UpdateTaskProgress(taskID, "Running", 0)
 	if err != nil {
-		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%s", taskType, taskID, err, IsUnretriable(err))
+		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 		return NilIfUnretriable(err)
 	}
 
@@ -114,7 +114,7 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 		glog.Errorf("Error sending AMQP task result event type=%q id=%s err=%q message=%+v", taskType, taskID, amqpErr, resultMsg)
 		return amqpErr
 	}
-	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%s", taskType, taskID, output, err, IsUnretriable(err))
+	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", taskType, taskID, output, err, IsUnretriable(err))
 	// Since we sent the AMQP task result event above we always want to return a
 	// nil error here. That is so the current message is acked from the queue as
 	// per the AMQPConsumer interface. Any retries will be handled by the API.
