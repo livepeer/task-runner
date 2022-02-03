@@ -2,6 +2,7 @@ package task
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,10 +11,10 @@ import (
 	"path"
 	"time"
 
-	"github.com/golang/glog"
+	livepeerAPI "github.com/livepeer/go-api-client"
+	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"golang.org/x/sync/errgroup"
-	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
 
 const (
@@ -22,10 +23,6 @@ const (
 	videoFileName    = "video.mp4"
 	metadataFileName = "video.json"
 )
-
-type fileMetadata struct {
-	Ffprobe *ffprobe.ProbeData `json:"ffprobe"`
-}
 
 func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 	var (
@@ -55,21 +52,22 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 	secondaryReader, pipe := io.Pipe()
 	mainReader := io.TeeReader(resp.Body, pipe)
 
+	eg, egCtx := errgroup.WithContext(ctx)
 	var (
-		eg, egCtx     = errgroup.WithContext(ctx)
-		videoFilePath string
-		metadata      *fileMetadata
+		videoFilePath, metadataFilePath string
+		assetSpec                       *livepeerAPI.AssetSpec
+		metadata                        *FileMetadata
 	)
-	eg.Go(func() error {
-		defer pipe.Close()
-		probeData, err := ffprobe.ProbeReader(egCtx, mainReader)
+	eg.Go(func() (err error) {
+		assetSpec, metadata, err = Probe(egCtx, filename(req, resp), mainReader)
+		pipe.CloseWithError(err)
 		if err != nil {
-			return fmt.Errorf("error probing file: %w", err)
+			return err
 		}
-		metadata = &fileMetadata{probeData}
-		return nil
+		metadataFilePath, err = saveMetadataFile(egCtx, osSess, metadata)
+		return err
 	})
-	eg.Go(func() error {
+	eg.Go(func() (err error) {
 		videoFilePath, err = osSess.SaveData(egCtx, videoFileName, secondaryReader, nil, fileUploadTimeout)
 		if err != nil {
 			return fmt.Errorf("error uploading file=%q to object store: %w", videoFileName, err)
@@ -77,24 +75,9 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
+		// TODO: Delete the uploaded file
 		return nil, err
 	}
-	rawMetadata, err := json.Marshal(metadata)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling ffprobe data: %w", err)
-	}
-	metadataFilePath, err := osSess.SaveData(egCtx, metadataFileName, bytes.NewReader(rawMetadata), nil, fileUploadTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("error saving metadata file: %w", err)
-	}
-
-	// TODO: hash file
-	assetSpec, err := toAssetSpec(filename(req, resp), metadata.Ffprobe, nil)
-	if err != nil {
-		// TODO: Delete uploaded file
-		return nil, err
-	}
-
 	return &data.ImportTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
@@ -113,4 +96,16 @@ func filename(req *http.Request, resp *http.Response) string {
 		return base
 	}
 	return ""
+}
+
+func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, metadata *FileMetadata) (string, error) {
+	raw, err := json.Marshal(metadata)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling file metadat: %w", err)
+	}
+	path, err := osSess.SaveData(ctx, metadataFileName, bytes.NewReader(raw), nil, fileUploadTimeout)
+	if err != nil {
+		return "", fmt.Errorf("error saving metadata file: %w", err)
+	}
+	return path, nil
 }

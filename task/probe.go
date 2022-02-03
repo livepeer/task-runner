@@ -1,7 +1,9 @@
 package task
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"path"
 	"strconv"
 	"strings"
@@ -15,6 +17,35 @@ var (
 	supportedVideoCodecs = map[string]bool{"h264": true}
 	supportedAudioCodecs = map[string]bool{"h264": true}
 )
+
+type FileMetadata struct {
+	MD5     string             `json:"md5"`
+	SHA256  string             `json:"sha256"`
+	Ffprobe *ffprobe.ProbeData `json:"ffprobe"`
+}
+
+func Probe(ctx context.Context, filename string, data io.Reader) (*livepeerAPI.AssetSpec, *FileMetadata, error) {
+	hasher := NewReadHasher(data)
+	probeData, err := ffprobe.ProbeReader(ctx, hasher)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error probing file: %w", err)
+	}
+	if _, err := hasher.FinishReader(); err != nil {
+		return nil, nil, fmt.Errorf("error reading input: %w", err)
+	}
+	md5, sha256 := hasher.MD5(), hasher.SHA256()
+	assetSpec, err := toAssetSpec(filename, probeData, []livepeerAPI.AssetHash{
+		{Hash: md5, Algorithm: "md5"},
+		{Hash: sha256, Algorithm: "sha256"}})
+	if err != nil {
+		return nil, nil, fmt.Errorf("error processing ffprobe output: %w", err)
+	}
+	return assetSpec, &FileMetadata{
+		MD5:     md5,
+		SHA256:  sha256,
+		Ffprobe: probeData,
+	}, nil
+}
 
 func toAssetSpec(filename string, probeData *ffprobe.ProbeData, hash []livepeerAPI.AssetHash) (*livepeerAPI.AssetSpec, error) {
 	if filename == "" && probeData.Format.Filename != "pipe:" {
