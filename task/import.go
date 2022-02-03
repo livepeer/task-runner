@@ -30,27 +30,14 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		srcURL = tctx.Params.Import.URL
 		osSess = tctx.osSession
 	)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", srcURL, nil)
+	filename, contents, err := getFile(ctx, srcURL)
 	if err != nil {
-		glog.Errorf("Error creating http request url=%s err=%q", srcURL, err)
-		return nil, UnretriableError{err}
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error on import request: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		err := fmt.Errorf("bad status code from import request: %d %s", resp.StatusCode, resp.Status)
-		if resp.StatusCode < 500 {
-			err = UnretriableError{err}
-		}
 		return nil, err
 	}
+	defer contents.Close()
 
 	secondaryReader, pipe := io.Pipe()
-	mainReader := io.TeeReader(resp.Body, pipe)
+	mainReader := io.TeeReader(contents, pipe)
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	var (
@@ -59,7 +46,7 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		metadata                        *FileMetadata
 	)
 	eg.Go(func() (err error) {
-		assetSpec, metadata, err = Probe(egCtx, filename(req, resp), mainReader)
+		assetSpec, metadata, err = Probe(egCtx, filename, mainReader)
 		pipe.CloseWithError(err)
 		if err != nil {
 			return err
@@ -84,6 +71,26 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		Metadata:         metadata,
 		AssetSpec:        assetSpec,
 	}, nil
+}
+
+func getFile(ctx context.Context, url string) (string, io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", nil, UnretriableError{fmt.Errorf("error creating http request: %w", err)}
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", nil, fmt.Errorf("error on import request: %w", err)
+	}
+	if resp.StatusCode >= 300 {
+		resp.Body.Close()
+		err := fmt.Errorf("bad status code from import request: %d %s", resp.StatusCode, resp.Status)
+		if resp.StatusCode < 500 {
+			err = UnretriableError{err}
+		}
+		return "", nil, err
+	}
+	return filename(req, resp), resp.Body, nil
 }
 
 func filename(req *http.Request, resp *http.Response) string {
