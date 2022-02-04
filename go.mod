@@ -9,6 +9,7 @@ require (
 	github.com/livepeer/livepeer-data v0.4.8
 	github.com/peterbourgon/ff v1.7.1
 	github.com/rabbitmq/amqp091-go v1.1.0
+	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/vansante/go-ffprobe.v2 v2.0.3
 )
