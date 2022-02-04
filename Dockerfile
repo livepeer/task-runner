@@ -1,8 +1,13 @@
-FROM golang:1.16-alpine as builder
-
-RUN apk add --update make
+FROM golang:1.16-stretch as builder
 
 WORKDIR /app
+ENV PKG_CONFIG_PATH /root/compiled/lib/pkgconfig
+
+RUN apt update \
+  && apt install -y build-essential pkg-config autoconf gnutls-dev git curl
+
+RUN curl -s https://raw.githubusercontent.com/livepeer/go-livepeer/5da8ff8e521c15e5828fb9dfa619daf91a091fd0/install_ffmpeg.sh \
+  | bash -
 
 ENV GOFLAGS "-mod=readonly"
 
@@ -17,10 +22,17 @@ COPY . .
 
 RUN make "version=$version"
 
-FROM alpine
+FROM debian:stretch-slim
+
+RUN apt update && \
+  apt install -y ffmpeg && \
+  apt clean && apt autoclean
+RUN ffmpeg -version
 
 WORKDIR /app
+ENV PKG_CONFIG_PATH /root/compiled/lib/pkgconfig
 
+COPY --from=builder /root/compiled /root/compiled/
 COPY --from=builder /app/build/* .
 
 ENTRYPOINT [ "./task-runner" ]
