@@ -50,7 +50,7 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		if err != nil {
 			return err
 		}
-		metadataFilePath, err = saveMetadataFile(egCtx, osSess, metadata)
+		metadataFilePath, err = saveMetadataFile(egCtx, osSess, playbackID, metadata)
 		return err
 	})
 	eg.Go(func() (err error) {
@@ -118,12 +118,13 @@ func filename(req *http.Request, resp *http.Response) string {
 	return ""
 }
 
-func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, metadata *FileMetadata) (string, error) {
+func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata *FileMetadata) (string, error) {
+	fullPath := path.Join(playbackID, metadataFileName)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return "", fmt.Errorf("error marshaling file metadat: %w", err)
 	}
-	path, err := osSess.SaveData(ctx, metadataFileName, bytes.NewReader(raw), nil, fileUploadTimeout)
+	path, err := osSess.SaveData(ctx, fullPath, bytes.NewReader(raw), nil, fileUploadTimeout)
 	if err != nil {
 		return "", fmt.Errorf("error saving metadata file: %w", err)
 	}

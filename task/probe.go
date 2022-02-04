@@ -34,8 +34,8 @@ func Probe(ctx context.Context, filename string, data io.Reader) (*FileMetadata,
 	if _, err := hasher.FinishReader(); err != nil {
 		return nil, fmt.Errorf("error reading input: %w", err)
 	}
-	md5, sha256 := hasher.MD5(), hasher.SHA256()
-	assetSpec, err := toAssetSpec(filename, probeData, []livepeerAPI.AssetHash{
+	size, md5, sha256 := hasher.Size(), hasher.MD5(), hasher.SHA256()
+	assetSpec, err := toAssetSpec(filename, probeData, size, []livepeerAPI.AssetHash{
 		{Hash: md5, Algorithm: "md5"},
 		{Hash: sha256, Algorithm: "sha256"}})
 	if err != nil {
@@ -49,7 +49,7 @@ func Probe(ctx context.Context, filename string, data io.Reader) (*FileMetadata,
 	}, nil
 }
 
-func toAssetSpec(filename string, probeData *ffprobe.ProbeData, hash []livepeerAPI.AssetHash) (*livepeerAPI.AssetSpec, error) {
+func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size int64, hash []livepeerAPI.AssetHash) (*livepeerAPI.AssetSpec, error) {
 	if filename == "" && probeData.Format.Filename != "pipe:" {
 		filename = probeData.Format.Filename
 	}
@@ -60,10 +60,6 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, hash []livepeerA
 	bitrate, err := strconv.ParseFloat(probeData.Format.BitRate, 64)
 	if probeData.Format.BitRate != "" && err != nil {
 		return nil, fmt.Errorf("error parsing file bitrate: %w", err)
-	}
-	size, err := strconv.ParseInt(probeData.Format.Size, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing file size: %w", err)
 	}
 	spec := &livepeerAPI.AssetSpec{
 		Name: filename,
