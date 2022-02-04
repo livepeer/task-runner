@@ -15,7 +15,7 @@ import (
 var (
 	supportedFormats     = []string{"mp4", "mov"}
 	supportedVideoCodecs = map[string]bool{"h264": true}
-	supportedAudioCodecs = map[string]bool{"h264": true}
+	supportedAudioCodecs = map[string]bool{"aac": true}
 )
 
 type FileMetadata struct {
