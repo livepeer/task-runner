@@ -87,12 +87,13 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
-	err = r.lapi.UpdateTaskProgress(taskID, "Running", 0)
+	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
 	if err != nil {
 		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 		return NilIfUnretriable(err)
 	}
 
+	glog.V(10).Infof(`Starting task type=%s playbackId=%s params="%+v"`, taskType, taskCtx.PlaybackID, taskCtx.Params)
 	var output *data.TaskOutput
 	switch strings.ToLower(taskType) {
 	case "import":
