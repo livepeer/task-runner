@@ -11,7 +11,6 @@ import (
 	"path"
 	"time"
 
-	livepeerAPI "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"golang.org/x/sync/errgroup"
@@ -42,11 +41,10 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 	eg, egCtx := errgroup.WithContext(ctx)
 	var (
 		videoFilePath, metadataFilePath string
-		assetSpec                       *livepeerAPI.AssetSpec
 		metadata                        *FileMetadata
 	)
 	eg.Go(func() (err error) {
-		assetSpec, metadata, err = Probe(egCtx, filename, mainReader)
+		metadata, err = Probe(egCtx, filename, mainReader)
 		pipe.CloseWithError(err)
 		if err != nil {
 			return err
@@ -69,7 +67,7 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
 		Metadata:         metadata,
-		AssetSpec:        assetSpec,
+		AssetSpec:        metadata.AssetSpec,
 	}, nil
 }
 

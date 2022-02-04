@@ -135,7 +135,6 @@ type TaskContext struct {
 	*livepeerAPI.Asset
 	*livepeerAPI.ObjectStore
 	osSession drivers.OSSession
-	lapi      *livepeerAPI.Client
 }
 
 func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.Client) (*TaskContext, error) {
@@ -166,7 +165,7 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
 	}
 	osSession := osDriver.NewSession(asset.PlaybackID)
-	return &TaskContext{ctx, info, task, asset, objectStore, osSession, lapi}, nil
+	return &TaskContext{ctx, info, task, asset, objectStore, osSession}, nil
 }
 
 func errorInfo(err error) *data.ErrorInfo {
