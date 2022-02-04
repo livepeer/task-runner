@@ -14,8 +14,29 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v1
 
+      - name: Cache ffmpeg
+        id: cache-ffmpeg
+        uses: actions/cache@v2.1.5
+        with:
+          path: ~/compiled
+          key: ${{ runner.os }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-ffmpeg
+
+      - name: Install ffmpeg
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          curl -s \
+            https://raw.githubusercontent.com/livepeer/go-livepeer/5da8ff8e521c15e5828fb9dfa619daf91a091fd0/install_ffmpeg.sh \
+            | bash -
+
       - name: Download dependencies
         run: go mod download
 
       - name: Build
-        run: make
+        env:
+          PKG_CONFIG_PATH: ~/compiled/lib/pkgconfig
+        run: |
+          echo $PKG_CONFIG_PATH
+          ls $PKG_CONFIG_PATH
+          make
