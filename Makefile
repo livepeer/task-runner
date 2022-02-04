@@ -21,5 +21,11 @@ docker:
 docker_run: docker
 	docker run -it --rm --name=$(cmd) --network=host $(dockerimg) $(args)
 
+docker_push:
+	for TAG in $(tags) ; \
+	do \
+		docker push $(dockerimg):$$TAG ; \
+	done;
+
 docker_ci:
 	docker buildx build --push --platform linux/amd64,linux/arm64 $(foreach tag,$(tags),-t $(dockerimg):$(tag)) --build-arg version=$(version) .

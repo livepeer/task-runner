@@ -17,8 +17,8 @@ const (
 	endpoint        = "https://" + host
 	bucket          = "test-victor"
 	region          = "us-east-1"
-	accessKey       = "B5E07531AB602CA501F2"
-	accessKeySecret = "mBAMcxMhoudDXjPlpaTT0ujuND73CaWYIbCEZNqV"
+	accessKey       = "REDACTED"
+	accessKeySecret = "REDACTED"
 
 	osPath = "s3+https://" + accessKey + ":" + accessKeySecret + "@" + host + "/" + region + "/" + bucket
 )
@@ -37,7 +37,7 @@ func TestImport(t *testing.T) {
 	os, err := drivers.ParseOSURL(osPath, true)
 	assert.NoError(err)
 
-	result, err := TaskImportOrDirectUpload(&TaskContext{
+	result, err := TaskImport(&TaskContext{
 		Context:   ctx,
 		Task:      task,
 		osSession: os.NewSession("test_import_bbb"),
