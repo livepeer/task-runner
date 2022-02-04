@@ -22,9 +22,14 @@ jobs:
       - name: Tags
         id: tags
         uses: livepeer/action-gh-release-tags@v0
+        with:
+          tags-prefix: amd64
 
-      - name: docker build & push
-        run: make docker_ci "tags=${{ steps.tags.outputs.tags }}"
+      - name: docker build
+        run: make docker "tags=${{ steps.tags.outputs.tags }}"
+
+      - name: docker push
+        run: make docker_push "tags=${{ steps.tags.outputs.tags }}"
 
       - name: notify livepeer-infra
         run: curl -X POST https://holy-bread-207a.livepeer.workers.dev
