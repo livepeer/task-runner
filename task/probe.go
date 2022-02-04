@@ -67,6 +67,7 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, hash []livepeerA
 	}
 	spec := &livepeerAPI.AssetSpec{
 		Name: filename,
+		Type: "video",
 		Hash: hash,
 		Size: size,
 		VideoSpec: &livepeerAPI.AssetVideoSpec{
