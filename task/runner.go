@@ -95,9 +95,9 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 
 	var output *data.TaskOutput
 	switch strings.ToLower(taskType) {
-	case "import", "directUpload":
+	case "import":
 		var ito *data.ImportTaskOutput
-		ito, err = TaskImportOrDirectUpload(taskCtx)
+		ito, err = TaskImport(taskCtx)
 		if ito != nil {
 			output = &data.TaskOutput{Import: ito}
 		}

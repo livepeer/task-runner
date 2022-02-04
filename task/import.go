@@ -23,11 +23,11 @@ const (
 	metadataFileName  = "video.json"
 )
 
-func TaskImportOrDirectUpload(tctx *TaskContext) (*data.ImportTaskOutput, error) {
+func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 	var (
 		ctx        = tctx.Context
 		playbackID = tctx.Asset.PlaybackID
-		params     = tctx.Task.Params
+		params     = *tctx.Task.Params.Import
 		osSess     = tctx.osSession
 	)
 	filename, contents, err := getFile(ctx, osSess, params)
@@ -73,21 +73,21 @@ func TaskImportOrDirectUpload(tctx *TaskContext) (*data.ImportTaskOutput, error)
 	}, nil
 }
 
-func getFile(ctx context.Context, osSess drivers.OSSession, params livepeerAPI.TaskParams) (string, io.ReadCloser, error) {
-	if params.DirectUpload != nil {
+func getFile(ctx context.Context, osSess drivers.OSSession, params livepeerAPI.ImportTaskParams) (string, io.ReadCloser, error) {
+	if upedObjKey := params.UploadedObjectKey; upedObjKey != "" {
 		// TODO: We should simply "move" the file in case of direct import since we
 		// know the file is already in the object store. Independently, we also have
 		// to delete the uploaded file after copying to the new location.
-		fileInfo, err := osSess.ReadData(ctx, params.DirectUpload.ObjectKey)
+		fileInfo, err := osSess.ReadData(ctx, upedObjKey)
 		if err != nil {
 			return "", nil, UnretriableError{fmt.Errorf("error reading direct uploaded file: %w", err)}
 		}
 		return fileInfo.FileInfo.Name, fileInfo.Body, nil
-	} else if params.Import == nil {
-		return "", nil, fmt.Errorf("no import or direct upload params: %+v", params)
+	} else if params.URL == "" {
+		return "", nil, fmt.Errorf("no import URL or direct upload object key: %+v", params)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", params.Import.URL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", params.URL, nil)
 	if err != nil {
 		return "", nil, UnretriableError{fmt.Errorf("error creating http request: %w", err)}
 	}

@@ -62,7 +62,7 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, hash []livepeerA
 		return nil, fmt.Errorf("error parsing file bitrate: %w", err)
 	}
 	size, err := strconv.ParseInt(probeData.Format.Size, 10, 64)
-	if probeData.Format.Size != "" && err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("error parsing file size: %w", err)
 	}
 	spec := &livepeerAPI.AssetSpec{
