@@ -11,6 +11,7 @@ import (
 	"path"
 	"time"
 
+	livepeerAPI "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"golang.org/x/sync/errgroup"
@@ -18,18 +19,18 @@ import (
 
 const (
 	fileUploadTimeout = 5 * time.Minute
-	// TODO: decide file name
-	videoFileName    = "video.mp4"
-	metadataFileName = "video.json"
+	videoFileName     = "video"
+	metadataFileName  = "video.json"
 )
 
-func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
+func TaskImportOrDirectUpload(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 	var (
-		ctx    = tctx.Context
-		srcURL = tctx.Params.Import.URL
-		osSess = tctx.osSession
+		ctx        = tctx.Context
+		playbackID = tctx.Asset.PlaybackID
+		params     = tctx.Task.Params
+		osSess     = tctx.osSession
 	)
-	filename, contents, err := getFile(ctx, srcURL)
+	filename, contents, err := getFile(ctx, osSess, params)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +54,8 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		return err
 	})
 	eg.Go(func() (err error) {
-		videoFilePath, err = osSess.SaveData(egCtx, videoFileName, secondaryReader, nil, fileUploadTimeout)
+		fullPath := path.Join(playbackID, videoFileName)
+		videoFilePath, err = osSess.SaveData(egCtx, fullPath, secondaryReader, nil, fileUploadTimeout)
 		if err != nil {
 			return fmt.Errorf("error uploading file=%q to object store: %w", videoFileName, err)
 		}
@@ -71,8 +73,21 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 	}, nil
 }
 
-func getFile(ctx context.Context, url string) (string, io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+func getFile(ctx context.Context, osSess drivers.OSSession, params livepeerAPI.TaskParams) (string, io.ReadCloser, error) {
+	if params.DirectUpload != nil {
+		// TODO: We should simply "move" the file in case of direct import since we
+		// know the file is already in the object store. Independently, we also have
+		// to delete the uploaded file after copying to the new location.
+		fileInfo, err := osSess.ReadData(ctx, params.DirectUpload.ObjectKey)
+		if err != nil {
+			return "", nil, UnretriableError{fmt.Errorf("error reading direct uploaded file: %w", err)}
+		}
+		return fileInfo.FileInfo.Name, fileInfo.Body, nil
+	} else if params.Import == nil {
+		return "", nil, fmt.Errorf("no import or direct upload params: %+v", params)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", params.Import.URL, nil)
 	if err != nil {
 		return "", nil, UnretriableError{fmt.Errorf("error creating http request: %w", err)}
 	}

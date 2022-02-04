@@ -95,9 +95,9 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 
 	var output *data.TaskOutput
 	switch strings.ToLower(taskType) {
-	case "import":
+	case "import", "directUpload":
 		var ito *data.ImportTaskOutput
-		ito, err = TaskImport(taskCtx)
+		ito, err = TaskImportOrDirectUpload(taskCtx)
 		if ito != nil {
 			output = &data.TaskOutput{Import: ito}
 		}
@@ -164,7 +164,7 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 	if err != nil {
 		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
 	}
-	osSession := osDriver.NewSession(asset.PlaybackID)
+	osSession := osDriver.NewSession("")
 	return &TaskContext{ctx, info, task, asset, objectStore, osSession}, nil
 }
 

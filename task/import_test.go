@@ -37,7 +37,7 @@ func TestImport(t *testing.T) {
 	os, err := drivers.ParseOSURL(osPath, true)
 	assert.NoError(err)
 
-	result, err := TaskImport(&TaskContext{
+	result, err := TaskImportOrDirectUpload(&TaskContext{
 		Context:   ctx,
 		Task:      task,
 		osSession: os.NewSession("test_import_bbb"),
