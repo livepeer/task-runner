@@ -13,3 +13,9 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/vansante/go-ffprobe.v2 v2.0.3
 )
+
+replace (
+	github.com/livepeer/go-api-client => ../go-api-client
+	github.com/livepeer/go-livepeer => ../go-livepeer
+	github.com/livepeer/livepeer-data => ../livepeer-data
+)
