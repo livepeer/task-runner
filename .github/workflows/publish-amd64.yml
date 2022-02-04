@@ -1,7 +1,6 @@
+# This publishes only the regular amd64 image to DockerHub. Only for a quicker
+# iteration since the cross-architecture build is really slow.
 name: Publish AMD64 image
-description: |
-  Publish the amd64 image to DockerHub. This is only for a quicker iteration
-  since the cross-architecture build is really slow.
 on: push
 
 jobs:
