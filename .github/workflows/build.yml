@@ -34,9 +34,6 @@ jobs:
         run: go mod download
 
       - name: Build
-        env:
-          PKG_CONFIG_PATH: ~/compiled/lib/pkgconfig
         run: |
-          echo $PKG_CONFIG_PATH
-          ls $PKG_CONFIG_PATH
+          export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig
           make
