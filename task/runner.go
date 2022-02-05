@@ -21,6 +21,16 @@ const (
 	maxConcurrentTasks    = 3
 )
 
+type TaskContext struct {
+	context.Context
+	data.TaskInfo
+	*livepeerAPI.Task
+	*livepeerAPI.Asset
+	*livepeerAPI.ObjectStore
+	osSession drivers.OSSession
+	lapi      *livepeerAPI.Client
+}
+
 type TaskHandler func(tctx *TaskContext) (*data.TaskOutput, error)
 
 type Runner interface {
@@ -95,7 +105,7 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
 	defer cancel()
-	taskCtx, err := buildTaskContext(ctx, msg, r.lapi)
+	taskCtx, err := r.buildTaskContext(ctx, msg)
 	if err != nil {
 		glog.Errorf("Error building task context err=%q unretriable=%v msg=%q", err, IsUnretriable(err), msg.Body)
 		return NilIfUnretriable(err)
@@ -109,20 +119,45 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 		err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
 		if err != nil {
 			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
-			return NilIfUnretriable(err)
+			// execute the task anyway
 		}
-
-		glog.V(10).Infof(`Starting task type=%s playbackId=%s params="%+v"`, taskType, taskCtx.PlaybackID, taskCtx.Params)
+		glog.Infof(`Starting task type=%q id=%s assetId=%s params="%+v"`, taskType, taskID, taskCtx.Asset.ID, taskCtx.Params)
 		output, err = handler(taskCtx)
 	}
-	if amqpErr := r.publishTaskResult(ctx, taskCtx.TaskInfo, output, err); amqpErr != nil {
-		return amqpErr
-	}
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", taskType, taskID, output, err, IsUnretriable(err))
-	// Since we sent the AMQP task result event above we always want to return a
-	// nil error here. That is so the current message is acked from the queue as
-	// per the AMQPConsumer interface. Any retries will be handled by the API.
-	return nil
+	// return the error directly so that if publishing the result fails we nack the message to try again
+	return r.publishTaskResult(ctx, taskCtx.TaskInfo, output, err)
+}
+
+func (r *runner) buildTaskContext(ctx context.Context, msg amqp.Delivery) (*TaskContext, error) {
+	parsedEvt, err := data.ParseEvent(msg.Body)
+	if err != nil {
+		return nil, UnretriableError{fmt.Errorf("error parsing AMQP message: %w", err)}
+	}
+	taskEvt, ok := parsedEvt.(*data.TaskTriggerEvent)
+	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTaskTrigger {
+		return nil, UnretriableError{fmt.Errorf("unexpected AMQP message type=%q", evType)}
+	}
+	info := taskEvt.Task
+
+	task, err := r.lapi.GetTask(info.ID)
+	if err != nil {
+		return nil, err
+	}
+	asset, err := r.lapi.GetAsset(task.ParentAssetID)
+	if err != nil {
+		return nil, err
+	}
+	objectStore, err := r.lapi.GetObjectStore(asset.ObjectStoreID)
+	if err != nil {
+		return nil, err
+	}
+	osDriver, err := drivers.ParseOSURL(objectStore.URL, true)
+	if err != nil {
+		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
+	}
+	osSession := osDriver.NewSession("")
+	return &TaskContext{ctx, info, task, asset, objectStore, osSession, r.lapi}, nil
 }
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {
@@ -143,47 +178,6 @@ func (r *runner) Shutdown(ctx context.Context) error {
 		return errors.New("runner not started")
 	}
 	return r.amqp.Shutdown(ctx)
-}
-
-type TaskContext struct {
-	context.Context
-	data.TaskInfo
-	*livepeerAPI.Task
-	*livepeerAPI.Asset
-	*livepeerAPI.ObjectStore
-	osSession drivers.OSSession
-	lapi      *livepeerAPI.Client
-}
-
-func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.Client) (*TaskContext, error) {
-	parsedEvt, err := data.ParseEvent(msg.Body)
-	if err != nil {
-		return nil, UnretriableError{fmt.Errorf("error parsing AMQP message: %w", err)}
-	}
-	taskEvt, ok := parsedEvt.(*data.TaskTriggerEvent)
-	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTaskTrigger {
-		return nil, UnretriableError{fmt.Errorf("unexpected AMQP message type=%q", evType)}
-	}
-	info := taskEvt.Task
-
-	task, err := lapi.GetTask(info.ID)
-	if err != nil {
-		return nil, err
-	}
-	asset, err := lapi.GetAsset(task.ParentAssetID)
-	if err != nil {
-		return nil, err
-	}
-	objectStore, err := lapi.GetObjectStore(asset.ObjectStoreID)
-	if err != nil {
-		return nil, err
-	}
-	osDriver, err := drivers.ParseOSURL(objectStore.URL, true)
-	if err != nil {
-		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
-	}
-	osSession := osDriver.NewSession("")
-	return &TaskContext{ctx, info, task, asset, objectStore, osSession, lapi}, nil
 }
 
 func errorInfo(err error) *data.ErrorInfo {
