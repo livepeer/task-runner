@@ -15,7 +15,11 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const globalTaskTimeout = 10 * time.Minute
+const (
+	globalTaskTimeout     = 10 * time.Minute
+	minTaskProcessingTime = 5 * time.Second
+	maxConcurrentTasks    = 3
+)
 
 type Runner interface {
 	Start() error
@@ -68,7 +72,7 @@ func (r *runner) Start() error {
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
-	err = amqp.Consume(r.QueueName, 3, r.handleTask)
+	err = amqp.Consume(r.QueueName, maxConcurrentTasks, r.handleTask)
 	if err != nil {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
@@ -78,6 +82,9 @@ func (r *runner) Start() error {
 }
 
 func (r *runner) handleTask(msg amqp.Delivery) error {
+	// rate-limit task processing time to limit load
+	defer blockUntil(time.After(minTaskProcessingTime))
+
 	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
 	defer cancel()
 	taskCtx, err := buildTaskContext(ctx, msg, r.lapi)
@@ -136,6 +143,7 @@ type TaskContext struct {
 	*livepeerAPI.Asset
 	*livepeerAPI.ObjectStore
 	osSession drivers.OSSession
+	lapi      *livepeerAPI.Client
 }
 
 func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.Client) (*TaskContext, error) {
@@ -166,7 +174,7 @@ func buildTaskContext(ctx context.Context, msg amqp.Delivery, lapi *livepeerAPI.
 		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
 	}
 	osSession := osDriver.NewSession("")
-	return &TaskContext{ctx, info, task, asset, objectStore, osSession}, nil
+	return &TaskContext{ctx, info, task, asset, objectStore, osSession, lapi}, nil
 }
 
 func errorInfo(err error) *data.ErrorInfo {
@@ -175,3 +183,5 @@ func errorInfo(err error) *data.ErrorInfo {
 	}
 	return &data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)}
 }
+
+func blockUntil(t <-chan time.Time) { <-t }
