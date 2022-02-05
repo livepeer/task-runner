@@ -161,16 +161,27 @@ func (r *runner) buildTaskContext(ctx context.Context, msg amqp.Delivery) (*Task
 }
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {
+	resultCh := make(chan event.PublishResult, 1)
 	msg := event.AMQPMessage{
-		Exchange: r.ExchangeName,
-		Key:      fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
-		Body:     data.NewTaskResultEvent(task, errorInfo(err), output),
+		Exchange:   r.ExchangeName,
+		Key:        fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
+		Body:       data.NewTaskResultEvent(task, errorInfo(err), output),
+		ResultChan: resultCh,
 	}
 	if err := r.amqp.Publish(ctx, msg); err != nil {
-		glog.Errorf("Error sending AMQP task result event type=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
+		glog.Errorf("Error enqueueing AMQP publish of task result event taskType=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
 		return err
 	}
-	return nil
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("waiting for publish confirmation of task result event: %w", ctx.Err())
+	case result := <-resultCh:
+		if err := result.Error; err != nil {
+			glog.Errorf("Failed publishing task result AMQP event taskType=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
+			return err
+		}
+		return nil
+	}
 }
 
 func (r *runner) Shutdown(ctx context.Context) error {
