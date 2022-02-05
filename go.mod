@@ -3,6 +3,7 @@ module github.com/livepeer/task-runner
 go 1.16
 
 require (
+	github.com/aws/aws-sdk-go v1.33.11
 	github.com/golang/glog v1.0.0
 	github.com/livepeer/go-api-client v0.0.0-20220204212514-21d868b37aea
 	github.com/livepeer/go-livepeer v0.5.27-0.20220201164915-5da8ff8e521c

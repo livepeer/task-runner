@@ -21,6 +21,8 @@ const (
 	maxConcurrentTasks    = 3
 )
 
+type TaskHandler func(tctx *TaskContext) (*data.TaskOutput, error)
+
 type Runner interface {
 	Start() error
 	Shutdown(ctx context.Context) error
@@ -30,11 +32,17 @@ type RunnerOptions struct {
 	AMQPUri      string
 	ExchangeName string
 	QueueName    string
+	TaskHandlers map[string]TaskHandler
 
 	LivepeerAPIOptions livepeerAPI.ClientOptions
 }
 
 func NewRunner(opts RunnerOptions) Runner {
+	if opts.TaskHandlers == nil {
+		opts.TaskHandlers = map[string]TaskHandler{
+			"import": TaskImport,
+		}
+	}
 	lapi := livepeerAPI.NewAPIClient(opts.LivepeerAPIOptions)
 	return &runner{
 		RunnerOptions: opts,
@@ -94,32 +102,20 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
-	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
-	if err != nil {
-		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
-		return NilIfUnretriable(err)
-	}
-
-	glog.V(10).Infof(`Starting task type=%s playbackId=%s params="%+v"`, taskType, taskCtx.PlaybackID, taskCtx.Params)
 	var output *data.TaskOutput
-	switch strings.ToLower(taskType) {
-	case "import":
-		var ito *data.ImportTaskOutput
-		ito, err = TaskImport(taskCtx)
-		if ito != nil {
-			output = &data.TaskOutput{Import: ito}
+	if handler, ok := r.TaskHandlers[strings.ToLower(taskType)]; !ok {
+		err = UnretriableError{fmt.Errorf("unknown task type=%q id=%s", taskType, taskID)}
+	} else {
+		err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
+		if err != nil {
+			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
+			return NilIfUnretriable(err)
 		}
-	default:
-		glog.Errorf("Unknown task type=%q id=%s", taskType, taskID)
-		return nil
+
+		glog.V(10).Infof(`Starting task type=%s playbackId=%s params="%+v"`, taskType, taskCtx.PlaybackID, taskCtx.Params)
+		output, err = handler(taskCtx)
 	}
-	resultMsg := event.AMQPMessage{
-		Exchange: r.ExchangeName,
-		Key:      fmt.Sprintf("task.result.%s.%s", taskType, taskID),
-		Body:     data.NewTaskResultEvent(taskCtx.TaskInfo, errorInfo(err), output),
-	}
-	if amqpErr := r.amqp.Publish(ctx, resultMsg); amqpErr != nil {
-		glog.Errorf("Error sending AMQP task result event type=%q id=%s err=%q message=%+v", taskType, taskID, amqpErr, resultMsg)
+	if amqpErr := r.publishTaskResult(ctx, taskCtx.TaskInfo, output, err); amqpErr != nil {
 		return amqpErr
 	}
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", taskType, taskID, output, err, IsUnretriable(err))
@@ -129,11 +125,24 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 	return nil
 }
 
-func (s *runner) Shutdown(ctx context.Context) error {
-	if s.amqp == nil {
+func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {
+	msg := event.AMQPMessage{
+		Exchange: r.ExchangeName,
+		Key:      fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
+		Body:     data.NewTaskResultEvent(task, errorInfo(err), output),
+	}
+	if err := r.amqp.Publish(ctx, msg); err != nil {
+		glog.Errorf("Error sending AMQP task result event type=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
+		return err
+	}
+	return nil
+}
+
+func (r *runner) Shutdown(ctx context.Context) error {
+	if r.amqp == nil {
 		return errors.New("runner not started")
 	}
-	return s.amqp.Shutdown(ctx)
+	return r.amqp.Shutdown(ctx)
 }
 
 type TaskContext struct {

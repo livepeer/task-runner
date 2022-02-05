@@ -23,7 +23,7 @@ const (
 	metadataFileName  = "video.json"
 )
 
-func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
+func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx        = tctx.Context
 		playbackID = tctx.Asset.PlaybackID
@@ -65,12 +65,12 @@ func TaskImport(tctx *TaskContext) (*data.ImportTaskOutput, error) {
 		// TODO: Delete the uploaded file
 		return nil, err
 	}
-	return &data.ImportTaskOutput{
+	return &data.TaskOutput{Import: &data.ImportTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
 		Metadata:         metadata,
 		AssetSpec:        metadata.AssetSpec,
-	}, nil
+	}}, nil
 }
 
 func getFile(ctx context.Context, osSess drivers.OSSession, params livepeerAPI.ImportTaskParams) (string, io.ReadCloser, error) {
