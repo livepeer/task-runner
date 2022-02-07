@@ -25,6 +25,8 @@ var defaultTasks = map[string]TaskHandler{
 	"import": TaskImport,
 }
 
+type TaskHandler func(tctx *TaskContext) (*data.TaskOutput, error)
+
 type TaskContext struct {
 	context.Context
 	data.TaskInfo
@@ -34,8 +36,6 @@ type TaskContext struct {
 	osSession drivers.OSSession
 	lapi      *livepeerAPI.Client
 }
-
-type TaskHandler func(tctx *TaskContext) (*data.TaskOutput, error)
 
 type Runner interface {
 	Start() error

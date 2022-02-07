@@ -68,7 +68,6 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	return &data.TaskOutput{Import: &data.ImportTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
-		Metadata:         metadata,
 		AssetSpec:        metadata.AssetSpec,
 	}}, nil
 }
