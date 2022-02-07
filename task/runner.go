@@ -21,6 +21,10 @@ const (
 	maxConcurrentTasks    = 3
 )
 
+var defaultTasks = map[string]TaskHandler{
+	"import": TaskImport,
+}
+
 type TaskContext struct {
 	context.Context
 	data.TaskInfo
@@ -49,9 +53,7 @@ type RunnerOptions struct {
 
 func NewRunner(opts RunnerOptions) Runner {
 	if opts.TaskHandlers == nil {
-		opts.TaskHandlers = map[string]TaskHandler{
-			"import": TaskImport,
-		}
+		opts.TaskHandlers = defaultTasks
 	}
 	lapi := livepeerAPI.NewAPIClient(opts.LivepeerAPIOptions)
 	return &runner{
