@@ -9,7 +9,7 @@ import (
 )
 
 type ReadHasher struct {
-	size   int64
+	size   uint64
 	md5    hash.Hash
 	sha256 hash.Hash
 	r      io.Reader
@@ -26,7 +26,7 @@ func NewReadHasher(r io.Reader) *ReadHasher {
 func (h *ReadHasher) Read(p []byte) (int, error) {
 	n, err := h.r.Read(p)
 	if n > 0 {
-		h.size += int64(n)
+		h.size += uint64(n)
 		// hashers never return errors
 		h.md5.Write(p[:n])
 		h.sha256.Write(p[:n])
@@ -37,12 +37,12 @@ func (h *ReadHasher) Read(p []byte) (int, error) {
 func (h *ReadHasher) FinishReader() (int64, error) {
 	n, err := io.Copy(io.MultiWriter(h.md5, h.sha256), h.r)
 	if n > 0 {
-		h.size += n
+		h.size += uint64(n)
 	}
 	return n, err
 }
 
-func (h *ReadHasher) Size() int64 {
+func (h *ReadHasher) Size() uint64 {
 	return h.size
 }
 

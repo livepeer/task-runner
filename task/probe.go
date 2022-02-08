@@ -49,7 +49,7 @@ func Probe(ctx context.Context, filename string, data io.Reader) (*FileMetadata,
 	}, nil
 }
 
-func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size int64, hash []livepeerAPI.AssetHash) (*livepeerAPI.AssetSpec, error) {
+func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, hash []livepeerAPI.AssetHash) (*livepeerAPI.AssetSpec, error) {
 	if filename == "" && probeData.Format.Filename != "pipe:" {
 		filename = probeData.Format.Filename
 	}
