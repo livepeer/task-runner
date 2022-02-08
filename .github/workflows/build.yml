@@ -1,0 +1,39 @@
+name: Build
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Set up go
+        id: go
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
+
+      - name: Check out code
+        uses: actions/checkout@v1
+
+      - name: Cache ffmpeg
+        id: cache-ffmpeg
+        uses: actions/cache@v2.1.5
+        with:
+          path: ~/compiled
+          key: ${{ runner.os }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-ffmpeg
+
+      - name: Install ffmpeg
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          curl -s \
+            https://raw.githubusercontent.com/livepeer/go-livepeer/5da8ff8e521c15e5828fb9dfa619daf91a091fd0/install_ffmpeg.sh \
+            | bash -
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: |
+          export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig
+          make
