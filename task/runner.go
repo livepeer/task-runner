@@ -24,8 +24,9 @@ const (
 )
 
 var defaultTasks = map[string]TaskHandler{
-	"import": TaskImport,
-	"export": TaskExport,
+	"import":    TaskImport,
+	"export":    TaskExport,
+	"transcode": TaskTranscode,
 }
 
 type TaskHandler func(tctx *TaskContext) (*data.TaskOutput, error)
@@ -37,6 +38,8 @@ type TaskContext struct {
 	*livepeerAPI.Task
 	InputAsset, OutputAsset *livepeerAPI.Asset
 	inputOS, outputOS       drivers.OSSession
+	OutputAssets            []*livepeerAPI.Asset
+	outputOSs               []drivers.OSSession
 }
 
 type Runner interface {
@@ -136,7 +139,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 
 	taskCtx, err := r.buildTaskContext(ctx, taskInfo)
 	if err != nil {
-		glog.Errorf("Error building task context taskId=%s err=%q", err, IsUnretriable(err), taskInfo.ID)
+		glog.Errorf("Error building task context taskId=%s err=%q id=%s", err, IsUnretriable(err), taskInfo.ID)
 		return nil, err
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
@@ -183,7 +186,19 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	if err != nil {
 		return nil, err
 	}
-	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOS, outputOS}, nil
+	var outputAssets []*livepeerAPI.Asset
+	var outputOSs []drivers.OSSession
+	for _, assetID := range task.OutputAssetsIDs {
+		outputAsset, outputOS, err := r.getAssetAndOS(assetID)
+		if err != nil {
+			return nil, err
+		}
+		if outputAsset != nil {
+			outputAssets = append(outputAssets, outputAsset)
+			outputOSs = append(outputOSs, outputOS)
+		}
+	}
+	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOS, outputOS, outputAssets, outputOSs}, nil
 }
 
 func (r *runner) getAssetAndOS(assetID string) (*livepeerAPI.Asset, drivers.OSSession, error) {
