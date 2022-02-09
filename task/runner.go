@@ -31,10 +31,9 @@ type TaskContext struct {
 	context.Context
 	data.TaskInfo
 	*livepeerAPI.Task
-	*livepeerAPI.Asset
-	*livepeerAPI.ObjectStore
-	osSession drivers.OSSession
-	lapi      *livepeerAPI.Client
+	InputAsset, OutputAsset *livepeerAPI.Asset
+	inputOS, outputOS       drivers.OSSession
+	lapi                    *livepeerAPI.Client
 }
 
 type Runner interface {
@@ -123,7 +122,7 @@ func (r *runner) handleTask(msg amqp.Delivery) error {
 			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 			// execute the task anyway
 		}
-		glog.Infof(`Starting task type=%q id=%s assetId=%s params="%+v"`, taskType, taskID, taskCtx.Asset.ID, taskCtx.Params)
+		glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
 		output, err = handler(taskCtx)
 	}
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", taskType, taskID, output, err, IsUnretriable(err))
@@ -146,20 +145,35 @@ func (r *runner) buildTaskContext(ctx context.Context, msg amqp.Delivery) (*Task
 	if err != nil {
 		return nil, err
 	}
-	asset, err := r.lapi.GetAsset(task.ParentAssetID)
+	inputAsset, inputOS, err := r.getAssetAndOS(task.InputAssetID)
 	if err != nil {
 		return nil, err
+	}
+	outputAsset, outputOS, err := r.getAssetAndOS(task.OutputAssetID)
+	if err != nil {
+		return nil, err
+	}
+	return &TaskContext{ctx, info, task, inputAsset, outputAsset, inputOS, outputOS, r.lapi}, nil
+}
+
+func (r *runner) getAssetAndOS(assetID string) (*livepeerAPI.Asset, drivers.OSSession, error) {
+	if assetID == "" {
+		return nil, nil, nil
+	}
+	asset, err := r.lapi.GetAsset(assetID)
+	if err != nil {
+		return nil, nil, err
 	}
 	objectStore, err := r.lapi.GetObjectStore(asset.ObjectStoreID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	osDriver, err := drivers.ParseOSURL(objectStore.URL, true)
 	if err != nil {
-		return nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
+		return nil, nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
 	}
 	osSession := osDriver.NewSession("")
-	return &TaskContext{ctx, info, task, asset, objectStore, osSession, r.lapi}, nil
+	return asset, osSession, nil
 }
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {

@@ -26,9 +26,9 @@ const (
 func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx        = tctx.Context
-		playbackID = tctx.Asset.PlaybackID
+		playbackID = tctx.OutputAsset.PlaybackID
 		params     = *tctx.Task.Params.Import
-		osSess     = tctx.osSession
+		osSess     = tctx.outputOS
 	)
 	filename, contents, err := getFile(ctx, osSess, params)
 	if err != nil {
