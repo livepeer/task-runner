@@ -55,7 +55,7 @@ func Run(build BuildFlags) {
 	cli := parseFlags()
 	glog.Infof("Task runner starting... version=%q", build.Version)
 
-	clients.UserAgent = "task-runner/" + build.Version
+	clients.UserAgent = "livepeer-task-runner/" + build.Version
 	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
 	runner := task.NewRunner(cli.runnerOpts)
 

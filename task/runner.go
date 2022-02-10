@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -98,7 +99,7 @@ func (r *runner) Start() error {
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
-	err = amqp.Consume(r.QueueName, maxConcurrentTasks, r.handleTask)
+	err = amqp.Consume(r.QueueName, maxConcurrentTasks, r.handleAMQPMessage)
 	if err != nil {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
@@ -107,47 +108,69 @@ func (r *runner) Start() error {
 	return nil
 }
 
-func (r *runner) handleTask(msg amqp.Delivery) error {
-	// rate-limit task processing time to limit load
+func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
+	// rate-limit message processing time to limit load
 	defer blockUntil(time.After(minTaskProcessingTime))
+
+	task, err := parseTaskInfo(msg)
+	if err != nil {
+		glog.Errorf("Error parsing AMQP message err=%q msg=%q", err, msg.Body)
+		return nil
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
 	defer cancel()
-	taskCtx, err := r.buildTaskContext(ctx, msg)
+	output, err := r.handleTask(ctx, task)
+
+	// return the error directly so that if publishing the result fails we nack the message to try again
+	return r.publishTaskResult(ctx, task, output, err)
+}
+
+func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output *data.TaskOutput, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			glog.Errorf("Panic handling task: value=%q stack:\n%s", r, string(debug.Stack()))
+			err = UnretriableError{fmt.Errorf("panic handling task: %v", r)}
+		}
+	}()
+
+	taskCtx, err := r.buildTaskContext(ctx, taskInfo)
 	if err != nil {
-		glog.Errorf("Error building task context err=%q unretriable=%v msg=%q", err, IsUnretriable(err), msg.Body)
-		return NilIfUnretriable(err)
+		glog.Errorf("Error building task context taskId=%s err=%q", err, IsUnretriable(err), taskInfo.ID)
+		return nil, err
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
-	var output *data.TaskOutput
-	if handler, ok := r.TaskHandlers[strings.ToLower(taskType)]; !ok {
-		err = UnretriableError{fmt.Errorf("unknown task type=%q id=%s", taskType, taskID)}
-	} else {
-		err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
-		if err != nil {
-			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
-			// execute the task anyway
-		}
-		glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
-		output, err = handler(taskCtx)
+	handler, ok := r.TaskHandlers[strings.ToLower(taskType)]
+	if !ok {
+		return nil, UnretriableError{fmt.Errorf("unknown task type=%q id=%s", taskType, taskID)}
 	}
+
+	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
+	if err != nil {
+		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
+		// execute the task anyway
+	}
+
+	glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
+	output, err = handler(taskCtx)
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", taskType, taskID, output, err, IsUnretriable(err))
-	// return the error directly so that if publishing the result fails we nack the message to try again
-	return r.publishTaskResult(ctx, taskCtx.TaskInfo, output, err)
+	return output, err
 }
 
-func (r *runner) buildTaskContext(ctx context.Context, msg amqp.Delivery) (*TaskContext, error) {
+func parseTaskInfo(msg amqp.Delivery) (data.TaskInfo, error) {
 	parsedEvt, err := data.ParseEvent(msg.Body)
 	if err != nil {
-		return nil, UnretriableError{fmt.Errorf("error parsing AMQP message: %w", err)}
+		return data.TaskInfo{}, UnretriableError{fmt.Errorf("error parsing AMQP message: %w", err)}
 	}
 	taskEvt, ok := parsedEvt.(*data.TaskTriggerEvent)
 	if evType := parsedEvt.Type(); !ok || evType != data.EventTypeTaskTrigger {
-		return nil, UnretriableError{fmt.Errorf("unexpected AMQP message type=%q", evType)}
+		return data.TaskInfo{}, UnretriableError{fmt.Errorf("unexpected AMQP message type=%q", evType)}
 	}
-	info := taskEvt.Task
+	return taskEvt.Task, nil
+}
 
+func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*TaskContext, error) {
 	task, err := r.lapi.GetTask(info.ID)
 	if err != nil {
 		return nil, err
