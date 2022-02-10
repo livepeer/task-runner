@@ -3,7 +3,6 @@ package clients
 import (
 	"context"
 	"io"
-	"net/http"
 	"time"
 )
 
@@ -18,10 +17,10 @@ type IPFS interface {
 
 func NewPinataClientJWT(jwt string) IPFS {
 	return &pinataClient{
-		baseClient: baseClient{
-			baseUrl: pinataBaseUrl,
-			baseHeaders: http.Header{
-				"Authorization": []string{"Bearer " + jwt},
+		BaseClient: BaseClient{
+			BaseUrl: pinataBaseUrl,
+			BaseHeaders: map[string]string{
+				"Authorization": "Bearer " + jwt,
 			},
 		},
 	}
@@ -29,18 +28,18 @@ func NewPinataClientJWT(jwt string) IPFS {
 
 func NewPinataClientAPIKey(apiKey, apiSecret string) IPFS {
 	return &pinataClient{
-		baseClient: baseClient{
-			baseUrl: pinataBaseUrl,
-			baseHeaders: http.Header{
-				"pinata_api_key":        []string{apiKey},
-				"pinata_secret_api_key": []string{apiSecret},
+		BaseClient: BaseClient{
+			BaseUrl: pinataBaseUrl,
+			BaseHeaders: map[string]string{
+				"pinata_api_key":        apiKey,
+				"pinata_secret_api_key": apiSecret,
 			},
 		},
 	}
 }
 
 type pinataClient struct {
-	baseClient
+	BaseClient
 }
 
 type uploadResponse struct {
@@ -57,11 +56,11 @@ func (p *pinataClient) PinContent(ctx context.Context, filename, fileContentType
 	defer body.Close()
 
 	var res *uploadResponse
-	err := p.doRequest(ctx, request{
-		method:      "POST",
-		url:         "/pinning/pinFileToIPFS",
-		body:        body,
-		contentType: contentType,
+	err := p.DoRequest(ctx, Request{
+		Method:      "POST",
+		URL:         "/pinning/pinFileToIPFS",
+		Body:        body,
+		ContentType: contentType,
 	}, &res)
 	if err != nil {
 		return "", nil, err
@@ -70,8 +69,8 @@ func (p *pinataClient) PinContent(ctx context.Context, filename, fileContentType
 }
 
 func (p *pinataClient) Unpin(ctx context.Context, cid string) error {
-	return p.doRequest(ctx, request{
-		method: "DELETE",
-		url:    "/pinning/unpin/" + cid,
+	return p.DoRequest(ctx, Request{
+		Method: "DELETE",
+		URL:    "/pinning/unpin/" + cid,
 	}, nil)
 }
