@@ -35,6 +35,11 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 	return &data.TaskOutput{Export: output}, nil
 }
 
+type internalMetadata struct {
+	DestType string      `json:"destType"`
+	Pinata   interface{} `json:"pinata"`
+}
+
 func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.ExportTaskParams, asset *livepeerAPI.Asset, content io.Reader) (*data.ExportTaskOutput, error) {
 	contentType := "video/" + asset.VideoSpec.Format
 	if c := params.Custom; c != nil {
@@ -54,10 +59,12 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 			}
 			return nil, fmt.Errorf("error on export request: %w", err)
 		}
-		return &data.ExportTaskOutput{}, nil
+		return &data.ExportTaskOutput{Internal: internalMetadata{DestType: "custom"}}, nil
 	}
 
+	destType := "own-pinata"
 	if p := params.IPFS.Pinata; p != nil {
+		destType = "ext-pinata"
 		if p.JWT != "" {
 			ipfs = clients.NewPinataClientJWT(p.JWT)
 		} else {
@@ -69,13 +76,14 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 		return nil, err
 	}
 	return &data.ExportTaskOutput{
+		Internal: &internalMetadata{
+			DestType: destType,
+			Pinata:   metadata,
+		},
 		IPFS: &data.IPFSExportInfo{
 			VideoFileCID: cid,
 			// TODO: Pin some default metadata as well
 			ERC1155MetadataCID: "",
-			Internal: map[string]interface{}{
-				"pinata": metadata,
-			},
 		},
 	}, nil
 }
