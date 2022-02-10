@@ -24,10 +24,11 @@ RUN make "version=$version"
 
 FROM debian:stretch-slim
 
-RUN apt update && \
-  apt install -y ffmpeg && \
-  apt clean && apt autoclean
+RUN apt update \
+  && apt install -y ffmpeg ca-certificates \
+  && apt clean && apt autoclean
 RUN ffmpeg -version
+RUN update-ca-certificates
 
 WORKDIR /app
 ENV PKG_CONFIG_PATH /root/compiled/lib/pkgconfig
