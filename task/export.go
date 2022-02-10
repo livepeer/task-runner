@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/livepeer/livepeer-data/pkg/data"
+	"github.com/livepeer/task-runner/clients"
 )
 
 func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -27,7 +28,16 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, fileUploadTimeout)
 	defer cancel()
-	cid, metadata, err := tctx.ipfs.PinContent(ctx, asset.PlaybackID, "video/"+asset.VideoSpec.Format, file.Body)
+
+	ipfs := tctx.ipfs
+	if p := params.IPFS.Pinata; p != nil {
+		if p.JWT != "" {
+			ipfs = clients.NewPinataClientJWT(p.JWT)
+		} else {
+			ipfs = clients.NewPinataClientAPIKey(p.APIKey, p.APISecret)
+		}
+	}
+	cid, metadata, err := ipfs.PinContent(ctx, asset.PlaybackID, "video/"+asset.VideoSpec.Format, file.Body)
 	if err != nil {
 		return nil, err
 	}
