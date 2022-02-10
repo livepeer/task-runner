@@ -60,7 +60,10 @@ func NewRunner(opts RunnerOptions) Runner {
 	return &runner{
 		RunnerOptions: opts,
 		lapi:          livepeerAPI.NewAPIClient(opts.LivepeerAPIOptions),
-		ipfs:          clients.NewPinataClientJWT(opts.PinataAccessToken),
+		ipfs: clients.NewPinataClientJWT(opts.PinataAccessToken, map[string]string{
+			"apiServer": opts.LivepeerAPIOptions.Server,
+			"createdBy": clients.UserAgent,
+		}),
 	}
 }
 

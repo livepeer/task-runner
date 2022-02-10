@@ -26,7 +26,7 @@ type cliFlags struct {
 
 func parseFlags() cliFlags {
 	cli := cliFlags{}
-	fs := flag.NewFlagSet("task-runner", flag.ExitOnError)
+	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
 
 	fs.StringVar(&cli.runnerOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol")
 	fs.StringVar(&cli.runnerOpts.ExchangeName, "exchange-name", "lp_tasks", "Name of exchange where the task events will be published to")
@@ -52,14 +52,14 @@ func parseFlags() cliFlags {
 }
 
 func Run(build BuildFlags) {
-	glog.Infof("Task runner starting... version=%q", build.Version)
-	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-
 	cli := parseFlags()
+	glog.Infof("Task runner starting... version=%q", build.Version)
+
 	clients.UserAgent = "task-runner/" + build.Version
 	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
 	runner := task.NewRunner(cli.runnerOpts)
 
+	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	err := runner.Start()
 	if err != nil {
 		glog.Fatalf("Failed to start runner: %v", err)

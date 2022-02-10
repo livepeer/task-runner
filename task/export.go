@@ -73,7 +73,9 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 	if p := params.IPFS.Pinata; p != nil {
 		destType = "ext-pinata"
 		if p.JWT != "" {
-			ipfs = clients.NewPinataClientJWT(p.JWT)
+			ipfs = clients.NewPinataClientJWT(p.JWT, map[string]string{
+				"createdBy": clients.UserAgent,
+			})
 		} else {
 			ipfs = clients.NewPinataClientAPIKey(p.APIKey, p.APISecret)
 		}

@@ -1,7 +1,9 @@
 package clients
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"time"
 )
@@ -15,7 +17,9 @@ type IPFS interface {
 	Unpin(ctx context.Context, cid string) error
 }
 
-func NewPinataClientJWT(jwt string) IPFS {
+func NewPinataClientJWT(jwt string, filesMetadata map[string]string) IPFS {
+	// no way this json marshal will err
+	metadataBytes, _ := json.Marshal(filesMetadata)
 	return &pinataClient{
 		BaseClient: BaseClient{
 			BaseUrl: pinataBaseUrl,
@@ -23,6 +27,7 @@ func NewPinataClientJWT(jwt string) IPFS {
 				"Authorization": "Bearer " + jwt,
 			},
 		},
+		filesMetadata: metadataBytes,
 	}
 }
 
@@ -40,6 +45,7 @@ func NewPinataClientAPIKey(apiKey, apiSecret string) IPFS {
 
 type pinataClient struct {
 	BaseClient
+	filesMetadata []byte
 }
 
 type uploadResponse struct {
@@ -50,9 +56,13 @@ type uploadResponse struct {
 }
 
 func (p *pinataClient) PinContent(ctx context.Context, filename, fileContentType string, data io.Reader) (string, interface{}, error) {
-	body, contentType := multipartBody([]part{
+	parts := []part{
 		{"file", filename, fileContentType, data},
-	})
+	}
+	if p.filesMetadata != nil {
+		parts = append(parts, part{"pinataMetadata", "", "application/json", bytes.NewReader(p.filesMetadata)})
+	}
+	body, contentType := multipartBody(parts)
 	defer body.Close()
 
 	var res *uploadResponse
