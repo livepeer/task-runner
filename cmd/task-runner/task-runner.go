@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/task"
 	"github.com/peterbourgon/ff"
 )
@@ -32,6 +33,7 @@ func parseFlags() cliFlags {
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
+	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
 
 	flag.Set("logtostderr", "true")
 	glogVFlag := flag.Lookup("v")
@@ -54,7 +56,8 @@ func Run(build BuildFlags) {
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	cli := parseFlags()
-	cli.runnerOpts.LivepeerAPIOptions.UserAgent = "task-runner/" + build.Version
+	clients.UserAgent = "task-runner/" + build.Version
+	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
 	runner := task.NewRunner(cli.runnerOpts)
 
 	err := runner.Start()

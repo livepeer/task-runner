@@ -9,18 +9,11 @@ import (
 	"mime"
 	"net/http"
 	"path"
-	"time"
 
 	livepeerAPI "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"golang.org/x/sync/errgroup"
-)
-
-const (
-	fileUploadTimeout = 5 * time.Minute
-	videoFileName     = "video"
-	metadataFileName  = "video.json"
 )
 
 func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -54,10 +47,10 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		return err
 	})
 	eg.Go(func() (err error) {
-		fullPath := path.Join(playbackID, videoFileName)
+		fullPath := videoFileName(playbackID)
 		videoFilePath, err = osSess.SaveData(egCtx, fullPath, secondaryReader, nil, fileUploadTimeout)
 		if err != nil {
-			return fmt.Errorf("error uploading file=%q to object store: %w", videoFileName, err)
+			return fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 		}
 		return nil
 	})
@@ -118,7 +111,7 @@ func filename(req *http.Request, resp *http.Response) string {
 }
 
 func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata *FileMetadata) (string, error) {
-	fullPath := path.Join(playbackID, metadataFileName)
+	fullPath := metadataFileName(playbackID)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return "", fmt.Errorf("error marshaling file metadat: %w", err)

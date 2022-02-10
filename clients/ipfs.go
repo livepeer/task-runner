@@ -16,13 +16,12 @@ type IPFS interface {
 	Unpin(ctx context.Context, cid string) error
 }
 
-func NewPinataClient(apiKey, userAgent string) IPFS {
+func NewPinataClient(jwt string) IPFS {
 	return &pinataClient{
 		baseClient: baseClient{
 			baseUrl: pinataBaseUrl,
 			baseHeaders: http.Header{
-				"Authorization": []string{"Bearer " + apiKey},
-				"User-Agent":    []string{userAgent},
+				"Authorization": []string{"Bearer " + jwt},
 			},
 		},
 	}

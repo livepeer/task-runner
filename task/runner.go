@@ -12,6 +12,7 @@ import (
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
+	"github.com/livepeer/task-runner/clients"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -23,17 +24,18 @@ const (
 
 var defaultTasks = map[string]TaskHandler{
 	"import": TaskImport,
+	"export": TaskExport,
 }
 
 type TaskHandler func(tctx *TaskContext) (*data.TaskOutput, error)
 
 type TaskContext struct {
 	context.Context
+	*runner
 	data.TaskInfo
 	*livepeerAPI.Task
 	InputAsset, OutputAsset *livepeerAPI.Asset
 	inputOS, outputOS       drivers.OSSession
-	lapi                    *livepeerAPI.Client
 }
 
 type Runner interface {
@@ -42,22 +44,23 @@ type Runner interface {
 }
 
 type RunnerOptions struct {
-	AMQPUri      string
-	ExchangeName string
-	QueueName    string
-	TaskHandlers map[string]TaskHandler
-
+	AMQPUri            string
+	ExchangeName       string
+	QueueName          string
 	LivepeerAPIOptions livepeerAPI.ClientOptions
+	PinataAccessToken  string
+
+	TaskHandlers map[string]TaskHandler
 }
 
 func NewRunner(opts RunnerOptions) Runner {
 	if opts.TaskHandlers == nil {
 		opts.TaskHandlers = defaultTasks
 	}
-	lapi := livepeerAPI.NewAPIClient(opts.LivepeerAPIOptions)
 	return &runner{
 		RunnerOptions: opts,
-		lapi:          lapi,
+		lapi:          livepeerAPI.NewAPIClient(opts.LivepeerAPIOptions),
+		ipfs:          clients.NewPinataClient(opts.PinataAccessToken),
 	}
 }
 
@@ -65,6 +68,7 @@ type runner struct {
 	RunnerOptions
 
 	lapi *livepeerAPI.Client
+	ipfs clients.IPFS
 	amqp event.AMQPClient
 }
 
@@ -153,7 +157,7 @@ func (r *runner) buildTaskContext(ctx context.Context, msg amqp.Delivery) (*Task
 	if err != nil {
 		return nil, err
 	}
-	return &TaskContext{ctx, info, task, inputAsset, outputAsset, inputOS, outputOS, r.lapi}, nil
+	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOS, outputOS}, nil
 }
 
 func (r *runner) getAssetAndOS(assetID string) (*livepeerAPI.Asset, drivers.OSSession, error) {

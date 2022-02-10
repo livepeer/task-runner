@@ -13,6 +13,8 @@ import (
 	"github.com/golang/glog"
 )
 
+var UserAgent string
+
 type baseClient struct {
 	httpClient  *http.Client
 	baseUrl     string
@@ -68,6 +70,9 @@ func (p *baseClient) newRequest(ctx context.Context, r request) (*http.Request, 
 	req, err := http.NewRequestWithContext(ctx, r.method, url, r.body)
 	if err != nil {
 		return nil, err
+	}
+	if UserAgent != "" {
+		req.Header.Set("User-Agent", UserAgent)
 	}
 	for key, values := range p.baseHeaders {
 		req.Header[key] = values
