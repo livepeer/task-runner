@@ -72,12 +72,13 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 	destType := "own-pinata"
 	if p := params.IPFS.Pinata; p != nil {
 		destType = "ext-pinata"
+		extMetadata := map[string]string{
+			"createdBy": clients.UserAgent,
+		}
 		if p.JWT != "" {
-			ipfs = clients.NewPinataClientJWT(p.JWT, map[string]string{
-				"createdBy": clients.UserAgent,
-			})
+			ipfs = clients.NewPinataClientJWT(p.JWT, extMetadata)
 		} else {
-			ipfs = clients.NewPinataClientAPIKey(p.APIKey, p.APISecret)
+			ipfs = clients.NewPinataClientAPIKey(p.APIKey, p.APISecret, extMetadata)
 		}
 	}
 	videoCID, metadata, err := ipfs.PinContent(ctx, "asset-"+asset.PlaybackID, contentType, content)

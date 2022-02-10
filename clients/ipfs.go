@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -18,8 +20,6 @@ type IPFS interface {
 }
 
 func NewPinataClientJWT(jwt string, filesMetadata map[string]string) IPFS {
-	// no way this json marshal will err
-	metadataBytes, _ := json.Marshal(filesMetadata)
 	return &pinataClient{
 		BaseClient: BaseClient{
 			BaseUrl: pinataBaseUrl,
@@ -27,11 +27,11 @@ func NewPinataClientJWT(jwt string, filesMetadata map[string]string) IPFS {
 				"Authorization": "Bearer " + jwt,
 			},
 		},
-		filesMetadata: metadataBytes,
+		filesMetadata: marshalFilesMetadata(filesMetadata),
 	}
 }
 
-func NewPinataClientAPIKey(apiKey, apiSecret string) IPFS {
+func NewPinataClientAPIKey(apiKey, apiSecret string, filesMetadata map[string]string) IPFS {
 	return &pinataClient{
 		BaseClient: BaseClient{
 			BaseUrl: pinataBaseUrl,
@@ -40,6 +40,7 @@ func NewPinataClientAPIKey(apiKey, apiSecret string) IPFS {
 				"pinata_secret_api_key": apiSecret,
 			},
 		},
+		filesMetadata: marshalFilesMetadata(filesMetadata),
 	}
 }
 
@@ -83,4 +84,14 @@ func (p *pinataClient) Unpin(ctx context.Context, cid string) error {
 		Method: "DELETE",
 		URL:    "/pinning/unpin/" + cid,
 	}, nil)
+}
+
+func marshalFilesMetadata(keyvalues map[string]string) []byte {
+	metadata := map[string]interface{}{"keyvalues": keyvalues}
+	bytes, err := json.Marshal(metadata)
+	if err != nil {
+		glog.Warningf("Error marshalling Piñata files metadata: err=%q", err)
+		return nil
+	}
+	return bytes
 }
