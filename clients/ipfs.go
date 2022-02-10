@@ -87,6 +87,9 @@ func (p *pinataClient) Unpin(ctx context.Context, cid string) error {
 }
 
 func marshalFilesMetadata(keyvalues map[string]string) []byte {
+	if len(keyvalues) == 0 {
+		return nil
+	}
 	metadata := map[string]interface{}{"keyvalues": keyvalues}
 	bytes, err := json.Marshal(metadata)
 	if err != nil {
