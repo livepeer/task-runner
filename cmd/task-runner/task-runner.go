@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/livepeer-data/pkg/mistconnector"
 	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/task"
 	"github.com/peterbourgon/ff"
@@ -24,7 +25,7 @@ type cliFlags struct {
 	runnerOpts task.RunnerOptions
 }
 
-func parseFlags() cliFlags {
+func parseFlags(build BuildFlags) cliFlags {
 	cli := cliFlags{}
 	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
 
@@ -34,6 +35,8 @@ func parseFlags() cliFlags {
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
+
+	mistJson := fs.Bool("j", false, "Print application info as json")
 
 	flag.Set("logtostderr", "true")
 	glogVFlag := flag.Lookup("v")
@@ -48,11 +51,22 @@ func parseFlags() cliFlags {
 	)
 	flag.CommandLine.Parse(nil)
 	glogVFlag.Value.Set(strconv.Itoa(*verbosity))
+
+	if *mistJson {
+		mistconnector.PrintMistConfigJson(
+			"livepeer-task-runner",
+			"Livepeer task processing application. Does imports/exports to S3 and IPFS and such.",
+			"Livepeer Task Runner",
+			build.Version,
+			fs,
+		)
+		os.Exit(0)
+	}
 	return cli
 }
 
 func Run(build BuildFlags) {
-	cli := parseFlags()
+	cli := parseFlags(build)
 	glog.Infof("Task runner starting... version=%q", build.Version)
 
 	clients.UserAgent = "livepeer-task-runner/" + build.Version
