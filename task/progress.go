@@ -28,7 +28,9 @@ func ReportProgress(ctx context.Context, lapi *livepeerAPI.Client, taskID string
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			progress := math.Min(float64(getCount())/float64(size), 0.99)
+			progress := float64(getCount()) / float64(size)
+			progress = math.Round(progress*1000) / 1000
+			progress = math.Min(progress, 0.99)
 			if err := lapi.UpdateTaskStatus(taskID, "running", progress); err != nil {
 				glog.Errorf("Error updating task progress taskID=%s progress=%v err=%q", taskID, progress, err)
 			}
