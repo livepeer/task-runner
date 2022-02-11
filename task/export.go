@@ -22,6 +22,7 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx    = tctx.Context
 		asset  = tctx.InputAsset
+		size   = asset.Size
 		osSess = tctx.inputOS
 		params = *tctx.Task.Params.Export
 	)
@@ -30,10 +31,15 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 		return nil, err
 	}
 	defer file.Body.Close()
+	if file.Size != nil && *file.Size > 0 {
+		size = uint64(*file.Size)
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, fileUploadTimeout)
 	defer cancel()
-	output, err := uploadFile(ctx, tctx.ipfs, params, asset, file.Body)
+	content := NewReadCounter(file.Body)
+	go ReportProgress(ctx, tctx.lapi, tctx.Task.ID, size, content.Count)
+	output, err := uploadFile(ctx, tctx.ipfs, params, asset, content)
 	if err != nil {
 		return nil, err
 	}
