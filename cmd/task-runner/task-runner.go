@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/task"
 	"github.com/peterbourgon/ff"
 )
@@ -25,13 +26,14 @@ type cliFlags struct {
 
 func parseFlags() cliFlags {
 	cli := cliFlags{}
-	fs := flag.NewFlagSet("task-runner", flag.ExitOnError)
+	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
 
 	fs.StringVar(&cli.runnerOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol")
 	fs.StringVar(&cli.runnerOpts.ExchangeName, "exchange-name", "lp_tasks", "Name of exchange where the task events will be published to")
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
+	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
 
 	flag.Set("logtostderr", "true")
 	glogVFlag := flag.Lookup("v")
@@ -50,13 +52,14 @@ func parseFlags() cliFlags {
 }
 
 func Run(build BuildFlags) {
-	glog.Infof("Task runner starting... version=%q", build.Version)
-	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-
 	cli := parseFlags()
-	cli.runnerOpts.LivepeerAPIOptions.UserAgent = "task-runner/" + build.Version
+	glog.Infof("Task runner starting... version=%q", build.Version)
+
+	clients.UserAgent = "livepeer-task-runner/" + build.Version
+	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
 	runner := task.NewRunner(cli.runnerOpts)
 
+	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	err := runner.Start()
 	if err != nil {
 		glog.Fatalf("Failed to start runner: %v", err)

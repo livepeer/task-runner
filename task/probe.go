@@ -3,7 +3,6 @@ package task
 import (
 	"context"
 	"fmt"
-	"io"
 	"path"
 	"strconv"
 	"strings"
@@ -25,7 +24,7 @@ type FileMetadata struct {
 	AssetSpec *livepeerAPI.AssetSpec `json:"assetSpec"`
 }
 
-func Probe(ctx context.Context, filename string, data io.Reader) (*FileMetadata, error) {
+func Probe(ctx context.Context, filename string, data *ReadCounter) (*FileMetadata, error) {
 	hasher := NewReadHasher(data)
 	probeData, err := ffprobe.ProbeReader(ctx, hasher)
 	if err != nil {
@@ -34,7 +33,7 @@ func Probe(ctx context.Context, filename string, data io.Reader) (*FileMetadata,
 	if _, err := hasher.FinishReader(); err != nil {
 		return nil, fmt.Errorf("error reading input: %w", err)
 	}
-	size, md5, sha256 := hasher.Size(), hasher.MD5(), hasher.SHA256()
+	size, md5, sha256 := data.Count(), hasher.MD5(), hasher.SHA256()
 	assetSpec, err := toAssetSpec(filename, probeData, size, []livepeerAPI.AssetHash{
 		{Hash: md5, Algorithm: "md5"},
 		{Hash: sha256, Algorithm: "sha256"}})

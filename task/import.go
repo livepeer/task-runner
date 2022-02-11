@@ -9,18 +9,11 @@ import (
 	"mime"
 	"net/http"
 	"path"
-	"time"
 
 	livepeerAPI "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"golang.org/x/sync/errgroup"
-)
-
-const (
-	fileUploadTimeout = 5 * time.Minute
-	videoFileName     = "video"
-	metadataFileName  = "video.json"
 )
 
 func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -30,20 +23,21 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		params     = *tctx.Task.Params.Import
 		osSess     = tctx.outputOS
 	)
-	filename, contents, err := getFile(ctx, osSess, params)
+	filename, size, contents, err := getFile(ctx, osSess, params)
 	if err != nil {
 		return nil, err
 	}
 	defer contents.Close()
 
 	secondaryReader, pipe := io.Pipe()
-	mainReader := io.TeeReader(contents, pipe)
+	mainReader := NewReadCounter(io.TeeReader(contents, pipe))
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	var (
 		videoFilePath, metadataFilePath string
 		metadata                        *FileMetadata
 	)
+	go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count)
 	eg.Go(func() (err error) {
 		metadata, err = Probe(egCtx, filename, mainReader)
 		pipe.CloseWithError(err)
@@ -54,10 +48,10 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		return err
 	})
 	eg.Go(func() (err error) {
-		fullPath := path.Join(playbackID, videoFileName)
+		fullPath := videoFileName(playbackID)
 		videoFilePath, err = osSess.SaveData(egCtx, fullPath, secondaryReader, nil, fileUploadTimeout)
 		if err != nil {
-			return fmt.Errorf("error uploading file=%q to object store: %w", videoFileName, err)
+			return fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 		}
 		return nil
 	})
@@ -72,27 +66,30 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}}, nil
 }
 
-func getFile(ctx context.Context, osSess drivers.OSSession, params livepeerAPI.ImportTaskParams) (string, io.ReadCloser, error) {
+func getFile(ctx context.Context, osSess drivers.OSSession, params livepeerAPI.ImportTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
 	if upedObjKey := params.UploadedObjectKey; upedObjKey != "" {
 		// TODO: We should simply "move" the file in case of direct import since we
 		// know the file is already in the object store. Independently, we also have
 		// to delete the uploaded file after copying to the new location.
 		fileInfo, err := osSess.ReadData(ctx, upedObjKey)
 		if err != nil {
-			return "", nil, UnretriableError{fmt.Errorf("error reading direct uploaded file: %w", err)}
+			return "", 0, nil, UnretriableError{fmt.Errorf("error reading direct uploaded file: %w", err)}
 		}
-		return fileInfo.FileInfo.Name, fileInfo.Body, nil
+		if fileInfo.Size != nil && *fileInfo.Size > 0 {
+			size = uint64(*fileInfo.Size)
+		}
+		return fileInfo.FileInfo.Name, size, fileInfo.Body, nil
 	} else if params.URL == "" {
-		return "", nil, fmt.Errorf("no import URL or direct upload object key: %+v", params)
+		return "", 0, nil, fmt.Errorf("no import URL or direct upload object key: %+v", params)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", params.URL, nil)
 	if err != nil {
-		return "", nil, UnretriableError{fmt.Errorf("error creating http request: %w", err)}
+		return "", 0, nil, UnretriableError{fmt.Errorf("error creating http request: %w", err)}
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", nil, fmt.Errorf("error on import request: %w", err)
+		return "", 0, nil, fmt.Errorf("error on import request: %w", err)
 	}
 	if resp.StatusCode >= 300 {
 		resp.Body.Close()
@@ -100,9 +97,12 @@ func getFile(ctx context.Context, osSess drivers.OSSession, params livepeerAPI.I
 		if resp.StatusCode < 500 {
 			err = UnretriableError{err}
 		}
-		return "", nil, err
+		return "", 0, nil, err
 	}
-	return filename(req, resp), resp.Body, nil
+	if resp.ContentLength > 0 {
+		size = uint64(resp.ContentLength)
+	}
+	return filename(req, resp), size, resp.Body, nil
 }
 
 func filename(req *http.Request, resp *http.Response) string {
@@ -118,7 +118,7 @@ func filename(req *http.Request, resp *http.Response) string {
 }
 
 func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata *FileMetadata) (string, error) {
-	fullPath := path.Join(playbackID, metadataFileName)
+	fullPath := metadataFileName(playbackID)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
 		return "", fmt.Errorf("error marshaling file metadat: %w", err)

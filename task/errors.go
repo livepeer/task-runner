@@ -16,10 +16,3 @@ func IsUnretriable(err error) bool {
 	return errors.Is(err, livepeerAPI.ErrNotExists) ||
 		errors.As(err, &UnretriableError{})
 }
-
-func NilIfUnretriable(err error) error {
-	if IsUnretriable(err) {
-		return nil
-	}
-	return err
-}

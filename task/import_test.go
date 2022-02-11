@@ -38,9 +38,10 @@ func TestImport(t *testing.T) {
 	assert.NoError(err)
 
 	result, err := TaskImport(&TaskContext{
-		Context:   ctx,
-		Task:      task,
-		osSession: os.NewSession("test_import_bbb"),
+		Context:     ctx,
+		Task:        task,
+		OutputAsset: &livepeerAPI.Asset{PlaybackID: "test-playback-id"},
+		outputOS:    os.NewSession("test_import_bbb"),
 	})
 	assert.NoError(err)
 	fmt.Println(json.MarshalIndent(result, "", "  "))
