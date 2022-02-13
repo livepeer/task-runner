@@ -40,7 +40,7 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	fullPath := videoFileName(inputPlaybackID)
 	fir, err := tctx.inputOS.ReadData(ctx, fullPath)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("error reading data from source OS url=%s err=%w", fullPath, err)
 	}
 	fileInMem, err := io.ReadAll(fir.Body)
 	fir.Body.Close()
