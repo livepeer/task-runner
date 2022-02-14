@@ -93,35 +93,35 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 	}
 	// This one is a nice to have so we don't return an error. If it fails we just
 	// ignore and don't return the metadata CID.
-	metadataCID := saveERC1155metadata(ctx, ipfs, asset, videoCID, params.IPFS.ERC1155Metadata)
+	metadataCID := saveNFTMetadata(ctx, ipfs, asset, videoCID, params.IPFS.NFTMetadata)
 	return &data.ExportTaskOutput{
 		Internal: &internalMetadata{
 			DestType: destType,
 			Pinata:   metadata,
 		},
 		IPFS: &data.IPFSExportInfo{
-			VideoFileCID:       videoCID,
-			ERC1155MetadataCID: metadataCID,
+			VideoFileCID:   videoCID,
+			NFTMetadataCID: metadataCID,
 		},
 	}, nil
 }
 
-func saveERC1155metadata(ctx context.Context, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string, customMetadata map[string]interface{}) string {
-	erc1155metadata := erc1155metadata(asset, videoCID, customMetadata)
-	rawMetadata, err := json.Marshal(erc1155metadata)
+func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string, customMetadata map[string]interface{}) string {
+	nftMetadata := nftMetadata(asset, videoCID, customMetadata)
+	rawMetadata, err := json.Marshal(nftMetadata)
 	if err != nil {
-		glog.Errorf("Error marshalling ERC-1155 metadata assetId=%s err=%q", asset.ID, err)
+		glog.Errorf("Error marshalling NFT metadata assetId=%s err=%q", asset.ID, err)
 		return ""
 	}
 	cid, _, err := ipfs.PinContent(ctx, "metadata-"+asset.PlaybackID, "application/json", bytes.NewReader(rawMetadata))
 	if err != nil {
-		glog.Errorf("Error saving ERC-1155 metadata assetId=%s err=%q", asset.ID, err)
+		glog.Errorf("Error saving NFT metadata assetId=%s err=%q", asset.ID, err)
 		return ""
 	}
 	return cid
 }
 
-func erc1155metadata(asset *livepeerAPI.Asset, videoCID string, customMetadata map[string]interface{}) map[string]interface{} {
+func nftMetadata(asset *livepeerAPI.Asset, videoCID string, customMetadata map[string]interface{}) map[string]interface{} {
 	videoUrl := "ipfs://" + videoCID
 	metadata := map[string]interface{}{
 		"name":        asset.Name,
