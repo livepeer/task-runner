@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
-	livepeerAPI "github.com/livepeer/go-api-client"
+	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/joy4/av"
 	"github.com/livepeer/joy4/av/avutil"
 	"github.com/livepeer/joy4/format"
@@ -22,18 +23,96 @@ import (
 )
 
 const (
-	segLen = 5 * time.Second
+	segLen               = 5 * time.Second
+	maxFileSizeForMemory = 50_000_000
 )
-
-var glapi *livepeerAPI.Client
 
 func init() {
 	format.RegisterAll()
 	rand.Seed(time.Now().UnixNano())
-	opts := livepeerAPI.ClientOptions{
-		AccessToken: "f8750a7c-084e-4315-8f8b-900237d48a57",
+}
+
+func readFileToMemory(fir *drivers.FileInfoReader) (io.ReadSeekCloser, error) {
+	fileInMem, err := io.ReadAll(fir.Body)
+	if err != nil {
+		return nil, err
 	}
-	glapi = livepeerAPI.NewAPIClient(opts)
+	return &ReaderClose{*bytes.NewReader(fileInMem)}, nil
+}
+
+type autodeletingFile struct {
+	*os.File
+}
+
+func (adf *autodeletingFile) Reader() io.Reader {
+	adf.Seek(0, io.SeekStart)
+	return adf
+}
+
+func (adf *autodeletingFile) Close() error {
+	err := adf.File.Close()
+	os.Remove(adf.File.Name())
+	return err
+}
+
+func getTempFile(size int64) (*os.File, error) {
+	file, err := os.CreateTemp("", "transcode")
+	if err != nil {
+		glog.Errorf("Error creating temporary file err=%v", err)
+		return nil, err
+	}
+	glog.Infof("Created temporary file name=%s", file.Name())
+	if size > 0 {
+		offset, err := file.Seek(size, io.SeekStart)
+		if err != nil || offset != size {
+			os.Remove(file.Name())
+			glog.Errorf("Error creating temporary file name=%s with size=%d offset=%d err=%v", file.Name(), size, offset, err)
+			return nil, err
+		}
+		file.Seek(0, io.SeekStart)
+	}
+	return file, nil
+}
+
+func readFile(fir *drivers.FileInfoReader) (io.ReadSeekCloser, error) {
+	var fileSize int64
+	if fir.Size != nil {
+		fileSize = *fir.Size
+	}
+	glog.Infof("Source file name=%s size=%d", fir.Name, fileSize)
+	if fir.Size != nil && *fir.Size < maxFileSizeForMemory {
+		// use memory
+		return readFileToMemory(fir)
+	}
+	if file, err := getTempFile(fileSize); err != nil {
+		return readFileToMemory(fir)
+	} else {
+		if _, err = file.ReadFrom(fir.Body); err != nil {
+			file.Close()
+			os.Remove(file.Name())
+			return nil, err
+		}
+		file.Seek(0, io.SeekStart)
+		return &autodeletingFile{file}, nil
+	}
+}
+
+type WriteSeekCloser interface {
+	io.WriteSeeker
+	io.Closer
+	Reader() io.Reader
+}
+
+func fileWriter(size int64) WriteSeekCloser {
+	if size > 0 && size < maxFileSizeForMemory {
+		// use memory
+		return &WriterSeeker{}
+	}
+	if file, err := getTempFile(size); err != nil {
+		return &WriterSeeker{}
+	} else {
+		return &autodeletingFile{file}
+	}
 }
 
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -42,17 +121,21 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		inputPlaybackID = tctx.InputAsset.PlaybackID
 		lapi            = tctx.lapi
 	)
-	lapi = glapi
 
 	fullPath := videoFileName(inputPlaybackID)
 	fir, err := tctx.inputOS.ReadData(ctx, fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading data from source OS url=%s err=%w", fullPath, err)
 	}
-	fileInMem, err := io.ReadAll(fir.Body)
+	sourceFile, err := readFile(fir)
 	fir.Body.Close()
 	if err != nil {
 		return nil, err
+	}
+	defer sourceFile.Close()
+	var sourceFileSize int64
+	if fir.Size != nil {
+		sourceFileSize = *fir.Size
 	}
 
 	streamName := fmt.Sprintf("vod_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
@@ -67,12 +150,13 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	gctx, gcancel := context.WithCancel(ctx)
 	defer gcancel()
 	segmentsIn := make(chan *model.HlsSegment)
-	if err = segmenter.StartSegmentingR(gctx, &ReaderClose{*bytes.NewReader(fileInMem)}, true, 0, 0, segLen, false, segmentsIn); err != nil {
+	if err = segmenter.StartSegmentingR(gctx, sourceFile, true, 0, 0, segLen, false, segmentsIn); err != nil {
 		return nil, err
 	}
 	var outFiles []av.Muxer
-	var outBuffers []*WriterSeeker
-	ws := &WriterSeeker{}
+	var outBuffers []WriteSeekCloser
+	ws := fileWriter(sourceFileSize)
+	defer ws.Close()
 	mp4muxer := mp4.NewMuxer(ws)
 	outFiles = append(outFiles, mp4muxer)
 	outBuffers = append(outBuffers, ws)
