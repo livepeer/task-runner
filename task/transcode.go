@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	livepeerAPI "github.com/livepeer/go-api-client"
 	"github.com/livepeer/joy4/av"
 	"github.com/livepeer/joy4/av/avutil"
 	"github.com/livepeer/joy4/format"
@@ -18,16 +19,21 @@ import (
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/stream-tester/model"
 	"github.com/livepeer/stream-tester/segmenter"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
 	segLen = 5 * time.Second
 )
 
+var glapi *livepeerAPI.Client
+
 func init() {
 	format.RegisterAll()
 	rand.Seed(time.Now().UnixNano())
+	opts := livepeerAPI.ClientOptions{
+		AccessToken: "f8750a7c-084e-4315-8f8b-900237d48a57",
+	}
+	glapi = livepeerAPI.NewAPIClient(opts)
 }
 
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -36,6 +42,7 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		inputPlaybackID = tctx.InputAsset.PlaybackID
 		lapi            = tctx.lapi
 	)
+	lapi = glapi
 
 	fullPath := videoFileName(inputPlaybackID)
 	fir, err := tctx.inputOS.ReadData(ctx, fullPath)
@@ -49,14 +56,14 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 
 	streamName := fmt.Sprintf("vod_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
-	profiles := tctx.Params.Transcode.Profiles
-	stream, err := lapi.CreateStreamEx(streamName, false, nil, profiles...)
+	profile := tctx.Params.Transcode.Profile
+	stream, err := lapi.CreateStreamEx(streamName, false, nil, profile)
 	if err != nil {
 		return nil, err
 	}
 	defer lapi.DeleteStream(stream.ID)
 
-	fmt.Printf("Created stream id=%s name=%s\n", stream.ID, stream.Name)
+	glog.V(model.DEBUG).Infof("Created vod stream id=%s name=%s\n", stream.ID, stream.Name)
 	gctx, gcancel := context.WithCancel(ctx)
 	defer gcancel()
 	segmentsIn := make(chan *model.HlsSegment)
@@ -65,12 +72,10 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	var outFiles []av.Muxer
 	var outBuffers []*WriterSeeker
-	for range tctx.Params.Transcode.Profiles {
-		ws := &WriterSeeker{}
-		mp4muxer := mp4.NewMuxer(ws)
-		outFiles = append(outFiles, mp4muxer)
-		outBuffers = append(outBuffers, ws)
-	}
+	ws := &WriterSeeker{}
+	mp4muxer := mp4.NewMuxer(ws)
+	outFiles = append(outFiles, mp4muxer)
+	outBuffers = append(outBuffers, ws)
 	var transcoded [][]byte
 	err = nil
 out:
@@ -80,17 +85,17 @@ out:
 		}
 		if seg.Err != nil {
 			err = seg.Err
-			glog.Errorf("===> got error %v", err)
+			glog.Errorf("Error while segmenting playbackID=%s err=%v", inputPlaybackID, err)
 			break
 		}
-		glog.V(model.DEBUG).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
+		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
 		started := time.Now()
 		transcoded, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data)
 		if err != nil {
-			glog.Errorf("Segment push err=%v\n", err)
+			glog.Errorf("Segment push playbackID=%s err=%v\n", inputPlaybackID, err)
 			break
 		}
-		glog.V(model.DEBUG).Infof("Transcoded %d took %s\n", len(transcoded), time.Since(started))
+		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 
 		for i, segData := range transcoded {
 			demuxer := ts.NewDemuxer(bytes.NewReader(segData))
@@ -106,7 +111,7 @@ out:
 				}
 			}
 			if err = avutil.CopyPackets(outFiles[i], demuxer); err != io.EOF {
-				glog.Errorf("Copy packets media %d err=%v\n", i, err)
+				glog.Errorf("copy packets media %d err=%v\n", i, err)
 				break out
 			}
 		}
@@ -117,50 +122,33 @@ out:
 	if err != nil {
 		return nil, err
 	}
-	eg, egCtx := errgroup.WithContext(ctx)
 	var videoFilePath string
-	assets := make([]data.ImportTaskOutput, len(tctx.Params.Transcode.Profiles))
-	for i, profile := range tctx.Params.Transcode.Profiles {
-		// for i, playbackID := range tctx.Params.Transcode.PlaybackIDs {
-		asset := tctx.OutputAssets[i]
-		glog.Infof("processing i %d pid %s profile %s", i, asset.PlaybackID, profile.Name)
-		outFiles[i].WriteTrailer()
-		func(j int) {
-			eg.Go(func() (err error) {
-				asset := tctx.OutputAssets[j]
-				fullPath := videoFileName(asset.PlaybackID)
-				ws := outBuffers[j]
-				videoFilePath, err = tctx.outputOSs[j].SaveData(egCtx, fullPath, ws.Reader(), nil, fileUploadTimeout)
-				if err != nil {
-					return fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-				} else {
-					glog.Infof("Saved file with j=%d playbackID=%s to url=%s", j, asset.PlaybackID, videoFilePath)
-				}
-
-				metadata, err := Probe(egCtx, asset.Name+"_"+tctx.Params.Transcode.Profiles[j].Name, NewReadCounter(ws.Reader()))
-				if err != nil {
-					return err
-				}
-				metadataFilePath, err := saveMetadataFile(egCtx, tctx.outputOSs[j], asset.PlaybackID, metadata)
-				if err != nil {
-					return err
-				}
-				assets[j] = data.ImportTaskOutput{
-					VideoFilePath:    videoFilePath,
-					MetadataFilePath: metadataFilePath,
-					AssetSpec:        metadata.AssetSpec,
-				}
-				return nil
-			})
-		}(i)
+	outFiles[0].WriteTrailer()
+	asset := tctx.OutputAsset
+	fullPath = videoFileName(asset.PlaybackID)
+	ws = outBuffers[0]
+	videoFilePath, err = tctx.outputOS.SaveData(gctx, fullPath, ws.Reader(), nil, fileUploadTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+	} else {
+		glog.Infof("Saved file with playbackID=%s to url=%s", asset.PlaybackID, videoFilePath)
 	}
-	if err := eg.Wait(); err != nil {
-		// TODO: Delete the uploaded file
+
+	metadata, err := Probe(gctx, asset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()))
+	if err != nil {
+		return nil, err
+	}
+	metadataFilePath, err := saveMetadataFile(gctx, tctx.outputOS, asset.PlaybackID, metadata)
+	if err != nil {
 		return nil, err
 	}
 	return &data.TaskOutput{
 		Transcode: &data.TranscodeTaskOutput{
-			Assets: assets,
+			Asset: data.ImportTaskOutput{
+				VideoFilePath:    videoFilePath,
+				MetadataFilePath: metadataFilePath,
+				AssetSpec:        metadata.AssetSpec,
+			},
 		},
 	}, nil
 }

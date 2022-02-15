@@ -18,10 +18,10 @@ require (
 	gopkg.in/vansante/go-ffprobe.v2 v2.0.3
 )
 
-// replace (
-// 	github.com/livepeer/go-api-client => ../go-api-client
-// 	github.com/livepeer/go-livepeer => ../go-livepeer
-// 	github.com/livepeer/joy4 => ../joy4
-// 	github.com/livepeer/livepeer-data => ../livepeer-data
-// 	github.com/livepeer/stream-tester => ../stream-tester
-// )
+replace (
+	github.com/livepeer/go-api-client => ../go-api-client
+	github.com/livepeer/go-livepeer => ../go-livepeer
+	github.com/livepeer/joy4 => ../joy4
+	github.com/livepeer/livepeer-data => ../livepeer-data
+	github.com/livepeer/stream-tester => ../stream-tester
+)
