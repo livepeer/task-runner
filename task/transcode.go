@@ -297,11 +297,6 @@ func (ws *WriterSeeker) Close() error {
 	return nil
 }
 
-// BytesReader returns a *bytes.Reader. Use it when you need a reader that implements the io.ReadSeeker interface
-func (ws *WriterSeeker) BytesReader() *bytes.Reader {
-	return bytes.NewReader(ws.buf.Bytes())
-}
-
 type ReaderClose struct {
 	bytes.Reader
 }
