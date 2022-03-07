@@ -5,7 +5,7 @@ on: push
 jobs:
   build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         arch: [amd64, arm64]
@@ -14,14 +14,30 @@ jobs:
             arch: arm64
 
     runs-on: ${{ matrix.os }}
-    env:
-      GOARCH: ${{ matrix.arch }}
+
     steps:
       - name: Set up go
         id: go
         uses: actions/setup-go@v1
         with:
           go-version: 1.17
+
+      - name: Set build environment
+        run: |
+          echo "GOARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
+          if [[ "${{ matrix.os }}" == "linux-latest" ]]
+          then
+            echo "GOOS=linux" >> "$GITHUB_ENV"
+            echo "LP_RELEASE_PLATFORM=linux" >> "$GITHUB_ENV"
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]
+          then
+            echo "GOOS=darwin >> "$GITHUB_ENV"
+            echo "LP_RELEASE_PLATFORM=darwin >> "$GITHUB_ENV"
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]
+          then
+            echo "GOOS=windows" >> "$GITHUB_ENV"
+            echo "LP_RELEASE_PLATFORM=windows" >> "$GITHUB_ENV"
+          fi
 
       - name: Check out code
         uses: actions/checkout@v1
@@ -49,6 +65,7 @@ jobs:
         if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
         shell: bash
         run: |
+          command -v brew && brew install coreutils
           curl -s \
             https://raw.githubusercontent.com/livepeer/go-livepeer/master/install_ffmpeg.sh \
             | bash -
@@ -67,9 +84,9 @@ jobs:
           if [[ "${{ runner.os }}" == "Windows" ]]
           then
             mv livepeer-task-runner livepeer-task-runner.exe
-            zip -9q "../releases/livepeer-task-runner-windows-amd64.zip" ./livepeer-task-runner.exe
+            zip -9q "../releases/livepeer-task-runner-${LP_RELEASE_PLATFORM}-amd64.zip" ./livepeer-task-runner.exe
           else
-            tar -czvf "../releases/livepeer-task-runner-${{ runner.os }}-${{ matrix.arch }}.tar.gz" ./livepeer-task-runner
+            tar -czvf "../releases/livepeer-task-runner-${LP_RELEASE_PLATFORM}-${{ matrix.arch }}.tar.gz" ./livepeer-task-runner
           fi
           cd -
 
