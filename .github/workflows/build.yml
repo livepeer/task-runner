@@ -10,17 +10,17 @@ jobs:
         # NOTE: Disabling windows and arm64 build environments while
         # ffmpeg installation issues get resolved.
         os:
-          - ubuntu-latest
-          - macos-latest
-          # - windows-latest
+          - ubuntu-20.04
+          - macos-11
+          # - windows-2022
         arch:
           - amd64
           - arm64
         exclude:
           - arch: arm64
-            os: macos-latest
+            os: macos-11
           - arch: arm64
-            os: ubuntu-latest
+            os: ubuntu-20.04
 
     runs-on: ${{ matrix.os }}
 
@@ -35,13 +35,13 @@ jobs:
         shell: bash
         run: |
           echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
+          if [[ "${{ matrix.os }}" == "ubuntu-20.04" ]]
           then
             echo "LP_RELEASE_PLATFORM=linux" >> $GITHUB_ENV
-          elif [[ "${{ matrix.os }}" == "macos-latest" ]]
+          elif [[ "${{ matrix.os }}" == "macos-11" ]]
           then
             echo "LP_RELEASE_PLATFORM=darwin" >> $GITHUB_ENV
-          elif [[ "${{ matrix.os }}" == "windows-latest" ]]
+          elif [[ "${{ matrix.os }}" == "windows-2022" ]]
           then
             echo "LP_RELEASE_PLATFORM=windows" >> $GITHUB_ENV
           fi
