@@ -23,20 +23,18 @@ jobs:
           go-version: 1.17
 
       - name: Set build environment
+        shell: bash
         run: |
-          echo "GOARCH=${{ matrix.arch }}" >> "$GITHUB_ENV"
-          if [[ "${{ matrix.os }}" == "linux-latest" ]]
+          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
           then
-            echo "GOOS=linux" >> "$GITHUB_ENV"
-            echo "LP_RELEASE_PLATFORM=linux" >> "$GITHUB_ENV"
+            echo "LP_RELEASE_PLATFORM=linux" >> $GITHUB_ENV
           elif [[ "${{ matrix.os }}" == "macos-latest" ]]
           then
-            echo "GOOS=darwin >> "$GITHUB_ENV"
-            echo "LP_RELEASE_PLATFORM=darwin >> "$GITHUB_ENV"
+            echo "LP_RELEASE_PLATFORM=darwin" >> $GITHUB_ENV
           elif [[ "${{ matrix.os }}" == "windows-latest" ]]
           then
-            echo "GOOS=windows" >> "$GITHUB_ENV"
-            echo "LP_RELEASE_PLATFORM=windows" >> "$GITHUB_ENV"
+            echo "LP_RELEASE_PLATFORM=windows" >> $GITHUB_ENV
           fi
 
       - name: Check out code
