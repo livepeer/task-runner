@@ -10,7 +10,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: ${{ github.ref_type == 'tag' && github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.ref_type == 'tag' }}
     steps:
       - name: checkout
         uses: actions/checkout@master
