@@ -50,6 +50,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: ${{ steps.match-tag.outputs.match != '' }}
         with:
+          tag_name: ${{ github.event.workflow_run.head_branch }}
           generate_release_notes: true
           files: |
             releases/*
