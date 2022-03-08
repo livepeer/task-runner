@@ -36,7 +36,7 @@ jobs:
         uses: livepeer/action-gh-checksum-and-gpg-sign@latest
         with:
           artifacts-dir: releases
-          release-name: ${{ github.ref_name }}
+          release-name: ${{ github.event.workflow_run.head_branch }}
           gpg-key: ${{ secrets.CI_GPG_SIGNING_KEY }}
           gpg-key-passphrase: ${{ secrets.CI_GPG_SIGNING_PASSPHRASE }}
 
