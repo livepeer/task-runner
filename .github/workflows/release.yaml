@@ -8,15 +8,6 @@ on:
       - "completed"
 
 jobs:
-  print:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dump event context
-        env:
-          CONTEXT: ${{ toJson(github) }}
-        run: |
-          echo $CONTEXT
-
   on-failure:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
@@ -32,6 +23,7 @@ jobs:
         uses: actions/checkout@master
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_branch }}
 
       - name: Download artifacts from build stage
         uses: dawidd6/action-download-artifact@v2
@@ -48,8 +40,15 @@ jobs:
           gpg-key: ${{ secrets.CI_GPG_SIGNING_KEY }}
           gpg-key-passphrase: ${{ secrets.CI_GPG_SIGNING_PASSPHRASE }}
 
+      - uses: actions-ecosystem/action-regex-match@v2
+        id: match-tag
+        with:
+          text: ${{ github.event.workflow_run.head_branch }}
+          regex: '^v([0-9]+\.\d+\.\d+)$'
+
       - name: Release to github
         uses: softprops/action-gh-release@v1
+        if: ${{ steps.match-tag.outputs.match != '' }}
         with:
           generate_release_notes: true
           files: |
