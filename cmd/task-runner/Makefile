@@ -1,7 +1,7 @@
 version ?= $(shell git describe --tag --dirty)
 
 ldflags := -X 'main.Version=$(version)'
-builddir := ../../build/
+builddir := ../../build
 
 .PHONY: all build run
 

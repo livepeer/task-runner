@@ -1,39 +1,104 @@
-name: Build
+name: Build binaries
+
 on: push
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # NOTE: Disabling windows and arm64 build environments while
+        # ffmpeg installation issues get resolved.
+        os:
+          - ubuntu-20.04
+          - macos-11
+          # - windows-2022
+        arch:
+          - amd64
+          - arm64
+        exclude:
+          - arch: arm64
+            os: macos-11
+          - arch: arm64
+            os: ubuntu-20.04
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - name: Set up go
         id: go
         uses: actions/setup-go@v1
         with:
-          go-version: 1.16
+          go-version: 1.17
+
+      - name: Set build environment
+        shell: bash
+        run: |
+          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
+          if [[ "${{ matrix.os }}" == "ubuntu-20.04" ]]
+          then
+            echo "LP_RELEASE_PLATFORM=linux" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == "macos-11" ]]
+          then
+            echo "LP_RELEASE_PLATFORM=darwin" >> $GITHUB_ENV
+          elif [[ "${{ matrix.os }}" == "windows-2022" ]]
+          then
+            echo "LP_RELEASE_PLATFORM=windows" >> $GITHUB_ENV
+          fi
 
       - name: Check out code
         uses: actions/checkout@v1
 
+      - name: Restore go package cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-go-
+
       - name: Cache ffmpeg
         id: cache-ffmpeg
-        uses: actions/cache@v2.1.5
+        uses: actions/cache@v2
         with:
           path: ~/compiled
-          key: ${{ runner.os }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
+          key: ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
           restore-keys: |
-            ${{ runner.os }}-ffmpeg
+            ${{ runner.os }}-${{ matrix.arch }}-ffmpeg
 
       - name: Install ffmpeg
         if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        shell: bash
         run: |
+          command -v brew && brew install coreutils
           curl -s \
-            https://raw.githubusercontent.com/livepeer/go-livepeer/5da8ff8e521c15e5828fb9dfa619daf91a091fd0/install_ffmpeg.sh \
+            https://raw.githubusercontent.com/livepeer/go-livepeer/master/install_ffmpeg.sh \
             | bash -
 
       - name: Download dependencies
         run: go mod download
 
       - name: Build
+        shell: bash
         run: |
+          mkdir -p build/ releases/
           export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig
           make
+          cd build
+          mv task-runner livepeer-task-runner
+          if [[ "${{ runner.os }}" == "Windows" ]]
+          then
+            mv livepeer-task-runner livepeer-task-runner.exe
+            zip -9q "../releases/livepeer-task-runner-${LP_RELEASE_PLATFORM}-amd64.zip" ./livepeer-task-runner.exe
+          else
+            tar -czvf "../releases/livepeer-task-runner-${LP_RELEASE_PLATFORM}-${{ matrix.arch }}.tar.gz" ./livepeer-task-runner
+          fi
+          cd -
+
+      - name: Upload artifacts for processing further in linux
+        uses: actions/upload-artifact@master
+        with:
+          name: release-artifacts
+          path: releases/
