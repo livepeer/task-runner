@@ -560,8 +560,8 @@ github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07/go.mod h1:RDTLvmm/
 github.com/livepeer/leaderboard-serverless v1.0.0/go.mod h1:0H4gFyyTO3lXtqfRIwyRaWPuW0pBMXkNUDtIjHHniW0=
 github.com/livepeer/livepeer-data v0.2.0/go.mod h1:vkW1PJ24gOJgx1hHUo07cXkR1b409n+dGpyWJsHKI3s=
 github.com/livepeer/livepeer-data v0.4.0/go.mod h1:XRMZAh6E48fZS9M6i5JHZMfEUXuwaC3Zig5OSogROOM=
-github.com/livepeer/livepeer-data v0.4.12-0.20220215093731-d90b902b27b5 h1:RheihGSZR1EpPO4S4eHMIP2+s5ml3a5CvuH/IrxAQTo=
-github.com/livepeer/livepeer-data v0.4.12-0.20220215093731-d90b902b27b5/go.mod h1:VIbJRdyH2Tas8EgLVkP79IPMepFDOv0dgHYLEZsCaf4=
+github.com/livepeer/livepeer-data v0.4.14 h1:tYlDKiBdjEj3+U7HZh+5KPoPGloXcl6vjM9nw8TlfmQ=
+github.com/livepeer/livepeer-data v0.4.14/go.mod h1:VIbJRdyH2Tas8EgLVkP79IPMepFDOv0dgHYLEZsCaf4=
 github.com/livepeer/lpms v0.0.0-20220111151401-0eb91f2facdb h1:2EM2tlBmcnK6QiT5JjWyRVya5N2UXDT/1evaMVmTzTQ=
 github.com/livepeer/lpms v0.0.0-20220111151401-0eb91f2facdb/go.mod h1:Hr/JhxxPDipOVd4ZrGYWrdJfpVF8/SEI0nNr2ctAlkM=
 github.com/livepeer/m3u8 v0.11.1 h1:VkUJzfNTyjy9mqsgp5JPvouwna8wGZMvd/gAfT5FinU=

@@ -7,7 +7,7 @@ require (
 	github.com/livepeer/go-api-client v0.1.1
 	github.com/livepeer/go-livepeer v0.5.27-0.20220201164915-5da8ff8e521c
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
-	github.com/livepeer/livepeer-data v0.4.12-0.20220215093731-d90b902b27b5
+	github.com/livepeer/livepeer-data v0.4.14
 	github.com/livepeer/stream-tester v0.11.4-0.20220210094813-3f56876c3ac8
 	github.com/peterbourgon/ff v1.7.1
 	github.com/rabbitmq/amqp091-go v1.1.0
