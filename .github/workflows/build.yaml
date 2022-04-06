@@ -168,8 +168,8 @@ jobs:
           developer-certificate-password: ${{ secrets.CI_MACOS_CERTIFICATE_PASSWORD }}
           app-notarization-email: ${{ secrets.CI_MACOS_NOTARIZATION_USER }}
           app-notarization-password: ${{ secrets.CI_MACOS_NOTARIZATION_PASSWORD }}
-          binary-path: "build/livepeer-analyzer"
-          app-bundle-id: "org.livepeer.analyzer"
+          binary-path: "build/livepeer-task-runner"
+          app-bundle-id: "org.livepeer.task-runner"
 
       - name: Archive signed binary
         run: |
