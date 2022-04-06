@@ -14,8 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         arch:
+          # Disabling arm64 builds till ffmpeg installation support isn't available
+          # - arm64
           - amd64
-          - arm64
     name: Build binaries for linux platform
     runs-on: ubuntu-20.04
     steps:
@@ -88,8 +89,9 @@ jobs:
       fail-fast: false
       matrix:
         arch:
+          # Disabling arm64 builds till ffmpeg installation support isn't available
+          # - arm64
           - amd64
-          - arm64
     name: Build binaries for macOS platform
     runs-on: macos-11
     steps:
@@ -180,90 +182,102 @@ jobs:
           name: release-artifacts
           path: releases/
 
-  windows:
-    defaults:
-      run:
-        shell: msys2 {0}
-    strategy:
-      matrix:
-        arch:
-          # Disabling arm64 builds till ffmpeg installation support isn't available
-          # - arm64
-          - amd64
-    name: Build binaries for windows platform
-    runs-on: windows-2022
-    steps:
-      - uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          install: >-
-            mingw-w64-x86_64-binutils
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-go
-            git
-            make
-            autoconf
-            automake
-            patch
-            libtool
-            texinfo
-            gtk-doc
-            zip
-            curl
+  # Disabling windows build stage while support isn't available
+  # windows:
+  #   defaults:
+  #     run:
+  #       shell: msys2 {0}
+  #   strategy:
+  #     matrix:
+  #       arch:
+  #         # Disabling arm64 builds till ffmpeg installation support isn't available
+  #         # - arm64
+  #         - amd64
+  #   name: Build binaries for windows platform
+  #   runs-on: windows-2022
+  #   steps:
+  #     - name: Setup Msys2 environment
+  #       uses: msys2/setup-msys2@v2
+  #       with:
+  #         msystem: MSYS
+  #         update: true
+  #         install: >-
+  #           mingw-w64-x86_64-binutils
+  #           mingw-w64-x86_64-gcc
+  #           mingw-w64-x86_64-go
+  #           git
+  #           make
+  #           autoconf
+  #           automake
+  #           patch
+  #           libtool
+  #           texinfo
+  #           gtk-doc
+  #           zip
+  #           curl
 
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          # Check https://github.com/livepeer/go-livepeer/pull/1891
-          # for ref value discussion
-          ref: ${{ github.event.pull_request.head.sha }}
+  #     - name: configure git line endings
+  #       run: git config --global core.autocrlf false
 
-      - name: Export OS and platform env
-        run: |
-          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
-          curl -sLO https://raw.githubusercontent.com/livepeer/go-livepeer/master/install_ffmpeg.sh
-          chmod a+x install_ffmpeg.sh
+  #     - name: Check out code
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
+  #         # Check https://github.com/livepeer/go-livepeer/pull/1891
+  #         # for ref value discussion
+  #         ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Restore go package cache
-        id: cache-go-mod
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-go-
+  #     - name: Export OS and platform env
+  #       run: |
+  #         echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
+  #         curl -sLO https://raw.githubusercontent.com/livepeer/go-livepeer/master/install_ffmpeg.sh
+  #         curl -sLO https://raw.githubusercontent.com/livepeer/go-livepeer/master/prepare_mingw64.sh
+  #         chmod a+x install_ffmpeg.sh
+  #         chmod a+x prepare_mingw64.sh
 
-      - name: Cache ffmpeg
-        id: cache-ffmpeg
-        uses: actions/cache@v3
-        with:
-          path: ~/compiled
-          key: ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-
+  #     - name: Prepare mingw64 environment
+  #       shell: msys2 {0}
+  #       run: ./prepare_mingw64.sh
 
-      - name: Install ffmpeg
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        run: ./install_ffmpeg.sh
+  #     - name: Restore go package cache
+  #       id: cache-go-mod
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: |
+  #           ~/.cache/go-build
+  #           ~/go/pkg/mod
+  #         key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('**/go.sum') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-${{ matrix.arch }}-go-
 
-      - name: Download dependencies
-        if: steps.cache-go-mod.outputs.cache-hit != 'true'
-        run: go mod download
+  #     - name: Cache ffmpeg
+  #       id: cache-ffmpeg
+  #       uses: actions/cache@v3
+  #       with:
+  #         path: ~/compiled
+  #         key: ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-
 
-      - name: Build
-        run: |
-          mkdir -p build/ releases/
-          export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig
-          make
-          cd build/
-          mv task-runner livepeer-task-runner.exe
-          zip -9q "../releases/livepeer-task-runner-windows-${GOARCH}.zip" ./livepeer-task-runner.exe
+  #     - name: Install ffmpeg
+  #       if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+  #       run: ./install_ffmpeg.sh
 
-      - name: Upload artifacts for cutting release
-        uses: actions/upload-artifact@master
-        with:
-          name: release-artifacts
-          path: releases/
+  #     - name: Download dependencies
+  #       if: steps.cache-go-mod.outputs.cache-hit != 'true'
+  #       run: go mod download
+
+  #     - name: Build
+  #       run: |
+  #         mkdir -p build/ releases/
+  #         export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig
+  #         make
+  #         cd build/
+  #         mv task-runner livepeer-task-runner.exe
+  #         zip -9q "../releases/livepeer-task-runner-windows-${GOARCH}.zip" ./livepeer-task-runner.exe
+
+  #     - name: Upload artifacts for cutting release
+  #       uses: actions/upload-artifact@master
+  #       with:
+  #         name: release-artifacts
+  #         path: releases/
