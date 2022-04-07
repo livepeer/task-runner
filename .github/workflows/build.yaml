@@ -69,7 +69,6 @@ jobs:
         run: go mod download
 
       - name: Build
-        shell: bash
         run: |
           mkdir -p build/ releases/
           export PKG_CONFIG_PATH=~/compiled/lib/pkgconfig
@@ -168,7 +167,7 @@ jobs:
           app-notarization-email: ${{ secrets.CI_MACOS_NOTARIZATION_USER }}
           app-notarization-password: ${{ secrets.CI_MACOS_NOTARIZATION_PASSWORD }}
           binary-path: "build/livepeer-task-runner"
-          app-bundle-id: "org.livepeer.task-runner"
+          app-bundle-id: "org.livepeer.taskRunner"
 
       - name: Archive signed binary
         run: |
