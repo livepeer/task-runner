@@ -38,6 +38,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		metadata                        *FileMetadata
 	)
 	go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count)
+	// Probe the file to retrieve metadata
 	eg.Go(func() (err error) {
 		metadata, err = Probe(egCtx, filename, mainReader)
 		pipe.CloseWithError(err)
@@ -47,6 +48,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		metadataFilePath, err = saveMetadataFile(egCtx, osSess, playbackID, metadata)
 		return err
 	})
+	// Save file to our storage
 	eg.Go(func() (err error) {
 		fullPath := videoFileName(playbackID)
 		videoFilePath, err = osSess.SaveData(egCtx, fullPath, secondaryReader, nil, fileUploadTimeout)
@@ -59,6 +61,12 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		// TODO: Delete the uploaded file
 		return nil, err
 	}
+	// RecordStream (on our file) after async goroutines finish
+	playbackRecordingSessionId, err := RecordStream(ctx, tctx.lapi, playbackID, osSess)
+	if err != nil {
+		return nil, err
+	}
+	metadata.AssetSpec.PlaybackRecordingSessionID = playbackRecordingSessionId
 	return &data.TaskOutput{Import: &data.ImportTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
