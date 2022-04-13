@@ -3,7 +3,6 @@ package task
 import (
 	"context"
 	"fmt"
-	"path"
 	"strconv"
 	"strings"
 
@@ -11,8 +10,13 @@ import (
 	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
 
+type supportedFormat struct {
+	format string
+	brand  string
+}
+
 var (
-	supportedFormats     = []string{"mp4", "mov"}
+	supportedFormats     = []supportedFormat{{"mp4", "isom"}}
 	supportedVideoCodecs = map[string]bool{"h264": true}
 	supportedAudioCodecs = map[string]bool{"aac": true}
 )
@@ -52,7 +56,7 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 	if filename == "" && probeData.Format.Filename != "pipe:" {
 		filename = probeData.Format.Filename
 	}
-	format, err := findFormat(supportedFormats, probeData.Format.FormatName, filename)
+	format, err := findFormat(supportedFormats, probeData.Format)
 	if err != nil {
 		return nil, err
 	}
@@ -90,18 +94,15 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 	return spec, nil
 }
 
-func findFormat(supportedFormats []string, format, filename string) (string, error) {
-	actualFormats := strings.Split(format, ",")
-	extension := path.Ext(filename)
-	if containsStr(supportedFormats, extension) && containsStr(actualFormats, extension) {
-		return extension, nil
-	}
+func findFormat(supportedFormats []supportedFormat, format *ffprobe.Format) (string, error) {
+	actualFormats := strings.Split(format.FormatName, ",")
+	actualBrand := format.Tags.MajorBrand
 	for _, f := range supportedFormats {
-		if containsStr(actualFormats, f) {
-			return f, nil
+		if containsStr(actualFormats, f.format) && actualBrand == f.brand {
+			return f.format, nil
 		}
 	}
-	return "", fmt.Errorf("unsupported format: %s", format)
+	return "", fmt.Errorf("unsupported format, not an ISO MP4: %s (%s)", format.FormatName, format.Tags.MajorBrand)
 }
 
 func containsStr(slc []string, val string) bool {
