@@ -38,7 +38,7 @@ func RecordStream(ctx context.Context, lapi *livepeerAPI.Client, playbackID stri
 	if err != nil {
 		return "", nil
 	}
-	defer lapi.DeleteStream(stream.ID) // if we delete the recording stream for cleanup will the session/recording persist?
+	defer lapi.DeleteStream(stream.ID)
 
 	gctx, gcancel := context.WithCancel(ctx)
 	defer gcancel()
