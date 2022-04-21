@@ -16,7 +16,7 @@ type supportedFormat struct {
 }
 
 var (
-	supportedFormats     = []supportedFormat{{"mp4", "isom"}}
+	supportedFormats     = []supportedFormat{{"mp4", "isom"}, {"mp4", "iso6"}}
 	supportedVideoCodecs = map[string]bool{"h264": true}
 	supportedAudioCodecs = map[string]bool{"aac": true}
 )
