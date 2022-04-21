@@ -16,6 +16,7 @@ type supportedFormat struct {
 }
 
 var (
+	// TODO: Check if there are any other ISO MP4 (non-MOV) brands we wanna support.
 	supportedFormats     = []supportedFormat{{"mp4", "isom"}, {"mp4", "iso6"}}
 	supportedVideoCodecs = map[string]bool{"h264": true}
 	supportedAudioCodecs = map[string]bool{"aac": true}
