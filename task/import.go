@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/golang/glog"
 	livepeerAPI "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
@@ -21,7 +22,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		ctx        = tctx.Context
 		playbackID = tctx.OutputAsset.PlaybackID
 		params     = *tctx.Task.Params.Import
-		osSess     = tctx.outputOS
+		osSess     = tctx.outputOS // Import deals with outputOS only (URL -> ObjectStorage)
 	)
 	filename, size, contents, err := getFile(ctx, osSess, params)
 	if err != nil {
@@ -34,11 +35,11 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 
 	eg, egCtx := errgroup.WithContext(ctx)
 	var (
-		videoFilePath, metadataFilePath string
-		metadata                        *FileMetadata
+		videoFilePath, metadataFilePath, fullPath string
+		metadata                                  *FileMetadata
 	)
 	go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count)
-	// Probe the file to retrieve metadata
+	// Probe the source file to retrieve metadata
 	eg.Go(func() (err error) {
 		metadata, err = Probe(egCtx, filename, mainReader)
 		pipe.CloseWithError(err)
@@ -48,25 +49,38 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		metadataFilePath, err = saveMetadataFile(egCtx, osSess, playbackID, metadata)
 		return err
 	})
-	// Save file to our storage
+	// Save source file to our storage
 	eg.Go(func() (err error) {
-		fullPath := videoFileName(playbackID)
+		fullPath = videoFileName(playbackID)
 		videoFilePath, err = osSess.SaveData(egCtx, fullPath, secondaryReader, nil, fileUploadTimeout)
 		if err != nil {
 			return fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+		} else {
+			glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
 		}
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		// TODO: Delete the uploaded file
+		// TODO: Delete the source file
 		return nil, err
 	}
-	// RecordStream (on our file) after async goroutines finish
-	playbackRecordingSessionId, err := RecordStream(ctx, tctx.lapi, playbackID, osSess)
+	// Download our output file after async goroutines finish
+	fileInfoReader, err := osSess.ReadData(ctx, fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading imported file from output OS path=%s err=%w", fullPath, err)
+	}
+	importedFile, err := readFile(fileInfoReader)
 	if err != nil {
 		return nil, err
 	}
-	metadata.AssetSpec.PlaybackRecordingSessionID = playbackRecordingSessionId
+	fileInfoReader.Body.Close()
+	defer importedFile.Close()
+	// RecordStream on output file for HLS playback
+	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, importedFile)
+	if err != nil {
+		return nil, err
+	}
+	metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{Import: &data.ImportTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,

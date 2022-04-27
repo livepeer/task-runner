@@ -226,6 +226,10 @@ out:
 	if err != nil {
 		return nil, err
 	}
+	// RecordStream on output file for HLS playback
+	// TODO: cast WriteSeekCloser to ReadSeekCloser
+	// playbackRecordingId, err := RecordStream(ctx, tctx.lapi, ws)
+	// metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{
 		Transcode: &data.TranscodeTaskOutput{
 			Asset: data.ImportTaskOutput{
