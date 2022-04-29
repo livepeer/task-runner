@@ -144,9 +144,12 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 
 	handler, ok := r.TaskHandlers[strings.ToLower(taskType)]
 	if !ok {
-		return nil, UnretriableError{fmt.Errorf("unknown task type=%q id=%s", taskType, taskID)}
+		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
+	if taskCtx.Status.Phase == "running" {
+		return nil, UnretriableError{errors.New("task has already been started before")}
+	}
 	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
 	if err != nil {
 		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
