@@ -60,11 +60,12 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		return nil
 	})
+	// Wait for async goroutines finish to run prepare
 	if err := eg.Wait(); err != nil {
 		// TODO: Delete the source file
 		return nil, err
 	}
-	// Download our output file after async goroutines finish
+	// Download our imported output file
 	fileInfoReader, err := osSess.ReadData(ctx, fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading imported file from output OS path=%s err=%w", fullPath, err)
@@ -78,7 +79,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	// RecordStream on output file for HLS playback
 	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, importedFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error preparing imported file err=%w", err)
 	}
 	metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{Import: &data.ImportTaskOutput{

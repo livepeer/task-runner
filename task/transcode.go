@@ -226,10 +226,23 @@ out:
 	if err != nil {
 		return nil, err
 	}
+	// Download our transcoded output file
+	outputFileInfoReader, err := tctx.outputOS.ReadData(ctx, videoFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading transcoded file from output OS path=%s err=%w", fullPath, err)
+	}
+	transcodedFile, err := readFile(outputFileInfoReader)
+	if err != nil {
+		return nil, err
+	}
+	outputFileInfoReader.Body.Close()
+	defer transcodedFile.Close()
 	// RecordStream on output file for HLS playback
-	// TODO: cast WriteSeekCloser to ReadSeekCloser
-	// playbackRecordingId, err := RecordStream(ctx, tctx.lapi, ws)
-	// metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
+	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, transcodedFile)
+	if err != nil {
+		return nil, fmt.Errorf("error preparing imported file err=%w", err)
+	}
+	metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{
 		Transcode: &data.TranscodeTaskOutput{
 			Asset: data.ImportTaskOutput{
