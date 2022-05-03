@@ -240,7 +240,7 @@ out:
 	// RecordStream on output file for HLS playback
 	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, metadata.AssetSpec, transcodedFile)
 	if err != nil {
-		return nil, fmt.Errorf("error preparing imported file err=%w", err)
+		glog.Errorf("error preparing imported file err=%w", err)
 	}
 	metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{

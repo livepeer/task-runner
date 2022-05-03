@@ -79,7 +79,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	// RecordStream on output file for HLS playback
 	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, metadata.AssetSpec, importedFile)
 	if err != nil {
-		return nil, fmt.Errorf("error preparing imported file err=%w", err)
+		glog.Errorf("error preparing imported file err=%w", err)
 	}
 	metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{Import: &data.ImportTaskOutput{
