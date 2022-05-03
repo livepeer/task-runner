@@ -35,14 +35,14 @@ func RecordStream(ctx context.Context, lapi *livepeerAPI.Client, file io.ReadSee
 		}
 		if seg.Err != nil {
 			err = seg.Err
-			glog.Errorf("Error while segmenting file for prepare err=%v", file, err)
+			glog.Errorf("Error while segmenting file for prepare err=%v", err)
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
 		started := time.Now()
 		_, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data)
 		if err != nil {
-			glog.Errorf("Error while segment push for prepare err=%v\n", file, err)
+			glog.Errorf("Error while segment push for prepare err=%v\n", err)
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
