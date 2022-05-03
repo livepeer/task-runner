@@ -49,8 +49,14 @@ var allProfiles = []livepeerAPI.Profile{
 	},
 }
 
-func RecordStream(ctx context.Context, lapi *livepeerAPI.Client, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser) (string, error) {
-	streamName := fmt.Sprintf("vod_hls_recording_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
+func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser) (string, error) {
+	var (
+		ctx     = tctx.Context
+		lapi    = tctx.lapi
+		assetId = tctx.OutputAsset.ID
+	)
+
+	streamName := fmt.Sprintf("vod_hls_recording_%s", assetId)
 	profiles, err := getPlaybackProfiles(assetSpec.VideoSpec)
 	if err != nil {
 		return "", nil
@@ -88,13 +94,9 @@ func RecordStream(ctx context.Context, lapi *livepeerAPI.Client, assetSpec *live
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 	}
-	if err == io.EOF {
-		err = nil
-	}
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return "", err
 	}
-
 	return stream.ID, nil
 }
 

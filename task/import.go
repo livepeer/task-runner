@@ -55,9 +55,8 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		videoFilePath, err = osSess.SaveData(egCtx, fullPath, secondaryReader, nil, fileUploadTimeout)
 		if err != nil {
 			return fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-		} else {
-			glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
 		}
+		glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
 		return nil
 	})
 	// Wait for async goroutines finish to run prepare
@@ -70,22 +69,23 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading imported file from output OS path=%s err=%w", fullPath, err)
 	}
+	defer fileInfoReader.Body.Close()
 	importedFile, err := readFile(fileInfoReader)
 	if err != nil {
 		return nil, err
 	}
-	fileInfoReader.Body.Close()
 	defer importedFile.Close()
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, metadata.AssetSpec, importedFile)
+	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, importedFile)
 	if err != nil {
-		glog.Errorf("error preparing imported file err=%w", err)
+		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}
-	metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
+	assetSpec := *metadata.AssetSpec
+	assetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{Import: &data.ImportTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
-		AssetSpec:        metadata.AssetSpec,
+		AssetSpec:        assetSpec,
 	}}, nil
 }
 

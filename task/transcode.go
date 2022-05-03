@@ -214,9 +214,8 @@ out:
 	videoFilePath, err = tctx.outputOS.SaveData(gctx, fullPath, ws.Reader(), nil, fileUploadTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-	} else {
-		glog.Infof("Saved file with playbackID=%s to url=%s", asset.PlaybackID, videoFilePath)
 	}
+	glog.Infof("Saved file with playbackID=%s to url=%s", asset.PlaybackID, videoFilePath)
 
 	metadata, err := Probe(gctx, asset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()))
 	if err != nil {
@@ -226,29 +225,19 @@ out:
 	if err != nil {
 		return nil, err
 	}
-	// Download our transcoded output file
-	outputFileInfoReader, err := tctx.outputOS.ReadData(ctx, fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading transcoded file from output OS path=%s err=%w", fullPath, err)
-	}
-	transcodedFile, err := readFile(outputFileInfoReader)
-	if err != nil {
-		return nil, err
-	}
-	outputFileInfoReader.Body.Close()
-	defer transcodedFile.Close()
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, metadata.AssetSpec, transcodedFile)
+	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, ws.Reader())
 	if err != nil {
-		glog.Errorf("error preparing imported file err=%w", err)
+		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}
-	metadata.AssetSpec.PlaybackRecordingID = playbackRecordingId
+	assetSpec := *metadata.AssetSpec
+	assetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{
 		Transcode: &data.TranscodeTaskOutput{
 			Asset: data.ImportTaskOutput{
 				VideoFilePath:    videoFilePath,
 				MetadataFilePath: metadataFilePath,
-				AssetSpec:        metadata.AssetSpec,
+				AssetSpec:        assetSpec,
 			},
 		},
 	}, nil
