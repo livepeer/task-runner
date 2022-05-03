@@ -238,7 +238,7 @@ out:
 	outputFileInfoReader.Body.Close()
 	defer transcodedFile.Close()
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, transcodedFile)
+	playbackRecordingId, err := RecordStream(ctx, tctx.lapi, metadata.AssetSpec, transcodedFile)
 	if err != nil {
 		return nil, fmt.Errorf("error preparing imported file err=%w", err)
 	}
