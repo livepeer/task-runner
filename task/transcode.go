@@ -37,14 +37,14 @@ func readFileToMemory(fir *drivers.FileInfoReader) (io.ReadSeekCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ReaderClose{*bytes.NewReader(fileInMem)}, nil
+	return nopCloser{bytes.NewReader(fileInMem)}, nil
 }
 
 type autodeletingFile struct {
 	*os.File
 }
 
-func (adf *autodeletingFile) Reader() io.Reader {
+func (adf *autodeletingFile) Reader() io.ReadSeekCloser {
 	adf.Seek(0, io.SeekStart)
 	return adf
 }
@@ -100,16 +100,16 @@ func readFile(fir *drivers.FileInfoReader) (io.ReadSeekCloser, error) {
 type WriteSeekCloser interface {
 	io.WriteSeeker
 	io.Closer
-	Reader() io.Reader
+	Reader() io.ReadSeekCloser
 }
 
 func fileWriter(size int64) WriteSeekCloser {
 	if size > 0 && size < maxFileSizeForMemory {
 		// use memory
-		return &WriterSeeker{}
+		return &memWriteSeeker{}
 	}
 	if file, err := getTempFile(size); err != nil {
-		return &WriterSeeker{}
+		return &memWriteSeeker{}
 	} else {
 		return &autodeletingFile{file}
 	}
@@ -214,9 +214,8 @@ out:
 	videoFilePath, err = tctx.outputOS.SaveData(gctx, fullPath, ws.Reader(), nil, fileUploadTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-	} else {
-		glog.Infof("Saved file with playbackID=%s to url=%s", asset.PlaybackID, videoFilePath)
 	}
+	glog.Infof("Saved file with playbackID=%s to url=%s", asset.PlaybackID, videoFilePath)
 
 	metadata, err := Probe(gctx, asset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()))
 	if err != nil {
@@ -226,25 +225,32 @@ out:
 	if err != nil {
 		return nil, err
 	}
+	// RecordStream on output file for HLS playback
+	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, ws.Reader())
+	if err != nil {
+		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+	}
+	assetSpec := *metadata.AssetSpec
+	assetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{
 		Transcode: &data.TranscodeTaskOutput{
 			Asset: data.ImportTaskOutput{
 				VideoFilePath:    videoFilePath,
 				MetadataFilePath: metadataFilePath,
-				AssetSpec:        metadata.AssetSpec,
+				AssetSpec:        assetSpec,
 			},
 		},
 	}, nil
 }
 
-// WriterSeeker is an in-memory io.WriteSeeker implementation
-type WriterSeeker struct {
+// memWriteSeeker is an in-memory io.WriteSeeker implementation
+type memWriteSeeker struct {
 	buf bytes.Buffer
 	pos int
 }
 
 // Write writes to the buffer of this WriterSeeker instance
-func (ws *WriterSeeker) Write(p []byte) (n int, err error) {
+func (ws *memWriteSeeker) Write(p []byte) (n int, err error) {
 	// If the offset is past the end of the buffer, grow the buffer with null bytes.
 	if extra := ws.pos - ws.buf.Len(); extra > 0 {
 		if _, err := ws.buf.Write(make([]byte, extra)); err != nil {
@@ -270,7 +276,7 @@ func (ws *WriterSeeker) Write(p []byte) (n int, err error) {
 }
 
 // Seek seeks in the buffer of this WriterSeeker instance
-func (ws *WriterSeeker) Seek(offset int64, whence int) (int64, error) {
+func (ws *memWriteSeeker) Seek(offset int64, whence int) (int64, error) {
 	newPos, offs := 0, int(offset)
 	switch whence {
 	case io.SeekStart:
@@ -288,17 +294,17 @@ func (ws *WriterSeeker) Seek(offset int64, whence int) (int64, error) {
 }
 
 // Reader returns an io.Reader. Use it, for example, with io.Copy, to copy the content of the WriterSeeker buffer to an io.Writer
-func (ws *WriterSeeker) Reader() io.Reader {
-	return bytes.NewReader(ws.buf.Bytes())
+func (ws *memWriteSeeker) Reader() io.ReadSeekCloser {
+	return nopCloser{bytes.NewReader(ws.buf.Bytes())}
 }
 
 // Close :
-func (ws *WriterSeeker) Close() error {
+func (ws *memWriteSeeker) Close() error {
 	return nil
 }
 
-type ReaderClose struct {
-	bytes.Reader
+type nopCloser struct {
+	*bytes.Reader
 }
 
-func (ReaderClose) Close() error { return nil }
+func (nopCloser) Close() error { return nil }
