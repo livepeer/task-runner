@@ -227,7 +227,7 @@ out:
 		return nil, err
 	}
 	// Download our transcoded output file
-	outputFileInfoReader, err := tctx.outputOS.ReadData(ctx, videoFilePath)
+	outputFileInfoReader, err := tctx.outputOS.ReadData(ctx, fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading transcoded file from output OS path=%s err=%w", fullPath, err)
 	}
