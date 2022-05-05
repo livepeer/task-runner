@@ -12,11 +12,16 @@ import (
 	"github.com/livepeer/stream-tester/segmenter"
 )
 
+const (
+	minVideoBitrate         = 100_000
+	absoluteMinVideoBitrate = 5_000
+)
+
 var allProfiles = []livepeerAPI.Profile{
 	{
 		Name:    "240p0",
 		Fps:     0,
-		Bitrate: 250000,
+		Bitrate: 250_000,
 		Width:   426,
 		Height:  240,
 		Gop:     "2.0",
@@ -24,7 +29,7 @@ var allProfiles = []livepeerAPI.Profile{
 	{
 		Name:    "360p0",
 		Fps:     0,
-		Bitrate: 800000,
+		Bitrate: 800_000,
 		Width:   640,
 		Height:  360,
 		Gop:     "2.0",
@@ -32,7 +37,7 @@ var allProfiles = []livepeerAPI.Profile{
 	{
 		Name:    "480p0",
 		Fps:     0,
-		Bitrate: 1600000,
+		Bitrate: 1_600_000,
 		Width:   854,
 		Height:  480,
 		Gop:     "2.0",
@@ -40,7 +45,7 @@ var allProfiles = []livepeerAPI.Profile{
 	{
 		Name:    "720p0",
 		Fps:     0,
-		Bitrate: 3000000,
+		Bitrate: 3_000_000,
 		Width:   1280,
 		Height:  720,
 		Gop:     "2.0",
@@ -115,14 +120,24 @@ func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeer
 		}
 	}
 	if len(filtered) == 0 {
-		return []livepeerAPI.Profile{{
-			Name:    "low-bitrate",
-			Fps:     0,
-			Bitrate: int(video.Bitrate / 2),
-			Width:   video.Width,
-			Height:  video.Height,
-			Gop:     "2.0",
-		}}, nil
+		return []livepeerAPI.Profile{lowBitrateProfile(video)}, nil
 	}
 	return filtered, nil
+}
+
+func lowBitrateProfile(video *livepeerAPI.AssetTrack) livepeerAPI.Profile {
+	bitrate := int(video.Bitrate / 3)
+	if bitrate < minVideoBitrate && video.Bitrate > minVideoBitrate {
+		bitrate = minVideoBitrate
+	} else if bitrate < absoluteMinVideoBitrate {
+		bitrate = absoluteMinVideoBitrate
+	}
+	return livepeerAPI.Profile{
+		Name:    "low-bitrate",
+		Fps:     0,
+		Bitrate: bitrate,
+		Width:   video.Width,
+		Height:  video.Height,
+		Gop:     "2.0",
+	}
 }
