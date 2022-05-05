@@ -116,7 +116,7 @@ func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeer
 	}
 	if len(filtered) == 0 {
 		return []livepeerAPI.Profile{{
-			Name:    "low",
+			Name:    "low-bitrate",
 			Fps:     0,
 			Bitrate: int(video.Bitrate / 2),
 			Width:   video.Width,
