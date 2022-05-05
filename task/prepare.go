@@ -115,7 +115,7 @@ func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeer
 	}
 	filtered := make([]livepeerAPI.Profile, 0, len(allProfiles))
 	for _, profile := range allProfiles {
-		if profile.Height <= video.Height && profile.Bitrate <= int(video.Bitrate) {
+		if profile.Height <= video.Height && profile.Bitrate < int(video.Bitrate) {
 			filtered = append(filtered, profile)
 		}
 	}
