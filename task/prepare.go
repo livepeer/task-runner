@@ -12,21 +12,24 @@ import (
 	"github.com/livepeer/stream-tester/segmenter"
 )
 
-var profile240p = livepeerAPI.Profile{
-	Name:    "240p0",
-	Fps:     0,
-	Bitrate: 250000,
-	Width:   426,
-	Height:  240,
-	Gop:     "2.0",
-}
+const (
+	minVideoBitrate         = 100_000
+	absoluteMinVideoBitrate = 5_000
+)
 
 var allProfiles = []livepeerAPI.Profile{
-	profile240p,
+	{
+		Name:    "240p0",
+		Fps:     0,
+		Bitrate: 250_000,
+		Width:   426,
+		Height:  240,
+		Gop:     "2.0",
+	},
 	{
 		Name:    "360p0",
 		Fps:     0,
-		Bitrate: 800000,
+		Bitrate: 800_000,
 		Width:   640,
 		Height:  360,
 		Gop:     "2.0",
@@ -34,7 +37,7 @@ var allProfiles = []livepeerAPI.Profile{
 	{
 		Name:    "480p0",
 		Fps:     0,
-		Bitrate: 1600000,
+		Bitrate: 1_600_000,
 		Width:   854,
 		Height:  480,
 		Gop:     "2.0",
@@ -42,7 +45,7 @@ var allProfiles = []livepeerAPI.Profile{
 	{
 		Name:    "720p0",
 		Fps:     0,
-		Bitrate: 3000000,
+		Bitrate: 3_000_000,
 		Width:   1280,
 		Height:  720,
 		Gop:     "2.0",
@@ -101,23 +104,39 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 }
 
 func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeerAPI.Profile, error) {
-	assetHeight := -1
+	var video *livepeerAPI.AssetTrack
 	for _, track := range assetVideoSpec.Tracks {
 		if track.Type == "video" {
-			assetHeight = track.Height
+			video = track
 		}
 	}
-	if assetHeight < 0 {
+	if video == nil {
 		return nil, fmt.Errorf("no video track found in asset spec")
 	}
 	filtered := make([]livepeerAPI.Profile, 0, len(allProfiles))
 	for _, profile := range allProfiles {
-		if profile.Height <= assetHeight {
+		if profile.Height <= video.Height && profile.Bitrate < int(video.Bitrate) {
 			filtered = append(filtered, profile)
 		}
 	}
 	if len(filtered) == 0 {
-		return []livepeerAPI.Profile{profile240p}, nil
+		return []livepeerAPI.Profile{lowBitrateProfile(video)}, nil
 	}
 	return filtered, nil
+}
+
+func lowBitrateProfile(video *livepeerAPI.AssetTrack) livepeerAPI.Profile {
+	bitrate := int(video.Bitrate / 3)
+	if bitrate < minVideoBitrate && video.Bitrate > minVideoBitrate {
+		bitrate = minVideoBitrate
+	} else if bitrate < absoluteMinVideoBitrate {
+		bitrate = absoluteMinVideoBitrate
+	}
+	return livepeerAPI.Profile{
+		Name:    "low-bitrate",
+		Fps:     0,
+		Bitrate: bitrate,
+		Width:   video.Width,
+		Height:  video.Height,
+	}
 }
