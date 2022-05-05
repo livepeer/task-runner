@@ -138,6 +138,5 @@ func lowBitrateProfile(video *livepeerAPI.AssetTrack) livepeerAPI.Profile {
 		Bitrate: bitrate,
 		Width:   video.Width,
 		Height:  video.Height,
-		Gop:     "2.0",
 	}
 }
