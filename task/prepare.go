@@ -101,18 +101,18 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 }
 
 func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeerAPI.Profile, error) {
-	assetHeight := -1
+	var video *livepeerAPI.AssetTrack
 	for _, track := range assetVideoSpec.Tracks {
 		if track.Type == "video" {
-			assetHeight = track.Height
+			video = track
 		}
 	}
-	if assetHeight < 0 {
+	if video == nil {
 		return nil, fmt.Errorf("no video track found in asset spec")
 	}
 	filtered := make([]livepeerAPI.Profile, 0, len(allProfiles))
 	for _, profile := range allProfiles {
-		if profile.Height <= assetHeight {
+		if profile.Height <= video.Height && profile.Bitrate <= int(video.Bitrate) {
 			filtered = append(filtered, profile)
 		}
 	}
