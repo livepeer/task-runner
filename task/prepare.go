@@ -12,17 +12,15 @@ import (
 	"github.com/livepeer/stream-tester/segmenter"
 )
 
-var profile240p = livepeerAPI.Profile{
-	Name:    "240p0",
-	Fps:     0,
-	Bitrate: 250000,
-	Width:   426,
-	Height:  240,
-	Gop:     "2.0",
-}
-
 var allProfiles = []livepeerAPI.Profile{
-	profile240p,
+	{
+		Name:    "240p0",
+		Fps:     0,
+		Bitrate: 250000,
+		Width:   426,
+		Height:  240,
+		Gop:     "2.0",
+	},
 	{
 		Name:    "360p0",
 		Fps:     0,
@@ -117,7 +115,14 @@ func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeer
 		}
 	}
 	if len(filtered) == 0 {
-		return []livepeerAPI.Profile{profile240p}, nil
+		return []livepeerAPI.Profile{{
+			Name:    "low",
+			Fps:     0,
+			Bitrate: int(video.Bitrate / 2),
+			Width:   video.Width,
+			Height:  video.Height,
+			Gop:     "2.0",
+		}}, nil
 	}
 	return filtered, nil
 }
