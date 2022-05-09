@@ -72,16 +72,18 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 			Tracks:      make([]*livepeerAPI.AssetTrack, 0, len(probeData.Streams)),
 		},
 	}
-	if ns := len(probeData.Streams); ns > 2 {
-		return nil, fmt.Errorf("too many tracks in file: %d", ns)
-	}
 	var hasVideo bool
 	for _, stream := range probeData.Streams {
 		track, err := toAssetTrack(stream)
 		if err != nil {
 			return nil, err
 		}
-		hasVideo = hasVideo || track.Type == "video"
+		if track.Type == "video" {
+			if hasVideo {
+				return nil, fmt.Errorf("multiple video tracks in file")
+			}
+			hasVideo = true
+		}
 		spec.VideoSpec.Tracks = append(spec.VideoSpec.Tracks, track)
 	}
 	if !hasVideo {
