@@ -15,6 +15,7 @@ import (
 const (
 	minVideoBitrate         = 100_000
 	absoluteMinVideoBitrate = 5_000
+	minVideoDimensionPixels = 145
 )
 
 var allProfiles = []livepeerAPI.Profile{
@@ -122,8 +123,10 @@ func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeer
 		return nil, fmt.Errorf("no video track found in asset spec")
 	}
 	filtered := make([]livepeerAPI.Profile, 0, len(allProfiles))
-	for _, profile := range allProfiles {
-		if profile.Height <= video.Height && profile.Bitrate < int(video.Bitrate) {
+	for _, baseProfile := range allProfiles {
+		profile := effectiveProfile(baseProfile, video)
+		if profile.Height <= video.Height && profile.Bitrate < int(video.Bitrate) &&
+			profile.Height > minVideoDimensionPixels && profile.Width > minVideoDimensionPixels {
 			filtered = append(filtered, profile)
 		}
 	}
@@ -131,6 +134,15 @@ func getPlaybackProfiles(assetVideoSpec *livepeerAPI.AssetVideoSpec) ([]livepeer
 		return []livepeerAPI.Profile{lowBitrateProfile(video)}, nil
 	}
 	return filtered, nil
+}
+
+func effectiveProfile(profile livepeerAPI.Profile, video *livepeerAPI.AssetTrack) livepeerAPI.Profile {
+	if video.Width >= video.Height {
+		profile.Height = profile.Width * video.Height / video.Width
+	} else {
+		profile.Width = profile.Height * video.Width / video.Height
+	}
+	return profile
 }
 
 func lowBitrateProfile(video *livepeerAPI.AssetTrack) livepeerAPI.Profile {
