@@ -77,7 +77,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	defer importedFile.Close()
 	playbackRecordingId := ""
-	if strings.Contains(params.URL, "/recordings/") {
+	if strings.HasPrefix(params.URL, "https://livepeercdn.") && strings.Contains(params.URL, "/recordings/") {
 		// RecordStream on output file for HLS playback
 		playbackRecordingId, err = Prepare(tctx, metadata.AssetSpec, importedFile)
 		if err != nil {
