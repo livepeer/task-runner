@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	livepeerAPI "github.com/livepeer/go-api-client"
@@ -75,10 +76,13 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		return nil, err
 	}
 	defer importedFile.Close()
-	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, importedFile)
-	if err != nil {
-		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+	playbackRecordingId := ""
+	if strings.Contains(params.URL, "/recordings/") {
+		// RecordStream on output file for HLS playback
+		playbackRecordingId, err = Prepare(tctx, metadata.AssetSpec, importedFile)
+		if err != nil {
+			glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+		}
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingId
