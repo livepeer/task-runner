@@ -77,9 +77,10 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	defer importedFile.Close()
 	playbackRecordingId := ""
+	isInputRecording := strings.HasPrefix(params.URL, "https://livepeercdn.") && strings.Contains(params.URL, "/recordings/")
 	// Temporarily skip preparing recorded streams while we figure out a bug in the orchestrators latest version.
 	// TODO: Remove this check and prepare all assets.
-	if strings.HasPrefix(params.URL, "https://livepeercdn.") && strings.Contains(params.URL, "/recordings/") {
+	if !isInputRecording {
 		// RecordStream on output file for HLS playback
 		playbackRecordingId, err = Prepare(tctx, metadata.AssetSpec, importedFile)
 		if err != nil {
