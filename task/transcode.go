@@ -161,6 +161,13 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	outFiles = append(outFiles, mp4muxer)
 	outBuffers = append(outBuffers, ws)
 	var transcoded [][]byte
+	contentResolution := ""
+	for _, track := range tctx.InputAsset.AssetSpec.VideoSpec.Tracks {
+		if track.Type == "video" {
+			contentResolution = fmt.Sprintf("%dx%d", track.Width, track.Height)
+			break
+		}
+	}
 	err = nil
 out:
 	for seg := range segmentsIn {
@@ -174,7 +181,7 @@ out:
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
 		started := time.Now()
-		transcoded, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data)
+		transcoded, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
 		if err != nil {
 			glog.Errorf("Segment push playbackID=%s err=%v\n", inputPlaybackID, err)
 			break
