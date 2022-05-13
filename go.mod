@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/golang/glog v1.0.0
-	github.com/livepeer/go-api-client v0.1.2
+	github.com/livepeer/go-api-client v0.1.3-0.20220513154150-a37f7c0b5586
 	github.com/livepeer/go-livepeer v0.5.31-0.20220519163208-13165dd519d4
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
 	github.com/livepeer/livepeer-data v0.4.14
