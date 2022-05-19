@@ -190,7 +190,6 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	err = nil
 	seqNo := 0
-	prevSegsDur := time.Duration(0)
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -210,13 +209,13 @@ out:
 				Width:    width,
 				Height:   height,
 			}
-			segStart, segEnd = prevSegsDur, prevSegsDur + seg.Duration
+			segStart, segEnd = seg.Pts, seg.Pts + seg.Duration
 		)
 		if segEnd <= startTime {
 			glog.V(model.VERBOSE).Infof("Skipping segment seqNo=%d\n", seg.SeqNo)
 			continue
 		} else if segStart < startTime {
-			params.SliceFrom = startTime - prevSegsDur
+			params.SliceFrom = startTime - segStart
 		}
 		if segStart >= endTime {
 			glog.V(model.VERBOSE).Infof("Stopping at segment seqNo=%d\n", seg.SeqNo)
@@ -231,7 +230,6 @@ out:
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
-		prevSegsDur = segEnd
 		seqNo++
 
 		for i, segData := range transcoded {
