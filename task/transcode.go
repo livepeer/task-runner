@@ -230,7 +230,6 @@ out:
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
-		seqNo++
 
 		for i, segData := range transcoded {
 			demuxer := ts.NewDemuxer(bytes.NewReader(segData))
@@ -250,6 +249,7 @@ out:
 				break out
 			}
 		}
+		seqNo++
 	}
 	if err == io.EOF {
 		err = nil
