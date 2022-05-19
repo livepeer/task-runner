@@ -80,10 +80,10 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 	var transcoded [][]byte
 	err = nil
 
-	contentResolution := ""
-	for _, track := range assetSpec.VideoSpec.Tracks {
+	width, height := 0, 0
+	for _, track := range tctx.InputAsset.AssetSpec.VideoSpec.Tracks {
 		if track.Type == "video" {
-			contentResolution = fmt.Sprintf("%dx%d", track.Width, track.Height)
+			width, height = track.Width, track.Height
 			break
 		}
 	}
@@ -99,7 +99,13 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
 		started := time.Now()
-		_, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution, 0, 0)
+		_, err = lapi.PushSegment(stream.ID, livepeerAPI.SegmentParameters{
+			SeqNo:    seg.SeqNo,
+			Duration: seg.Duration,
+			Data:     seg.Data,
+			Width:    width,
+			Height:   height,
+		})
 		if err != nil {
 			glog.Errorf("Error while segment push for prepare err=%v\n", err)
 			break

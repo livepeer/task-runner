@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/joy4/av"
 	"github.com/livepeer/joy4/av/avutil"
@@ -180,10 +181,10 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	outFiles = append(outFiles, mp4muxer)
 	outBuffers = append(outBuffers, ws)
 	var transcoded [][]byte
-	contentResolution := ""
+	width, height := 0, 0
 	for _, track := range tctx.InputAsset.AssetSpec.VideoSpec.Tracks {
 		if track.Type == "video" {
-			contentResolution = fmt.Sprintf("%dx%d", track.Width, track.Height)
+			width, height = track.Width, track.Height
 			break
 		}
 	}
@@ -202,23 +203,29 @@ out:
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
 		var (
-			segStart, segEnd   = prevSegsDur, prevSegsDur + seg.Duration
-			sliceFrom, sliceTo time.Duration
+			params = api.SegmentParameters{
+				SeqNo:    seqNo,
+				Duration: seg.Duration,
+				Data:     seg.Data,
+				Width:    width,
+				Height:   height,
+			}
+			segStart, segEnd = prevSegsDur, prevSegsDur + seg.Duration
 		)
 		if segEnd <= startTime {
 			glog.V(model.VERBOSE).Infof("Skipping segment seqNo=%d\n", seg.SeqNo)
 			continue
 		} else if segStart < startTime {
-			sliceFrom = startTime - prevSegsDur
+			params.SliceFrom = startTime - prevSegsDur
 		}
 		if segStart >= endTime {
 			glog.V(model.VERBOSE).Infof("Stopping at segment seqNo=%d\n", seg.SeqNo)
 			break
 		} else if segEnd > endTime {
-			sliceTo = endTime - segStart
+			params.SliceTo = endTime - segStart
 		}
 		started := time.Now()
-		transcoded, err = lapi.PushSegment(stream.ID, seqNo, seg.Duration, seg.Data, contentResolution, sliceFrom, sliceTo)
+		transcoded, err = lapi.PushSegment(stream.ID, params)
 		if err != nil {
 			glog.Errorf("Segment push playbackID=%s err=%v\n", inputPlaybackID, err)
 			break
