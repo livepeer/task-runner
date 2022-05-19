@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -138,8 +140,25 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		sourceFileSize = *fir.Size
 	}
 
-	streamName := fmt.Sprintf("vod_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
-	profile := tctx.Params.Transcode.Profile
+	var (
+		streamName               = fmt.Sprintf("vod_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
+		profile                  = tctx.Params.Transcode.Profile
+		startTime  time.Duration = 0
+		endTime    time.Duration = math.MaxInt64
+	)
+	if parts := strings.SplitN(profile.Name, ";", 3); len(parts) > 1 {
+		profile.Name = parts[0]
+		startTime, err = time.ParseDuration(parts[1])
+		if err != nil && parts[1] != "" {
+			return nil, fmt.Errorf("error parsing start time %s", parts[1])
+		}
+		if len(parts) == 3 {
+			endTime, err = time.ParseDuration(parts[2])
+			if err != nil {
+				return nil, fmt.Errorf("error parsing end time %s", parts[2])
+			}
+		}
+	}
 	stream, err := lapi.CreateStreamEx(streamName, false, nil, profile)
 	if err != nil {
 		return nil, err
@@ -169,6 +188,8 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 	}
 	err = nil
+	seqNo := 0
+	prevSegsDur := time.Duration(0)
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -180,13 +201,31 @@ out:
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
+		var (
+			segStart, segEnd   = prevSegsDur, prevSegsDur + seg.Duration
+			sliceFrom, sliceTo time.Duration
+		)
+		if segEnd <= startTime {
+			glog.V(model.VERBOSE).Infof("Skipping segment seqNo=%d\n", seg.SeqNo)
+			continue
+		} else if segStart < startTime {
+			sliceFrom = startTime - prevSegsDur
+		}
+		if segStart >= endTime {
+			glog.V(model.VERBOSE).Infof("Stopping at segment seqNo=%d\n", seg.SeqNo)
+			break
+		} else if segEnd > endTime {
+			sliceTo = endTime - segStart
+		}
 		started := time.Now()
-		transcoded, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
+		transcoded, err = lapi.PushSegment(stream.ID, seqNo, seg.Duration, seg.Data, contentResolution, sliceFrom, sliceTo)
 		if err != nil {
 			glog.Errorf("Segment push playbackID=%s err=%v\n", inputPlaybackID, err)
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
+		prevSegsDur = segEnd
+		seqNo++
 
 		for i, segData := range transcoded {
 			demuxer := ts.NewDemuxer(bytes.NewReader(segData))
