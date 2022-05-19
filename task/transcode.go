@@ -234,7 +234,7 @@ out:
 
 		for i, segData := range transcoded {
 			demuxer := ts.NewDemuxer(bytes.NewReader(segData))
-			if seg.SeqNo == 0 {
+			if seqNo == 0 {
 				streams, err := demuxer.Streams()
 				if err != nil {
 					glog.Errorf("error in demuxer err=%v", err)
