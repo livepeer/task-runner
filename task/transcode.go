@@ -215,12 +215,14 @@ out:
 			continue
 		} else if segStart < startTime {
 			params.SliceFrom = startTime - segStart
+			glog.V(model.VERBOSE).Infof("Slicing segment seqNo=%d from=%s\n", seg.SeqNo, params.SliceFrom)
 		}
 		if segStart >= endTime {
 			glog.V(model.VERBOSE).Infof("Stopping at segment seqNo=%d\n", seg.SeqNo)
 			break
 		} else if segEnd > endTime {
 			params.SliceTo = endTime - segStart
+			glog.V(model.VERBOSE).Infof("Slicing segment seqNo=%d to=%s\n", seg.SeqNo, params.SliceTo)
 		}
 		started := time.Now()
 		transcoded, err = lapi.PushSegment(stream.ID, params)
@@ -253,6 +255,7 @@ out:
 					glog.Errorf("read packets media %d err=%v\n", i, err)
 					break out
 				}
+				glog.V(model.VERBOSE).Infof("Got transcoded segment pkt seqNo=%d pts=%s ptsAdj=%s timeScale=%d timeTs=%d compTime=%s compTimeTs=%d byteLen=%d\n", seqNo, pkt.Time, pkt.Time-startTime, pkt.TimeScale, pkt.TimeTS, pkt.CompositionTime, pkt.CompositionTimeTS, len(pkt.Data))
 				pkt.Time -= startTime
 				if err = outFiles[i].WritePacket(pkt); err != nil {
 					glog.Errorf("write packets media %d err=%v\n", i, err)
