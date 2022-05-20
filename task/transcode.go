@@ -16,6 +16,8 @@ import (
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/joy4/av"
+	"github.com/livepeer/joy4/av/avutil"
+	"github.com/livepeer/joy4/av/pktque"
 	"github.com/livepeer/joy4/format"
 	"github.com/livepeer/joy4/format/mp4"
 	"github.com/livepeer/joy4/format/ts"
@@ -189,6 +191,7 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	err = nil
 	seqNo := 0
+	packetFilter := &pktque.FixTime{StartFromZero: true, MakeIncrement: true}
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -233,7 +236,8 @@ out:
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 
 		for i, segData := range transcoded {
-			demuxer := ts.NewDemuxer(bytes.NewReader(segData))
+			var demuxer av.Demuxer
+			demuxer = ts.NewDemuxer(bytes.NewReader(segData))
 			if seqNo == 0 {
 				var streams []av.CodecData
 				streams, err = demuxer.Streams()
@@ -246,20 +250,10 @@ out:
 					break out
 				}
 			}
-			for {
-				var pkt av.Packet
-				if pkt, err = demuxer.ReadPacket(); err != nil {
-					if err == io.EOF {
-						break
-					}
-					glog.Errorf("read packets media %d err=%v\n", i, err)
-					break out
-				}
-				glog.V(model.VERBOSE).Infof("Got transcoded segment pkt seqNo=%d pts=%s ptsAdj=%s timeScale=%d timeTs=%d compTime=%s compTimeTs=%d byteLen=%d\n", seqNo, pkt.Time, pkt.Time-startTime, pkt.TimeScale, pkt.TimeTS, pkt.CompositionTime, pkt.CompositionTimeTS, len(pkt.Data))
-				if err = outFiles[i].WritePacket(pkt); err != nil {
-					glog.Errorf("write packets media %d err=%v\n", i, err)
-					break out
-				}
+			demuxer = &pktque.FilterDemuxer{Demuxer: demuxer, Filter: packetFilter}
+			if err = avutil.CopyPackets(outFiles[i], demuxer); err != io.EOF {
+				glog.Errorf("copy packets media %d err=%v\n", i, err)
+				break out
 			}
 		}
 		seqNo++
