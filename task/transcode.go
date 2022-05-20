@@ -16,7 +16,6 @@ import (
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/joy4/av"
-	"github.com/livepeer/joy4/av/avutil"
 	"github.com/livepeer/joy4/format"
 	"github.com/livepeer/joy4/format/mp4"
 	"github.com/livepeer/joy4/format/ts"
@@ -234,7 +233,8 @@ out:
 		for i, segData := range transcoded {
 			demuxer := ts.NewDemuxer(bytes.NewReader(segData))
 			if seqNo == 0 {
-				streams, err := demuxer.Streams()
+				var streams []av.CodecData
+				streams, err = demuxer.Streams()
 				if err != nil {
 					glog.Errorf("error in demuxer err=%v", err)
 					break out
@@ -244,9 +244,20 @@ out:
 					break out
 				}
 			}
-			if err = avutil.CopyPackets(outFiles[i], demuxer); err != io.EOF {
-				glog.Errorf("copy packets media %d err=%v\n", i, err)
-				break out
+			for {
+				var pkt av.Packet
+				if pkt, err = demuxer.ReadPacket(); err != nil {
+					if err == io.EOF {
+						break
+					}
+					glog.Errorf("read packets media %d err=%v\n", i, err)
+					break out
+				}
+				pkt.Time -= startTime
+				if err = outFiles[i].WritePacket(pkt); err != nil {
+					glog.Errorf("write packets media %d err=%v\n", i, err)
+					break out
+				}
 			}
 		}
 		seqNo++
