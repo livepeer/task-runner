@@ -256,7 +256,6 @@ out:
 					break out
 				}
 				glog.V(model.VERBOSE).Infof("Got transcoded segment pkt seqNo=%d pts=%s ptsAdj=%s timeScale=%d timeTs=%d compTime=%s compTimeTs=%d byteLen=%d\n", seqNo, pkt.Time, pkt.Time-startTime, pkt.TimeScale, pkt.TimeTS, pkt.CompositionTime, pkt.CompositionTimeTS, len(pkt.Data))
-				pkt.Time -= startTime
 				if err = outFiles[i].WritePacket(pkt); err != nil {
 					glog.Errorf("write packets media %d err=%v\n", i, err)
 					break out
