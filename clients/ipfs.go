@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -12,6 +13,8 @@ import (
 
 const (
 	pinataBaseUrl = "https://api.pinata.cloud"
+	jsonMimeType  = "application/json"
+	pinataOptions = `{"cidVersion":1}`
 )
 
 type IPFS interface {
@@ -59,9 +62,10 @@ type uploadResponse struct {
 func (p *pinataClient) PinContent(ctx context.Context, filename, fileContentType string, data io.Reader) (string, interface{}, error) {
 	parts := []part{
 		{"file", filename, fileContentType, data},
+		{"pinataOptions", "", jsonMimeType, strings.NewReader(pinataOptions)},
 	}
 	if p.filesMetadata != nil {
-		parts = append(parts, part{"pinataMetadata", "", "application/json", bytes.NewReader(p.filesMetadata)})
+		parts = append(parts, part{"pinataMetadata", "", jsonMimeType, bytes.NewReader(p.filesMetadata)})
 	}
 	body, contentType := multipartBody(parts)
 	defer body.Close()
