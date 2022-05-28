@@ -96,9 +96,10 @@ func uploadFile(tctx *TaskContext, asset *livepeerAPI.Asset, content io.Reader) 
 	if err != nil {
 		return nil, err
 	}
-	// This one is a nice to have so we don't return an error. If it fails we just
-	// ignore and don't return the metadata CID.
-	metadataCID := saveNFTMetadata(tctx, ipfs, asset, videoCID)
+	metadataCID, err := saveNFTMetadata(tctx, ipfs, asset, videoCID)
+	if err != nil {
+		return nil, err
+	}
 	return &data.ExportTaskOutput{
 		Internal: &internalMetadata{
 			DestType: destType,
@@ -111,7 +112,7 @@ func uploadFile(tctx *TaskContext, asset *livepeerAPI.Asset, content io.Reader) 
 	}, nil
 }
 
-func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string) string {
+func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string) (string, error) {
 	params := tctx.Task.Params.Export.IPFS
 	nftMetadata := nftMetadata(asset, videoCID, params.NFTMetadataTemplate, tctx.PlayerImmutableURL, tctx.PlayerExternalURL)
 	mergeJson(nftMetadata, params.NFTMetadata)
@@ -119,14 +120,14 @@ func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.As
 	rawMetadata, err := json.Marshal(nftMetadata)
 	if err != nil {
 		glog.Errorf("Error marshalling NFT metadata assetId=%s err=%q", asset.ID, err)
-		return ""
+		return "", err
 	}
 	cid, _, err := ipfs.PinContent(tctx, "metadata-"+asset.PlaybackID, "application/json", bytes.NewReader(rawMetadata))
 	if err != nil {
 		glog.Errorf("Error saving NFT metadata assetId=%s err=%q", asset.ID, err)
-		return ""
+		return "", err
 	}
-	return cid
+	return cid, nil
 }
 
 func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI.NFTMetadataTemplate, immutablePlayer, externalPlayer *url.URL) map[string]interface{} {
