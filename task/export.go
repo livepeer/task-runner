@@ -20,6 +20,12 @@ var DefaultClient = clients.BaseClient{}
 // TODO: Create some thumbnail from the video for the image
 const livepeerLogoUrl = "ipfs://bafkreidmlgpjoxgvefhid2xjyqjnpmjjmq47yyrcm6ifvoovclty7sm4wm"
 
+type ExportTaskConfig struct {
+	PinataAccessToken  string
+	PlayerImmutableURL *url.URL
+	PlayerExternalURL  *url.URL
+}
+
 func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx    = tctx.Context

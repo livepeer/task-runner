@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -58,11 +57,7 @@ type RunnerOptions struct {
 	ExchangeName       string
 	QueueName          string
 	LivepeerAPIOptions livepeerAPI.ClientOptions
-
-	// export task
-	PinataAccessToken  string
-	PlayerImmutableURL *url.URL
-	PlayerExternalURL  *url.URL
+	ExportTaskConfig
 
 	TaskHandlers map[string]TaskHandler
 }
