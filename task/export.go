@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"github.com/golang/glog"
@@ -16,6 +17,7 @@ import (
 
 var DefaultClient = clients.BaseClient{}
 
+// TODO: Create some thumbnail from the video for the image
 const livepeerLogoUrl = "ipfs://bafkreidmlgpjoxgvefhid2xjyqjnpmjjmq47yyrcm6ifvoovclty7sm4wm"
 
 func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -24,7 +26,6 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 		asset  = tctx.InputAsset
 		size   = asset.Size
 		osSess = tctx.inputOS
-		params = *tctx.Task.Params.Export
 	)
 	file, err := osSess.ReadData(ctx, videoFileName(asset.PlaybackID))
 	if err != nil {
@@ -37,9 +38,11 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 
 	ctx, cancel := context.WithTimeout(ctx, fileUploadTimeout)
 	defer cancel()
+	tctx = tctx.WithContext(ctx)
+
 	content := NewReadCounter(file.Body)
 	go ReportProgress(ctx, tctx.lapi, tctx.Task.ID, size, content.Count)
-	output, err := uploadFile(ctx, tctx.ipfs, params, asset, content)
+	output, err := uploadFile(tctx, asset, content)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +54,8 @@ type internalMetadata struct {
 	Pinata   interface{} `json:"pinata"`
 }
 
-func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.ExportTaskParams, asset *livepeerAPI.Asset, content io.Reader) (*data.ExportTaskOutput, error) {
+func uploadFile(tctx *TaskContext, asset *livepeerAPI.Asset, content io.Reader) (*data.ExportTaskOutput, error) {
+	params := tctx.Task.Params.Export
 	contentType := "video/" + asset.VideoSpec.Format
 	if c := params.Custom; c != nil {
 		req := clients.Request{
@@ -64,7 +68,7 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 		if req.Method == "" {
 			req.Method = "PUT"
 		}
-		if err := DefaultClient.DoRequest(ctx, req, nil); err != nil {
+		if err := DefaultClient.DoRequest(tctx, req, nil); err != nil {
 			if httpErr, ok := err.(*clients.HTTPStatusError); ok && httpErr.Status < 500 {
 				err = UnretriableError{err}
 			}
@@ -76,6 +80,7 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 	}
 
 	destType := "own-pinata"
+	ipfs := tctx.ipfs
 	if p := params.IPFS.Pinata; p != nil {
 		destType = "ext-pinata"
 		extMetadata := map[string]string{
@@ -87,13 +92,13 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 			ipfs = clients.NewPinataClientAPIKey(p.APIKey, p.APISecret, extMetadata)
 		}
 	}
-	videoCID, metadata, err := ipfs.PinContent(ctx, "asset-"+asset.PlaybackID, contentType, content)
+	videoCID, metadata, err := ipfs.PinContent(tctx, "asset-"+asset.PlaybackID, contentType, content)
 	if err != nil {
 		return nil, err
 	}
 	// This one is a nice to have so we don't return an error. If it fails we just
 	// ignore and don't return the metadata CID.
-	metadataCID := saveNFTMetadata(ctx, ipfs, asset, videoCID, params.IPFS.NFTMetadata)
+	metadataCID := saveNFTMetadata(tctx, ipfs, asset, videoCID)
 	return &data.ExportTaskOutput{
 		Internal: &internalMetadata{
 			DestType: destType,
@@ -106,14 +111,17 @@ func uploadFile(ctx context.Context, ipfs clients.IPFS, params livepeerAPI.Expor
 	}, nil
 }
 
-func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string, customMetadata map[string]interface{}) string {
-	nftMetadata := nftMetadata(asset, videoCID, customMetadata)
+func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string) string {
+	params := tctx.Task.Params.Export.IPFS
+	nftMetadata := nftMetadata(asset, videoCID, params.NFTMetadataTemplate, tctx.PlayerImmutableURL, tctx.PlayerExternalURL)
+	mergeJson(nftMetadata, params.NFTMetadata)
+
 	rawMetadata, err := json.Marshal(nftMetadata)
 	if err != nil {
 		glog.Errorf("Error marshalling NFT metadata assetId=%s err=%q", asset.ID, err)
 		return ""
 	}
-	cid, _, err := ipfs.PinContent(ctx, "metadata-"+asset.PlaybackID, "application/json", bytes.NewReader(rawMetadata))
+	cid, _, err := ipfs.PinContent(tctx, "metadata-"+asset.PlaybackID, "application/json", bytes.NewReader(rawMetadata))
 	if err != nil {
 		glog.Errorf("Error saving NFT metadata assetId=%s err=%q", asset.ID, err)
 		return ""
@@ -121,20 +129,43 @@ func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS, asset *livepeerAPI.
 	return cid
 }
 
-func nftMetadata(asset *livepeerAPI.Asset, videoCID string, customMetadata map[string]interface{}) map[string]interface{} {
+func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI.NFTMetadataTemplate, immutablePlayer, externalPlayer *url.URL) map[string]interface{} {
 	videoUrl := "ipfs://" + videoCID
-	metadata := map[string]interface{}{
-		"name":        asset.Name,
-		"description": fmt.Sprintf("Livepeer video from asset %q", asset.Name),
-		// TODO: Create some thumbnail from the video for the image
-		"image":         livepeerLogoUrl,
-		"animation_url": videoUrl,
-		"properties": map[string]interface{}{
-			"video": videoUrl,
-		},
+	switch template {
+	default:
+		fallthrough
+	case livepeerAPI.NFTMetadataTemplatePlayer:
+		return map[string]interface{}{
+			"name":          asset.Name,
+			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
+			"image":         livepeerLogoUrl,
+			"animation_url": buildPlayerUrl(immutablePlayer, asset.PlaybackID),
+			"external_url":  buildPlayerUrl(externalPlayer, asset.PlaybackID),
+			// TODO: Consider migrating these to `attributes` instead.
+			"properties": map[string]interface{}{
+				"video":                   videoUrl,
+				"com.livepeer.playbackId": asset.PlaybackID,
+			},
+		}
+	case livepeerAPI.NFTMetadataTemplateFile:
+		return map[string]interface{}{
+			"name":          asset.Name,
+			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
+			"image":         livepeerLogoUrl,
+			"animation_url": videoUrl,
+			"properties": map[string]interface{}{
+				"video": videoUrl,
+			},
+		}
 	}
-	mergeJson(metadata, customMetadata)
-	return metadata
+}
+
+func buildPlayerUrl(base *url.URL, playbackID string) string {
+	url := *base
+	query := url.Query()
+	query.Set("p", playbackID)
+	url.RawQuery = query.Encode()
+	return url.String()
 }
 
 func mergeJson(dst, src map[string]interface{}) {

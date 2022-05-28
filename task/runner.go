@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -40,6 +41,13 @@ type TaskContext struct {
 	inputOS, outputOS       drivers.OSSession
 }
 
+func (t *TaskContext) WithContext(ctx context.Context) *TaskContext {
+	t2 := new(TaskContext)
+	*t2 = *t
+	t2.Context = ctx
+	return t2
+}
+
 type Runner interface {
 	Start() error
 	Shutdown(ctx context.Context) error
@@ -50,7 +58,11 @@ type RunnerOptions struct {
 	ExchangeName       string
 	QueueName          string
 	LivepeerAPIOptions livepeerAPI.ClientOptions
+
+	// export task
 	PinataAccessToken  string
+	PlayerImmutableURL *url.URL
+	PlayerExternalURL  *url.URL
 
 	TaskHandlers map[string]TaskHandler
 }
