@@ -57,7 +57,7 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
-	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihhu24g5gxqt3i7xigug5h7wpeoizryyflp2drj6pcl5kuqkd57ji/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
+	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihza7ss7ebsxqud4kcqjizygkv2uyfixfqlwl6cboavj2anvlfn3i/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
 
 	mistJson := fs.Bool("j", false, "Print application info as json")
