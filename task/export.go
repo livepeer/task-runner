@@ -120,7 +120,7 @@ func uploadFile(tctx *TaskContext, asset *livepeerAPI.Asset, content io.Reader) 
 
 func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string) (string, error) {
 	params := tctx.Task.Params.Export.IPFS
-	nftMetadata := nftMetadata(asset, videoCID, params.NFTMetadataTemplate, tctx.PlayerImmutableURL, tctx.PlayerExternalURL)
+	nftMetadata := nftMetadata(asset, videoCID, params.NFTMetadataTemplate, tctx.ExportTaskConfig)
 	mergeJson(nftMetadata, params.NFTMetadata)
 
 	rawMetadata, err := json.Marshal(nftMetadata)
@@ -136,7 +136,7 @@ func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.As
 	return cid, nil
 }
 
-func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI.NFTMetadataTemplate, immutablePlayer, externalPlayer *url.URL) map[string]interface{} {
+func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI.NFTMetadataTemplate, config ExportTaskConfig) map[string]interface{} {
 	videoUrl := "ipfs://" + videoCID
 	switch template {
 	default:
@@ -146,8 +146,8 @@ func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI
 			"name":          asset.Name,
 			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
 			"image":         livepeerLogoUrl,
-			"animation_url": buildPlayerUrl(immutablePlayer, asset.PlaybackID),
-			"external_url":  buildPlayerUrl(externalPlayer, asset.PlaybackID),
+			"animation_url": buildPlayerUrl(config.PlayerImmutableURL, asset.PlaybackID),
+			"external_url":  buildPlayerUrl(config.PlayerExternalURL, asset.PlaybackID),
 			// TODO: Consider migrating these to `attributes` instead.
 			"properties": map[string]interface{}{
 				"video":                   videoUrl,
