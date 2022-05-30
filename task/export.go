@@ -146,8 +146,8 @@ func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI
 			"name":          asset.Name,
 			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
 			"image":         livepeerLogoUrl,
-			"animation_url": buildPlayerUrl(config.PlayerImmutableURL, asset.PlaybackID),
-			"external_url":  buildPlayerUrl(config.PlayerExternalURL, asset.PlaybackID),
+			"animation_url": buildPlayerUrl(config.PlayerImmutableURL, asset.PlaybackID, true),
+			"external_url":  buildPlayerUrl(config.PlayerExternalURL, asset.PlaybackID, false),
 			// TODO: Consider migrating these to `attributes` instead.
 			"properties": map[string]interface{}{
 				"video":                   videoUrl,
@@ -167,9 +167,12 @@ func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI
 	}
 }
 
-func buildPlayerUrl(base *url.URL, playbackID string) string {
+func buildPlayerUrl(base *url.URL, playbackID string, loop bool) string {
 	url := *base
 	query := url.Query()
+	if loop {
+		query.Set("loop", "1")
+	}
 	query.Set("p", playbackID)
 	url.RawQuery = query.Encode()
 	return url.String()
