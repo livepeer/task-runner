@@ -173,7 +173,7 @@ func buildPlayerUrl(base *url.URL, playbackID string, loop bool) string {
 	if loop {
 		query.Set("loop", "1")
 	}
-	query.Set("p", playbackID)
+	query.Set("v", playbackID)
 	url.RawQuery = query.Encode()
 	return url.String()
 }
