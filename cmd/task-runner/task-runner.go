@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"flag"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -25,6 +26,27 @@ type cliFlags struct {
 	runnerOpts task.RunnerOptions
 }
 
+func URLVarFlag(fs *flag.FlagSet, dest **url.URL, name, value, usage string) {
+	defaultUrl, err := url.Parse(value)
+	if err != nil {
+		panic(err)
+	}
+	*dest = defaultUrl
+
+	fs.Func(name, usage, func(s string) error {
+		u, err := url.Parse(s)
+		if err != nil {
+			return err
+		}
+		_, err = url.ParseQuery(u.RawQuery)
+		if err != nil {
+			return err
+		}
+		*dest = u
+		return nil
+	})
+}
+
 func parseFlags(build BuildFlags) cliFlags {
 	cli := cliFlags{}
 	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
@@ -35,6 +57,8 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
+	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihcqgu4rmsrlkqvavkzsnu7h5n66jopckes6u5zrhs3kcffqvylge/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
+	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
 
 	mistJson := fs.Bool("j", false, "Print application info as json")
 

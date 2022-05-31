@@ -40,6 +40,13 @@ type TaskContext struct {
 	inputOS, outputOS       drivers.OSSession
 }
 
+func (t *TaskContext) WithContext(ctx context.Context) *TaskContext {
+	t2 := new(TaskContext)
+	*t2 = *t
+	t2.Context = ctx
+	return t2
+}
+
 type Runner interface {
 	Start() error
 	Shutdown(ctx context.Context) error
@@ -50,7 +57,7 @@ type RunnerOptions struct {
 	ExchangeName       string
 	QueueName          string
 	LivepeerAPIOptions livepeerAPI.ClientOptions
-	PinataAccessToken  string
+	ExportTaskConfig
 
 	TaskHandlers map[string]TaskHandler
 }
