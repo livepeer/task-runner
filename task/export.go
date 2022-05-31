@@ -120,7 +120,17 @@ func uploadFile(tctx *TaskContext, asset *livepeerAPI.Asset, content io.Reader) 
 
 func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string) (string, error) {
 	params := tctx.Task.Params.Export.IPFS
-	nftMetadata := nftMetadata(asset, videoCID, params.NFTMetadataTemplate, tctx.ExportTaskConfig)
+	template := params.NFTMetadataTemplate
+	if template == livepeerAPI.NFTMetadataTemplatePlayer && asset.PlaybackRecordingID == "" {
+		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
+	}
+	if template == "" {
+		template = livepeerAPI.NFTMetadataTemplatePlayer
+		if asset.PlaybackRecordingID == "" {
+			template = livepeerAPI.NFTMetadataTemplateFile
+		}
+	}
+	nftMetadata := nftMetadata(asset, videoCID, template, tctx.ExportTaskConfig)
 	mergeJson(nftMetadata, params.NFTMetadata)
 
 	rawMetadata, err := json.Marshal(nftMetadata)
