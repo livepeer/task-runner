@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
@@ -116,6 +117,24 @@ func fileWriter(size int64) WriteSeekCloser {
 	}
 }
 
+type SegmentCounter struct {
+	size  uint64
+	count uint64
+}
+
+func NewSegmentCounter(size int64) *SegmentCounter {
+	return &SegmentCounter{size: uint64(size)}
+}
+
+func (c SegmentCounter) Count() uint64 {
+	return atomic.LoadUint64(&c.count)
+}
+
+func (c SegmentCounter) Read(data []byte) int {
+	atomic.AddUint64(&c.count, uint64(len(data)))
+	return len(data)
+}
+
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx             = tctx.Context
@@ -171,6 +190,8 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 	}
 	err = nil
+	counter := NewSegmentCounter(sourceFileSize)
+	go ReportProgress(ctx, lapi, tctx.Task.ID, counter.size, counter.Count, 0, 50)
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -182,6 +203,7 @@ out:
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
+		counter.Read(seg.Data)
 		started := time.Now()
 		transcoded, err = lapi.PushSegmentR(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
 		if err != nil {
@@ -238,7 +260,7 @@ out:
 		return nil, err
 	}
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader())
+	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, ws.Reader(), int64(metadata.AssetSpec.Size), 50)
 	if err != nil {
 		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}

@@ -54,7 +54,7 @@ var allProfiles = []api.Profile{
 	},
 }
 
-func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser, reportProgressStartPercentage int) (string, error) {
+func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser, size int64, reportProgressStartPercentage int) (string, error) {
 	var (
 		ctx     = tctx.Context
 		lapi    = tctx.lapi
@@ -89,6 +89,9 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 		}
 	}
 
+	counter := NewSegmentCounter(size)
+	go ReportProgress(ctx, lapi, tctx.Task.ID, counter.size, counter.Count, reportProgressStartPercentage, 100)
+
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
 			break
@@ -99,6 +102,7 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
+		counter.Read(seg.Data)
 		started := time.Now()
 		_, err = lapi.PushSegmentR(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
 		if err != nil {
