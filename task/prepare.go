@@ -54,7 +54,7 @@ var allProfiles = []api.Profile{
 	},
 }
 
-func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser) (string, error) {
+func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser, reportProgressStartPercentage int) (string, error) {
 	var (
 		ctx     = tctx.Context
 		lapi    = tctx.lapi

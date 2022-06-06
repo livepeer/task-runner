@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
@@ -38,7 +39,13 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		videoFilePath, metadataFilePath, fullPath string
 		metadata                                  *FileMetadata
 	)
-	go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count)
+	// Temporarily skip preparing recorded streams while we figure out a bug in the orchestrators latest version.
+	isInputRecording := strings.HasPrefix(params.URL, "https://livepeercdn.") && strings.Contains(params.URL, "/recordings/")
+	if isInputRecording {
+		go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count, 0, 100)
+	} else {
+		go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count, 0, 50)
+	}
 	// Probe the source file to retrieve metadata
 	eg.Go(func() (err error) {
 		metadata, err = Probe(egCtx, tctx.OutputAsset.ID, filename, mainReader)
@@ -63,9 +70,25 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		// TODO: Delete the source file
 		return nil, err
 	}
-	playbackRecordingID, err := prepareImportedAsset(tctx, metadata, fullPath)
-	if err != nil {
-		return nil, err
+	playbackRecordingId := ""
+	// TODO: Remove this check and prepare all assets.
+	if !isInputRecording {
+		// Download our imported output file
+		fileInfoReader, err := osSess.ReadData(ctx, fullPath)
+		if err != nil {
+			return nil, fmt.Errorf("error reading imported file from output OS path=%s err=%w", fullPath, err)
+		}
+		defer fileInfoReader.Body.Close()
+		importedFile, err := readFile(fileInfoReader)
+		if err != nil {
+			return nil, err
+		}
+		defer importedFile.Close()
+		// RecordStream on output file for HLS playback
+		playbackRecordingId, err = Prepare(tctx, metadata.AssetSpec, importedFile, 50)
+		if err != nil {
+			glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+		}
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingID

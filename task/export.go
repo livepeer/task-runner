@@ -47,7 +47,7 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 	tctx = tctx.WithContext(ctx)
 
 	content := NewReadCounter(file.Body)
-	go ReportProgress(ctx, tctx.lapi, tctx.Task.ID, size, content.Count)
+	go ReportProgress(ctx, tctx.lapi, tctx.Task.ID, size, content.Count, 0, 100)
 	output, err := uploadFile(tctx, asset, content)
 	if err != nil {
 		return nil, err

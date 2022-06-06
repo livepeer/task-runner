@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	api "github.com/livepeer/go-api-client"
 )
 
 var progressReportBuckets = []float64{0, 0.25, 0.5, 0.75, 1}
@@ -16,7 +15,9 @@ var progressReportBuckets = []float64{0, 0.25, 0.5, 0.75, 1}
 const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
-func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size uint64, getCount func() uint64) {
+func ReportProgress(ctx context.Context, lapi *livepeerAPI.Client, taskID string, size uint64, getCount func() uint64, startPercentage int, endPercentage int) {
+	startPercentage = int(math.Max(float64(startPercentage), 0)) // >= 0, <= 100, < endPercentage
+	endPercentage = int(math.Min(float64(endPercentage), 100))   // >= 0, <= 100, > startPercentage
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic reporting task progress: value=%q stack:\n%s", r, string(debug.Stack()))
@@ -36,7 +37,7 @@ func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size u
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			progress := calcProgress(getCount(), size)
+			progress := calcProgress(getCount(), size, startPercentage, endPercentage)
 			if time.Since(lastReport) < minProgressReportInterval &&
 				progressBucket(progress) == progressBucket(lastProgress) {
 				continue
@@ -50,8 +51,10 @@ func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size u
 	}
 }
 
-func calcProgress(count, size uint64) (val float64) {
+func calcProgress(count, size uint64, startPercentage int, endPercentage int) (val float64) {
 	val = float64(count) / float64(size)
+	val = val * (float64(startPercentage) - float64(endPercentage))
+	val = (val + float64(startPercentage)) / 100
 	val = math.Round(val*1000) / 1000
 	val = math.Min(val, 0.99)
 	return
