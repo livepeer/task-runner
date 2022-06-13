@@ -42,9 +42,9 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	// Temporarily skip preparing recorded streams while we figure out a bug in the orchestrators latest version.
 	isInputRecording := strings.HasPrefix(params.URL, "https://livepeercdn.") && strings.Contains(params.URL, "/recordings/")
 	if !isInputRecording {
-		go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count, 0, 50)
+		go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count, 0, 0.5)
 	} else {
-		go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count, 0, 100)
+		go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count, 0, 1)
 	}
 	// Probe the source file to retrieve metadata
 	eg.Go(func() (err error) {
@@ -85,7 +85,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		defer importedFile.Close()
 		// RecordStream on output file for HLS playback
-		playbackRecordingId, err = Prepare(tctx, metadata.AssetSpec, importedFile, *fileInfoReader.Size, 50)
+		playbackRecordingId, err = Prepare(tctx, metadata.AssetSpec, importedFile, 0.5)
 		if err != nil {
 			glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 		}

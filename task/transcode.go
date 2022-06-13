@@ -117,22 +117,20 @@ func fileWriter(size int64) WriteSeekCloser {
 	}
 }
 
-type SegmentCounter struct {
-	size  uint64
-	count uint64
+type SegmentSizeAccumulator struct {
+	readSize uint64
 }
 
-func NewSegmentCounter(size int64) *SegmentCounter {
-	return &SegmentCounter{size: uint64(size)}
+func NewSegmentSizeAccumulator() *SegmentSizeAccumulator {
+	return &SegmentSizeAccumulator{}
 }
 
-func (c SegmentCounter) Count() uint64 {
-	return atomic.LoadUint64(&c.count)
+func (c SegmentSizeAccumulator) Size() uint64 {
+	return atomic.LoadUint64(&c.readSize)
 }
 
-func (c SegmentCounter) Read(data []byte) int {
-	atomic.AddUint64(&c.count, uint64(len(data)))
-	return len(data)
+func (c SegmentSizeAccumulator) Accumulate(size uint64) {
+	atomic.AddUint64(&c.readSize, size)
 }
 
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -190,10 +188,10 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 	}
 	err = nil
-	counter := NewSegmentCounter(sourceFileSize)
+	accumulator := NewSegmentSizeAccumulator()
 	progressCtx, cancelProgress := context.WithCancel(ctx)
 	defer cancelProgress()
-	go ReportProgress(progressCtx, lapi, tctx.Task.ID, counter.size, counter.Count, 0, 50)
+	go ReportProgress(progressCtx, lapi, tctx.Task.ID, uint64(sourceFileSize), accumulator.Size, 0, 0.5)
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -211,7 +209,7 @@ out:
 			glog.Errorf("Segment push playbackID=%s err=%v\n", inputPlaybackID, err)
 			break
 		}
-		counter.Read(seg.Data)
+		accumulator.Accumulate(uint64(len(seg.Data)))
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 
 		for i, segData := range transcoded {
@@ -263,7 +261,7 @@ out:
 	}
 	cancelProgress()
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, ws.Reader(), 50)
+	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, ws.Reader(), 0.5)
 	if err != nil {
 		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}

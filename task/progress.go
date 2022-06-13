@@ -15,9 +15,11 @@ var progressReportBuckets = []float64{0, 0.25, 0.5, 0.75, 1}
 const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
-func ReportProgress(ctx context.Context, lapi *livepeerAPI.Client, taskID string, size uint64, getCount func() uint64, startPercentage int, endPercentage int) {
-	startPercentage = int(math.Max(float64(startPercentage), 0)) // >= 0, <= 100, smaller than endPercentage
-	endPercentage = int(math.Min(float64(endPercentage), 100))   // >= 0, <= 100, larger than startPercentage
+func ReportProgress(ctx context.Context, lapi *livepeerAPI.Client, taskID string, size uint64, getCount func() uint64, startFraction float64, endFraction float64) {
+	if startFraction > endFraction || startFraction < 0 || endFraction < 0 || startFraction > 1 || endFraction > 1 {
+		glog.Errorf("Error reporting task progress taskID=%s startFraction=%v endFraction=%v", taskID, startFraction, endFraction)
+		return
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic reporting task progress: value=%q stack:\n%s", r, string(debug.Stack()))
@@ -37,12 +39,13 @@ func ReportProgress(ctx context.Context, lapi *livepeerAPI.Client, taskID string
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			progress := calcProgress(getCount(), size, startPercentage, endPercentage)
+			progress := calcProgress(getCount(), size)
 			if time.Since(lastReport) < minProgressReportInterval &&
 				progressBucket(progress) == progressBucket(lastProgress) {
 				continue
 			}
-			if err := lapi.UpdateTaskStatus(taskID, "running", progress); err != nil {
+			scaledProgress := scaleProgress(progress, startFraction, endFraction)
+			if err := lapi.UpdateTaskStatus(taskID, "running", scaledProgress); err != nil {
 				glog.Errorf("Error updating task progress taskID=%s progress=%v err=%q", taskID, progress, err)
 				continue
 			}
@@ -51,12 +54,15 @@ func ReportProgress(ctx context.Context, lapi *livepeerAPI.Client, taskID string
 	}
 }
 
-func calcProgress(count, size uint64, startPercentage int, endPercentage int) (val float64) {
+func calcProgress(count, size uint64) (val float64) {
 	val = float64(count) / float64(size)
-	val = val * (float64(endPercentage) - float64(startPercentage))
-	val = (val + float64(startPercentage)) / 100
 	val = math.Round(val*1000) / 1000
 	val = math.Min(val, 0.99)
+	return
+}
+
+func scaleProgress(progress, startFraction, endFraction float64) (val float64) {
+	val = startFraction + val*(endFraction-startFraction)
 	return
 }
 
