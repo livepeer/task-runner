@@ -54,7 +54,7 @@ var allProfiles = []api.Profile{
 	},
 }
 
-func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser, size int64, reportProgressStartPercentage int) (string, error) {
+func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser, reportProgressStartPercentage int) (string, error) {
 	var (
 		ctx     = tctx.Context
 		lapi    = tctx.lapi
@@ -89,7 +89,7 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 		}
 	}
 
-	counter := NewSegmentCounter(size)
+	counter := NewSegmentCounter(int64(assetSpec.Size))
 	go ReportProgress(ctx, lapi, tctx.Task.ID, counter.size, counter.Count, reportProgressStartPercentage, 100)
 
 	for seg := range segmentsIn {
