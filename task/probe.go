@@ -27,13 +27,13 @@ type FileMetadata struct {
 	AssetSpec *api.AssetSpec     `json:"assetSpec"`
 }
 
-func Probe(ctx context.Context, filename string, data *ReadCounter) (*FileMetadata, error) {
+func Probe(ctx context.Context, assetId, filename string, data *ReadCounter) (*FileMetadata, error) {
 	hasher := NewReadHasher(data)
 	probeData, err := ffprobe.ProbeReader(ctx, hasher)
 	if err != nil {
 		return nil, fmt.Errorf("error probing file: %w", err)
 	}
-	logProbeData(filename, probeData)
+	logProbeData(assetId, filename, probeData)
 	if _, err := hasher.FinishReader(); err != nil {
 		return nil, fmt.Errorf("error reading input: %w", err)
 	}
@@ -195,7 +195,7 @@ func parseFps(framerate string) (float64, error) {
 	return float64(num) / float64(den), nil
 }
 
-func logProbeData(filename string, probeData *ffprobe.ProbeData) {
+func logProbeData(assetId, filename string, probeData *ffprobe.ProbeData) {
 	streamFields := []string{}
 	var width, height int
 	for _, stream := range probeData.Streams {
@@ -211,15 +211,16 @@ func logProbeData(filename string, probeData *ffprobe.ProbeData) {
 			width, height = stream.Width, stream.Height
 		}
 	}
-	glog.Infof("Probed video file filename=%q format=%v width=%d height=%d bitrate=%s startTime=%v %s",
-		filename, probeData.Format.FormatName, width, height, probeData.Format.BitRate, probeData.Format.StartTimeSeconds, strings.Join(streamFields, " "))
+	glog.Infof("Probed video file assetId=%s filename=%q format=%v width=%d height=%d bitrate=%s startTime=%v %s",
+		assetId, filename, probeData.Format.FormatName, width, height, probeData.Format.BitRate,
+		probeData.Format.StartTimeSeconds, strings.Join(streamFields, " "))
 
 	if glog.V(model.VERBOSE) {
 		rawData, err := json.Marshal(probeData)
 		if err != nil {
 			glog.Errorf("Error JSON marshalling probe data err=%q", err)
 		} else {
-			glog.Infof("Raw ffprobe output filename=%q ffprobeOut=%q", filename, rawData)
+			glog.Infof("Raw ffprobe output assetId=%s filename=%q ffprobeOut=%q", assetId, filename, rawData)
 		}
 	}
 }
