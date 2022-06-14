@@ -63,26 +63,12 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		// TODO: Delete the source file
 		return nil, err
 	}
-	playbackRecordingId := params.RecordedSessionID
-	if playbackRecordingId == "" {
-		fileInfoReader, err := osSess.ReadData(ctx, fullPath)
-		if err != nil {
-			return nil, fmt.Errorf("error reading imported file from output OS path=%s err=%w", fullPath, err)
-		}
-		defer fileInfoReader.Body.Close()
-		importedFile, err := readFile(fileInfoReader)
-		if err != nil {
-			return nil, err
-		}
-		defer importedFile.Close()
-		// RecordStream on output file for HLS playback
-		playbackRecordingId, err = Prepare(tctx, metadata.AssetSpec, importedFile)
-		if err != nil {
-			glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
-		}
+	playbackRecordingID, err := prepareImportedAsset(tctx, metadata, fullPath)
+	if err != nil {
+		return nil, err
 	}
 	assetSpec := *metadata.AssetSpec
-	assetSpec.PlaybackRecordingID = playbackRecordingId
+	assetSpec.PlaybackRecordingID = playbackRecordingID
 	return &data.TaskOutput{Import: &data.ImportTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
@@ -127,6 +113,31 @@ func getFile(ctx context.Context, osSess drivers.OSSession, params api.ImportTas
 		size = uint64(resp.ContentLength)
 	}
 	return filename(req, resp), size, resp.Body, nil
+}
+
+func prepareImportedAsset(tctx *TaskContext, metadata *FileMetadata, fullPath string) (string, error) {
+	if sessID := tctx.Params.Import.RecordedSessionID; sessID != "" {
+		return sessID, nil
+	}
+
+	fileInfoReader, err := tctx.outputOS.ReadData(tctx, fullPath)
+	if err != nil {
+		return "", fmt.Errorf("error reading imported file from output OS path=%s err=%w", fullPath, err)
+	}
+	defer fileInfoReader.Body.Close()
+	importedFile, err := readFile(fileInfoReader)
+	if err != nil {
+		return "", err
+	}
+	defer importedFile.Close()
+
+	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, importedFile)
+	if err != nil {
+		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+		// TODO: make these fatal once we're confident about prepare reliability
+		return "", nil
+	}
+	return playbackRecordingID, nil
 }
 
 func filename(req *http.Request, resp *http.Response) string {
