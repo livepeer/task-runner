@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	lp_api "github.com/livepeer/go-api-client"
+	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/joy4/av"
 	"github.com/livepeer/joy4/av/avutil"
@@ -141,8 +141,8 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 
 	streamName := fmt.Sprintf("vod_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
-	profiles := []lp_api.Profile{tctx.Params.Transcode.Profile}
-	stream, err := lapi.CreateStream(lp_api.CreateStreamReq{Name: streamName, Profiles: profiles})
+	profiles := []api.Profile{tctx.Params.Transcode.Profile}
+	stream, err := lapi.CreateStream(api.CreateStreamReq{Name: streamName, Profiles: profiles})
 	if err != nil {
 		return nil, err
 	}

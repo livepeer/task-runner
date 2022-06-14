@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	livepeerAPI "github.com/livepeer/go-api-client"
+	api "github.com/livepeer/go-api-client"
 )
 
 var progressReportBuckets = []float64{0, 0.25, 0.5, 0.75, 1}
@@ -16,7 +16,7 @@ var progressReportBuckets = []float64{0, 0.25, 0.5, 0.75, 1}
 const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
-func ReportProgress(ctx context.Context, lapi *livepeerAPI.Client, taskID string, size uint64, getCount func() uint64) {
+func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size uint64, getCount func() uint64) {
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic reporting task progress: value=%q stack:\n%s", r, string(debug.Stack()))

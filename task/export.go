@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	livepeerAPI "github.com/livepeer/go-api-client"
+	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
 )
@@ -60,7 +60,7 @@ type internalMetadata struct {
 	Pinata   interface{} `json:"pinata"`
 }
 
-func uploadFile(tctx *TaskContext, asset *livepeerAPI.Asset, content io.Reader) (*data.ExportTaskOutput, error) {
+func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.ExportTaskOutput, error) {
 	params := tctx.Task.Params.Export
 	contentType := "video/" + asset.VideoSpec.Format
 	if c := params.Custom; c != nil {
@@ -118,16 +118,16 @@ func uploadFile(tctx *TaskContext, asset *livepeerAPI.Asset, content io.Reader) 
 	}, nil
 }
 
-func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.Asset, videoCID string) (string, error) {
+func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *api.Asset, videoCID string) (string, error) {
 	params := tctx.Task.Params.Export.IPFS
 	template := params.NFTMetadataTemplate
-	if template == livepeerAPI.NFTMetadataTemplatePlayer && asset.PlaybackRecordingID == "" {
+	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackRecordingID == "" {
 		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
 	}
 	if template == "" {
-		template = livepeerAPI.NFTMetadataTemplatePlayer
+		template = api.NFTMetadataTemplatePlayer
 		if asset.PlaybackRecordingID == "" {
-			template = livepeerAPI.NFTMetadataTemplateFile
+			template = api.NFTMetadataTemplateFile
 		}
 	}
 	nftMetadata := nftMetadata(asset, videoCID, template, tctx.ExportTaskConfig)
@@ -146,12 +146,12 @@ func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *livepeerAPI.As
 	return cid, nil
 }
 
-func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI.NFTMetadataTemplate, config ExportTaskConfig) map[string]interface{} {
+func nftMetadata(asset *api.Asset, videoCID string, template api.NFTMetadataTemplate, config ExportTaskConfig) map[string]interface{} {
 	videoUrl := "ipfs://" + videoCID
 	switch template {
 	default:
 		fallthrough
-	case livepeerAPI.NFTMetadataTemplatePlayer:
+	case api.NFTMetadataTemplatePlayer:
 		return map[string]interface{}{
 			"name":          asset.Name,
 			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
@@ -164,7 +164,7 @@ func nftMetadata(asset *livepeerAPI.Asset, videoCID string, template livepeerAPI
 				"com.livepeer.playbackId": asset.PlaybackID,
 			},
 		}
-	case livepeerAPI.NFTMetadataTemplateFile:
+	case api.NFTMetadataTemplateFile:
 		return map[string]interface{}{
 			"name":          asset.Name,
 			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),

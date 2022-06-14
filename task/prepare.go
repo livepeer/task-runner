@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	lp_api "github.com/livepeer/go-api-client"
+	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/stream-tester/model"
 	"github.com/livepeer/stream-tester/segmenter"
 )
@@ -17,7 +17,7 @@ const (
 	absoluteMinVideoBitrate = 5_000
 )
 
-var allProfiles = []lp_api.Profile{
+var allProfiles = []api.Profile{
 	{
 		Name:    "240p0",
 		Fps:     0,
@@ -52,7 +52,7 @@ var allProfiles = []lp_api.Profile{
 	},
 }
 
-func Prepare(tctx *TaskContext, assetSpec *lp_api.AssetSpec, file io.ReadSeekCloser) (string, error) {
+func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser) (string, error) {
 	var (
 		ctx     = tctx.Context
 		lapi    = tctx.lapi
@@ -64,7 +64,7 @@ func Prepare(tctx *TaskContext, assetSpec *lp_api.AssetSpec, file io.ReadSeekClo
 	if err != nil {
 		return "", nil
 	}
-	stream, err := lapi.CreateStream(lp_api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
+	stream, err := lapi.CreateStream(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
 	if err != nil {
 		return "", nil
 	}
@@ -114,8 +114,8 @@ func Prepare(tctx *TaskContext, assetSpec *lp_api.AssetSpec, file io.ReadSeekClo
 	return stream.ID, nil
 }
 
-func getPlaybackProfiles(assetVideoSpec *lp_api.AssetVideoSpec) ([]lp_api.Profile, error) {
-	var video *lp_api.AssetTrack
+func getPlaybackProfiles(assetVideoSpec *api.AssetVideoSpec) ([]api.Profile, error) {
+	var video *api.AssetTrack
 	for _, track := range assetVideoSpec.Tracks {
 		if track.Type == "video" {
 			video = track
@@ -124,26 +124,26 @@ func getPlaybackProfiles(assetVideoSpec *lp_api.AssetVideoSpec) ([]lp_api.Profil
 	if video == nil {
 		return nil, fmt.Errorf("no video track found in asset spec")
 	}
-	filtered := make([]lp_api.Profile, 0, len(allProfiles))
+	filtered := make([]api.Profile, 0, len(allProfiles))
 	for _, profile := range allProfiles {
 		if profile.Height <= video.Height && profile.Bitrate < int(video.Bitrate) {
 			filtered = append(filtered, profile)
 		}
 	}
 	if len(filtered) == 0 {
-		return []lp_api.Profile{lowBitrateProfile(video)}, nil
+		return []api.Profile{lowBitrateProfile(video)}, nil
 	}
 	return filtered, nil
 }
 
-func lowBitrateProfile(video *lp_api.AssetTrack) lp_api.Profile {
+func lowBitrateProfile(video *api.AssetTrack) api.Profile {
 	bitrate := int(video.Bitrate / 3)
 	if bitrate < minVideoBitrate && video.Bitrate > minVideoBitrate {
 		bitrate = minVideoBitrate
 	} else if bitrate < absoluteMinVideoBitrate {
 		bitrate = absoluteMinVideoBitrate
 	}
-	return lp_api.Profile{
+	return api.Profile{
 		Name:    "low-bitrate",
 		Fps:     0,
 		Bitrate: bitrate,
