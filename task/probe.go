@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path"
 	"strconv"
 	"strings"
@@ -198,6 +199,7 @@ func parseFps(framerate string) (float64, error) {
 func logProbeData(assetId, filename string, probeData *ffprobe.ProbeData) {
 	streamFields := []string{}
 	var width, height int
+	var maxStartTime float64
 	for _, stream := range probeData.Streams {
 		add := func(field string, value string) {
 			streamFields = append(streamFields, fmt.Sprintf("stream_%d_%s=%s, ", stream.Index, field, value))
@@ -210,10 +212,13 @@ func logProbeData(assetId, filename string, probeData *ffprobe.ProbeData) {
 		if stream.CodecType == "video" {
 			width, height = stream.Width, stream.Height
 		}
+		if startTime, err := strconv.ParseFloat(stream.StartTime, 64); err == nil {
+			maxStartTime = math.Max(maxStartTime, startTime)
+		}
 	}
-	glog.Infof("Probed video file assetId=%s filename=%q format=%v width=%d height=%d bitrate=%s startTime=%v %s",
+	glog.Infof("Probed video file assetId=%s filename=%q format=%v width=%d height=%d bitrate=%s startTime=%v maxStreamStartTime=%v %s",
 		assetId, filename, probeData.Format.FormatName, width, height, probeData.Format.BitRate,
-		probeData.Format.StartTimeSeconds, strings.Join(streamFields, " "))
+		probeData.Format.StartTimeSeconds, maxStartTime, strings.Join(streamFields, " "))
 
 	if glog.V(model.VERBOSE) {
 		rawData, err := json.Marshal(probeData)
