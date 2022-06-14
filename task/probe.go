@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	livepeerAPI "github.com/livepeer/go-api-client"
+	api "github.com/livepeer/go-api-client"
 	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
 
@@ -18,10 +18,10 @@ var (
 )
 
 type FileMetadata struct {
-	MD5       string                 `json:"md5"`
-	SHA256    string                 `json:"sha256"`
-	Ffprobe   *ffprobe.ProbeData     `json:"ffprobe"`
-	AssetSpec *livepeerAPI.AssetSpec `json:"assetSpec"`
+	MD5       string             `json:"md5"`
+	SHA256    string             `json:"sha256"`
+	Ffprobe   *ffprobe.ProbeData `json:"ffprobe"`
+	AssetSpec *api.AssetSpec     `json:"assetSpec"`
 }
 
 func Probe(ctx context.Context, filename string, data *ReadCounter) (*FileMetadata, error) {
@@ -34,7 +34,7 @@ func Probe(ctx context.Context, filename string, data *ReadCounter) (*FileMetada
 		return nil, fmt.Errorf("error reading input: %w", err)
 	}
 	size, md5, sha256 := data.Count(), hasher.MD5(), hasher.SHA256()
-	assetSpec, err := toAssetSpec(filename, probeData, size, []livepeerAPI.AssetHash{
+	assetSpec, err := toAssetSpec(filename, probeData, size, []api.AssetHash{
 		{Hash: md5, Algorithm: "md5"},
 		{Hash: sha256, Algorithm: "sha256"}})
 	if err != nil {
@@ -48,7 +48,7 @@ func Probe(ctx context.Context, filename string, data *ReadCounter) (*FileMetada
 	}, nil
 }
 
-func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, hash []livepeerAPI.AssetHash) (*livepeerAPI.AssetSpec, error) {
+func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, hash []api.AssetHash) (*api.AssetSpec, error) {
 	if filename == "" && probeData.Format.Filename != "pipe:" {
 		filename = probeData.Format.Filename
 	}
@@ -60,16 +60,16 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 	if probeData.Format.BitRate != "" && err != nil {
 		return nil, fmt.Errorf("error parsing file bitrate: %w", err)
 	}
-	spec := &livepeerAPI.AssetSpec{
+	spec := &api.AssetSpec{
 		Name: filename,
 		Type: "video",
 		Hash: hash,
 		Size: size,
-		VideoSpec: &livepeerAPI.AssetVideoSpec{
+		VideoSpec: &api.AssetVideoSpec{
 			Format:      format,
 			DurationSec: probeData.Format.DurationSeconds,
 			Bitrate:     bitrate,
-			Tracks:      make([]*livepeerAPI.AssetTrack, 0, len(probeData.Streams)),
+			Tracks:      make([]*api.AssetTrack, 0, len(probeData.Streams)),
 		},
 	}
 	var hasVideo bool
@@ -115,7 +115,7 @@ func containsStr(slc []string, val string) bool {
 	return false
 }
 
-func toAssetTrack(stream *ffprobe.Stream) (*livepeerAPI.AssetTrack, error) {
+func toAssetTrack(stream *ffprobe.Stream) (*api.AssetTrack, error) {
 	if stream.CodecType != "video" && stream.CodecType != "audio" {
 		return nil, fmt.Errorf("unsupported codec type: %s", stream.CodecType)
 	} else if stream.CodecType == "video" && !supportedVideoCodecs[stream.CodecName] {
@@ -136,7 +136,7 @@ func toAssetTrack(stream *ffprobe.Stream) (*livepeerAPI.AssetTrack, error) {
 	if stream.BitRate != "" && err != nil {
 		return nil, fmt.Errorf("error parsing bitrate from track %d: %w", stream.Index, err)
 	}
-	track := &livepeerAPI.AssetTrack{
+	track := &api.AssetTrack{
 		Type:        stream.CodecType,
 		Codec:       stream.CodecName,
 		StartTime:   startTime,

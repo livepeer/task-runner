@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	livepeerAPI "github.com/livepeer/go-api-client"
+	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
@@ -35,8 +35,8 @@ type TaskContext struct {
 	context.Context
 	*runner
 	data.TaskInfo
-	*livepeerAPI.Task
-	InputAsset, OutputAsset *livepeerAPI.Asset
+	*api.Task
+	InputAsset, OutputAsset *api.Asset
 	inputOS, outputOS       drivers.OSSession
 }
 
@@ -56,7 +56,7 @@ type RunnerOptions struct {
 	AMQPUri            string
 	ExchangeName       string
 	QueueName          string
-	LivepeerAPIOptions livepeerAPI.ClientOptions
+	LivepeerAPIOptions api.ClientOptions
 	ExportTaskConfig
 
 	TaskHandlers map[string]TaskHandler
@@ -68,7 +68,7 @@ func NewRunner(opts RunnerOptions) Runner {
 	}
 	return &runner{
 		RunnerOptions: opts,
-		lapi:          livepeerAPI.NewAPIClient(opts.LivepeerAPIOptions),
+		lapi:          api.NewAPIClient(opts.LivepeerAPIOptions),
 		ipfs: clients.NewPinataClientJWT(opts.PinataAccessToken, map[string]string{
 			"apiServer": opts.LivepeerAPIOptions.Server,
 			"createdBy": clients.UserAgent,
@@ -79,7 +79,7 @@ func NewRunner(opts RunnerOptions) Runner {
 type runner struct {
 	RunnerOptions
 
-	lapi *livepeerAPI.Client
+	lapi *api.Client
 	ipfs clients.IPFS
 	amqp event.AMQPClient
 }
@@ -197,7 +197,7 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOS, outputOS}, nil
 }
 
-func (r *runner) getAssetAndOS(assetID string) (*livepeerAPI.Asset, drivers.OSSession, error) {
+func (r *runner) getAssetAndOS(assetID string) (*api.Asset, drivers.OSSession, error) {
 	if assetID == "" {
 		return nil, nil, nil
 	}
