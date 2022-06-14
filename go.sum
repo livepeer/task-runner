@@ -708,8 +708,8 @@ github.com/livepeer/lpms v0.0.0-20220523122311-fc32eb80248c h1:LFwabjsjQU/bxVdUL
 github.com/livepeer/lpms v0.0.0-20220523122311-fc32eb80248c/go.mod h1:Hr/JhxxPDipOVd4ZrGYWrdJfpVF8/SEI0nNr2ctAlkM=
 github.com/livepeer/m3u8 v0.11.1 h1:VkUJzfNTyjy9mqsgp5JPvouwna8wGZMvd/gAfT5FinU=
 github.com/livepeer/m3u8 v0.11.1/go.mod h1:IUqAtwWPAG2CblfQa4SVzTQoDcEMPyfNOaBSxqHMS04=
-github.com/livepeer/stream-tester v0.12.11 h1:RuHOIC5pFZy9XUbGqWLuiFoqh4UHBUp6q+//IxEOme0=
-github.com/livepeer/stream-tester v0.12.11/go.mod h1:UJG9vkEJuBcbEFl0AUQYu1mahBOiVRZkF/FAcvJ4nJQ=
+github.com/livepeer/stream-tester v0.12.12 h1:G1P7PCisbBN6puttlbHz1p5OKiItQk75JgHI/3UV7d4=
+github.com/livepeer/stream-tester v0.12.12/go.mod h1:UJG9vkEJuBcbEFl0AUQYu1mahBOiVRZkF/FAcvJ4nJQ=
 github.com/magiconair/properties v1.8.5/go.mod h1:y3VJvCyxH9uVvJTWEGAELF3aiYNyPKd5NZ3oSwXrF60=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
 github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
