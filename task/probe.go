@@ -2,12 +2,15 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
+	"github.com/livepeer/stream-tester/model"
 	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
 
@@ -30,6 +33,7 @@ func Probe(ctx context.Context, filename string, data *ReadCounter) (*FileMetada
 	if err != nil {
 		return nil, fmt.Errorf("error probing file: %w", err)
 	}
+	logProbeData(filename, probeData)
 	if _, err := hasher.FinishReader(); err != nil {
 		return nil, fmt.Errorf("error reading input: %w", err)
 	}
@@ -189,4 +193,33 @@ func parseFps(framerate string) (float64, error) {
 		return 0, fmt.Errorf("error parsing framerate denominator: %w", err)
 	}
 	return float64(num) / float64(den), nil
+}
+
+func logProbeData(filename string, probeData *ffprobe.ProbeData) {
+	streamFields := []string{}
+	var width, height int
+	for _, stream := range probeData.Streams {
+		add := func(field string, value string) {
+			streamFields = append(streamFields, fmt.Sprintf("stream_%d_%s=%s, ", stream.Index, field, value))
+		}
+		add("type", stream.CodecType)
+		add("codec", stream.CodecName)
+		add("bitrate", stream.BitRate)
+		add("startTime", stream.StartTime)
+		add("duration", stream.Duration)
+		if stream.CodecType == "video" {
+			width, height = stream.Width, stream.Height
+		}
+	}
+	glog.Infof("Probed video file filename=%q format=%v width=%d height=%d bitrate=%s startTime=%v %s",
+		filename, probeData.Format.FormatName, width, height, probeData.Format.BitRate, probeData.Format.StartTimeSeconds, strings.Join(streamFields, " "))
+
+	if glog.V(model.VERBOSE) {
+		rawData, err := json.Marshal(probeData)
+		if err != nil {
+			glog.Errorf("Error JSON marshalling probe data err=%q", err)
+		} else {
+			glog.Infof("Raw ffprobe output filename=%q ffprobeOut=%q", filename, rawData)
+		}
+	}
 }
