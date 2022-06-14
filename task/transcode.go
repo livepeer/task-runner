@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	lp_api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-livepeer/drivers"
 	"github.com/livepeer/joy4/av"
 	"github.com/livepeer/joy4/av/avutil"
@@ -139,8 +140,8 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 
 	streamName := fmt.Sprintf("vod_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
-	profile := tctx.Params.Transcode.Profile
-	stream, err := lapi.CreateStreamEx(streamName, false, nil, profile)
+	profiles := []lp_api.Profile{tctx.Params.Transcode.Profile}
+	stream, err := lapi.CreateStream(lp_api.CreateStreamReq{Name: streamName, Profiles: profiles})
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +182,7 @@ out:
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
 		started := time.Now()
-		transcoded, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
+		transcoded, err = lapi.PushSegmentR(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
 		if err != nil {
 			glog.Errorf("Segment push playbackID=%s err=%v\n", inputPlaybackID, err)
 			break
