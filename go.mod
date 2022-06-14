@@ -8,7 +8,7 @@ require (
 	github.com/livepeer/go-livepeer v0.5.31
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
 	github.com/livepeer/livepeer-data v0.4.14
-	github.com/livepeer/stream-tester v0.12.10
+	github.com/livepeer/stream-tester v0.12.11
 	github.com/peterbourgon/ff v1.7.1
 	github.com/rabbitmq/amqp091-go v1.1.0
 	github.com/stretchr/testify v1.7.0
