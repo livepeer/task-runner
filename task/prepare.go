@@ -70,10 +70,10 @@ func Prepare(tctx *TaskContext, assetSpec *lp_api.AssetSpec, file io.ReadSeekClo
 	}
 	defer lapi.DeleteStream(stream.ID)
 
-	gctx, gcancel := context.WithCancel(ctx)
-	defer gcancel()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	segmentsIn := make(chan *model.HlsSegment)
-	if err = segmenter.StartSegmentingR(gctx, file, true, 0, 0, segLen, false, segmentsIn); err != nil {
+	if err = segmenter.StartSegmentingR(ctx, file, true, 0, 0, segLen, false, segmentsIn); err != nil {
 		return "", err
 	}
 	var transcoded [][]byte
@@ -104,6 +104,9 @@ func Prepare(tctx *TaskContext, assetSpec *lp_api.AssetSpec, file io.ReadSeekClo
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
+	}
+	if ctxErr := ctx.Err(); err == nil && ctxErr != nil {
+		err = ctxErr
 	}
 	if err != nil && err != io.EOF {
 		return "", err

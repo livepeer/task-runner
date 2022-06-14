@@ -119,6 +119,7 @@ func fileWriter(size int64) WriteSeekCloser {
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx             = tctx.Context
+		outAsset        = tctx.OutputAsset
 		inputPlaybackID = tctx.InputAsset.PlaybackID
 		lapi            = tctx.lapi
 	)
@@ -148,10 +149,10 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	defer lapi.DeleteStream(stream.ID)
 
 	glog.V(model.DEBUG).Infof("Created vod stream id=%s name=%s\n", stream.ID, stream.Name)
-	gctx, gcancel := context.WithCancel(ctx)
-	defer gcancel()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	segmentsIn := make(chan *model.HlsSegment)
-	if err = segmenter.StartSegmentingR(gctx, sourceFile, true, 0, 0, segLen, false, segmentsIn); err != nil {
+	if err = segmenter.StartSegmentingR(ctx, sourceFile, true, 0, 0, segLen, false, segmentsIn); err != nil {
 		return nil, err
 	}
 	var outFiles []av.Muxer
@@ -208,33 +209,31 @@ out:
 			}
 		}
 	}
-	if err == io.EOF {
-		err = nil
+	if ctxErr := ctx.Err(); err == nil && ctxErr != nil {
+		err = ctxErr
 	}
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
-	var videoFilePath string
 	outFiles[0].WriteTrailer()
-	asset := tctx.OutputAsset
-	fullPath = videoFileName(asset.PlaybackID)
+	fullPath = videoFileName(outAsset.PlaybackID)
 	ws = outBuffers[0]
-	videoFilePath, err = tctx.outputOS.SaveData(gctx, fullPath, ws.Reader(), nil, fileUploadTimeout)
+	videoFilePath, err := tctx.outputOS.SaveData(ctx, fullPath, ws.Reader(), nil, fileUploadTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 	}
-	glog.Infof("Saved file with playbackID=%s to url=%s", asset.PlaybackID, videoFilePath)
+	glog.Infof("Saved file with playbackID=%s to url=%s", outAsset.PlaybackID, videoFilePath)
 
-	metadata, err := Probe(gctx, asset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()))
+	metadata, err := Probe(ctx, outAsset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()))
 	if err != nil {
 		return nil, err
 	}
-	metadataFilePath, err := saveMetadataFile(gctx, tctx.outputOS, asset.PlaybackID, metadata)
+	metadataFilePath, err := saveMetadataFile(ctx, tctx.outputOS, outAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, err
 	}
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, ws.Reader())
+	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader())
 	if err != nil {
 		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}
