@@ -9,7 +9,6 @@ import (
 	"mime"
 	"net/http"
 	"path"
-	"strings"
 
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
@@ -60,17 +59,12 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
 		return nil
 	})
-	// Wait for async goroutines finish to run prepare
 	if err := eg.Wait(); err != nil {
 		// TODO: Delete the source file
 		return nil, err
 	}
-	playbackRecordingId := ""
-	isInputRecording := strings.HasPrefix(params.URL, "https://livepeercdn.") && strings.Contains(params.URL, "/recordings/")
-	// Temporarily skip preparing recorded streams while we figure out a bug in the orchestrators latest version.
-	// TODO: Remove this check and prepare all assets.
-	if !isInputRecording {
-		// Download our imported output file
+	playbackRecordingId := params.RecordedSessionID
+	if playbackRecordingId == "" {
 		fileInfoReader, err := osSess.ReadData(ctx, fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("error reading imported file from output OS path=%s err=%w", fullPath, err)
