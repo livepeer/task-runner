@@ -215,7 +215,12 @@ out:
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
-	outFiles[0].WriteTrailer()
+	for i, f := range outFiles {
+		if err := f.WriteTrailer(); err != nil {
+			glog.Errorf("Error writing trailer file=%d err=%v\n", i, err)
+			return nil, fmt.Errorf("error writing trailer of file %d: %w", i, err)
+		}
+	}
 	fullPath = videoFileName(outAsset.PlaybackID)
 	ws = outBuffers[0]
 	videoFilePath, err := tctx.outputOS.SaveData(ctx, fullPath, ws.Reader(), nil, fileUploadTimeout)
