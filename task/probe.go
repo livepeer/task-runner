@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	supportedFormats     = []string{"mp4", "mov"}
-	supportedVideoCodecs = map[string]bool{"h264": true}
-	supportedAudioCodecs = map[string]bool{"aac": true}
+	supportedFormats      = []string{"mp4", "mov"}
+	supportedVideoCodecs  = map[string]bool{"h264": true}
+	supportedPixelFormats = map[string]bool{"yuv420p": true}
+	supportedAudioCodecs  = map[string]bool{"aac": true}
 )
 
 type FileMetadata struct {
@@ -123,10 +124,15 @@ func containsStr(slc []string, val string) bool {
 func toAssetTrack(stream *ffprobe.Stream) (*api.AssetTrack, error) {
 	if stream.CodecType != "video" && stream.CodecType != "audio" {
 		return nil, fmt.Errorf("unsupported codec type: %s", stream.CodecType)
-	} else if stream.CodecType == "video" && !supportedVideoCodecs[stream.CodecName] {
-		return nil, fmt.Errorf("unsupported video codec: %s", stream.CodecName)
 	} else if stream.CodecType == "audio" && !supportedAudioCodecs[stream.CodecName] {
 		return nil, fmt.Errorf("unsupported audio codec: %s", stream.CodecName)
+	} else if stream.CodecType == "video" {
+		if !supportedVideoCodecs[stream.CodecName] {
+			return nil, fmt.Errorf("unsupported video codec: %s", stream.CodecName)
+		}
+		if !supportedPixelFormats[stream.PixFmt] {
+			return nil, fmt.Errorf("unsupported video pixel format: %s", stream.PixFmt)
+		}
 	}
 
 	startTime, err := strconv.ParseFloat(stream.StartTime, 64)
