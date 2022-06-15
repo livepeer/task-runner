@@ -2,19 +2,24 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
+	"github.com/livepeer/stream-tester/model"
 	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
 
 var (
-	supportedFormats     = []string{"mp4", "mov"}
-	supportedVideoCodecs = map[string]bool{"h264": true}
-	supportedAudioCodecs = map[string]bool{"aac": true}
+	supportedFormats      = []string{"mp4", "mov"}
+	supportedVideoCodecs  = map[string]bool{"h264": true}
+	supportedPixelFormats = map[string]bool{"yuv420p": true}
+	supportedAudioCodecs  = map[string]bool{"aac": true}
 )
 
 type FileMetadata struct {
@@ -24,12 +29,13 @@ type FileMetadata struct {
 	AssetSpec *api.AssetSpec     `json:"assetSpec"`
 }
 
-func Probe(ctx context.Context, filename string, data *ReadCounter) (*FileMetadata, error) {
+func Probe(ctx context.Context, assetId, filename string, data *ReadCounter) (*FileMetadata, error) {
 	hasher := NewReadHasher(data)
 	probeData, err := ffprobe.ProbeReader(ctx, hasher)
 	if err != nil {
 		return nil, fmt.Errorf("error probing file: %w", err)
 	}
+	logProbeData(assetId, filename, probeData)
 	if _, err := hasher.FinishReader(); err != nil {
 		return nil, fmt.Errorf("error reading input: %w", err)
 	}
@@ -118,10 +124,15 @@ func containsStr(slc []string, val string) bool {
 func toAssetTrack(stream *ffprobe.Stream) (*api.AssetTrack, error) {
 	if stream.CodecType != "video" && stream.CodecType != "audio" {
 		return nil, fmt.Errorf("unsupported codec type: %s", stream.CodecType)
-	} else if stream.CodecType == "video" && !supportedVideoCodecs[stream.CodecName] {
-		return nil, fmt.Errorf("unsupported video codec: %s", stream.CodecName)
 	} else if stream.CodecType == "audio" && !supportedAudioCodecs[stream.CodecName] {
 		return nil, fmt.Errorf("unsupported audio codec: %s", stream.CodecName)
+	} else if stream.CodecType == "video" {
+		if !supportedVideoCodecs[stream.CodecName] {
+			return nil, fmt.Errorf("unsupported video codec: %s", stream.CodecName)
+		}
+		if !supportedPixelFormats[stream.PixFmt] {
+			return nil, fmt.Errorf("unsupported video pixel format: %s", stream.PixFmt)
+		}
 	}
 
 	startTime, err := strconv.ParseFloat(stream.StartTime, 64)
@@ -189,4 +200,38 @@ func parseFps(framerate string) (float64, error) {
 		return 0, fmt.Errorf("error parsing framerate denominator: %w", err)
 	}
 	return float64(num) / float64(den), nil
+}
+
+func logProbeData(assetId, filename string, probeData *ffprobe.ProbeData) {
+	streamFields := []string{}
+	var width, height int
+	var maxStartTime float64
+	for _, stream := range probeData.Streams {
+		add := func(field string, value string) {
+			streamFields = append(streamFields, fmt.Sprintf("stream_%d_%s=%q", stream.Index, field, value))
+		}
+		add("type", stream.CodecType)
+		add("codec", stream.CodecName)
+		add("bitrate", stream.BitRate)
+		add("startTime", stream.StartTime)
+		add("duration", stream.Duration)
+		if stream.CodecType == "video" {
+			width, height = stream.Width, stream.Height
+		}
+		if startTime, err := strconv.ParseFloat(stream.StartTime, 64); err == nil {
+			maxStartTime = math.Max(maxStartTime, startTime)
+		}
+	}
+	glog.Infof("Probed video file assetId=%s filename=%q format=%v width=%d height=%d bitrate=%s startTime=%v maxStreamStartTime=%v %s",
+		assetId, filename, probeData.Format.FormatName, width, height, probeData.Format.BitRate,
+		probeData.Format.StartTimeSeconds, maxStartTime, strings.Join(streamFields, " "))
+
+	if glog.V(model.VERBOSE) {
+		rawData, err := json.Marshal(probeData)
+		if err != nil {
+			glog.Errorf("Error JSON marshalling probe data err=%q", err)
+		} else {
+			glog.Infof("Raw ffprobe output assetId=%s filename=%q ffprobeOut=%q", assetId, filename, rawData)
+		}
+	}
 }

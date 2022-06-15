@@ -41,7 +41,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count)
 	// Probe the source file to retrieve metadata
 	eg.Go(func() (err error) {
-		metadata, err = Probe(egCtx, filename, mainReader)
+		metadata, err = Probe(egCtx, tctx.OutputAsset.ID, filename, mainReader)
 		pipe.CloseWithError(err)
 		if err != nil {
 			return err
