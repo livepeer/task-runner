@@ -208,7 +208,7 @@ func logProbeData(assetId, filename string, probeData *ffprobe.ProbeData) {
 	var maxStartTime float64
 	for _, stream := range probeData.Streams {
 		add := func(field string, value string) {
-			streamFields = append(streamFields, fmt.Sprintf("stream_%d_%s=%s, ", stream.Index, field, value))
+			streamFields = append(streamFields, fmt.Sprintf("stream_%d_%s=%q", stream.Index, field, value))
 		}
 		add("type", stream.CodecType)
 		add("codec", stream.CodecName)
