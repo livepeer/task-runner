@@ -216,13 +216,14 @@ func logProbeData(assetId, filename string, probeData *ffprobe.ProbeData) {
 		add("startTime", stream.StartTime)
 		add("duration", stream.Duration)
 		if stream.CodecType == "video" {
+			add("pixelFormat", stream.PixFmt)
 			width, height = stream.Width, stream.Height
 		}
 		if startTime, err := strconv.ParseFloat(stream.StartTime, 64); err == nil {
 			maxStartTime = math.Max(maxStartTime, startTime)
 		}
 	}
-	glog.Infof("Probed video file assetId=%s filename=%q format=%v width=%d height=%d bitrate=%s startTime=%v maxStreamStartTime=%v %s",
+	glog.Infof("Probed video file assetId=%s filename=%q format=%q width=%d height=%d bitrate=%s startTime=%v maxStreamStartTime=%v %s",
 		assetId, filename, probeData.Format.FormatName, width, height, probeData.Format.BitRate,
 		probeData.Format.StartTimeSeconds, maxStartTime, strings.Join(streamFields, " "))
 
