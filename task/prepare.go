@@ -89,7 +89,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		}
 	}
 
-	accumulator := NewSegmentSizeAccumulator()
+	accumulator := NewAccumulator()
 	progressCtx, cancelProgress := context.WithCancel(ctx)
 	defer cancelProgress()
 	go ReportProgress(progressCtx, lapi, tctx.Task.ID, assetSpec.Size, accumulator.Size, progressStart, 1)

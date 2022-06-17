@@ -62,9 +62,8 @@ func calcProgress(count, size uint64) (val float64) {
 	return
 }
 
-func scaleProgress(progress, startFraction, endFraction float64) (val float64) {
-	val = startFraction + progress*(endFraction-startFraction)
-	return
+func scaleProgress(progress, startFraction, endFraction float64) float64 {
+	return startFraction + progress*(endFraction-startFraction)
 }
 
 func progressBucket(progress float64) int {

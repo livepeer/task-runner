@@ -117,20 +117,20 @@ func fileWriter(size int64) WriteSeekCloser {
 	}
 }
 
-type SegmentSizeAccumulator struct {
-	readSize uint64
+type Accumulator struct {
+	size uint64
 }
 
-func NewSegmentSizeAccumulator() *SegmentSizeAccumulator {
-	return &SegmentSizeAccumulator{}
+func NewAccumulator() *Accumulator {
+	return &Accumulator{}
 }
 
-func (a *SegmentSizeAccumulator) Size() uint64 {
-	return atomic.LoadUint64(&a.readSize)
+func (a *Accumulator) Size() uint64 {
+	return atomic.LoadUint64(&a.size)
 }
 
-func (a *SegmentSizeAccumulator) Accumulate(size uint64) {
-	atomic.AddUint64(&a.readSize, size)
+func (a *Accumulator) Accumulate(size uint64) {
+	atomic.AddUint64(&a.size, size)
 }
 
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -188,7 +188,7 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 	}
 	err = nil
-	accumulator := NewSegmentSizeAccumulator()
+	accumulator := NewAccumulator()
 	progressCtx, cancelProgress := context.WithCancel(ctx)
 	defer cancelProgress()
 	go ReportProgress(progressCtx, lapi, tctx.Task.ID, uint64(sourceFileSize), accumulator.Size, 0, 0.5)
