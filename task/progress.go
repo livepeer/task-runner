@@ -17,7 +17,7 @@ const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
 func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size uint64, getCount func() uint64, startFraction, endFraction float64) {
-	glog.Infof(`Report Progress rev5 START taskID=%s size=%d count=%d startFraction=%f endFraction=%f"`, taskID, size, getCount(), startFraction, endFraction)
+	glog.Infof(`Report Progress rev6 START taskID=%s size=%d count=%d startFraction=%f endFraction=%f"`, taskID, size, getCount(), startFraction, endFraction)
 	if startFraction > endFraction || startFraction < 0 || endFraction < 0 || startFraction > 1 || endFraction > 1 {
 		glog.Errorf("Error reporting task progress taskID=%s startFraction=%f endFraction=%f", taskID, startFraction, endFraction)
 		return
@@ -42,13 +42,13 @@ func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size u
 			return
 		case <-timer.C:
 			progress := calcProgress(getCount(), size)
-			glog.Infof(`Report Progress rev5 COUNT taskID=%s count=%d size=%d progress=%f"`, taskID, getCount(), size, progress)
+			glog.Infof(`Report Progress rev6 COUNT taskID=%s count=%d size=%d progress=%f"`, taskID, getCount(), size, progress)
 			if time.Since(lastReport) < minProgressReportInterval &&
 				progressBucket(progress) == progressBucket(lastProgress) {
 				continue
 			}
 			scaledProgress := scaleProgress(progress, startFraction, endFraction)
-			glog.Infof(`Report Progress rev5 SCALE taskID=%s progress=%f scaledProgress=%f start=%f end=%f"`, taskID, progress, scaledProgress, startFraction, endFraction)
+			glog.Infof(`Report Progress rev6 SCALE taskID=%s progress=%f scaledProgress=%f start=%f end=%f"`, taskID, progress, scaledProgress, startFraction, endFraction)
 			if err := lapi.UpdateTaskStatus(taskID, "running", scaledProgress); err != nil {
 				glog.Errorf("Error updating task progress taskID=%s progress=%v err=%q", taskID, progress, err)
 				continue
