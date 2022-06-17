@@ -54,7 +54,7 @@ var allProfiles = []api.Profile{
 	},
 }
 
-func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSeekCloser, progressStart float64) (string, error) {
+func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser, progressStart float64) (string, error) {
 	var (
 		ctx     = tctx.Context
 		lapi    = tctx.lapi
@@ -90,7 +90,9 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 	}
 
 	accumulator := NewSegmentSizeAccumulator()
-	go ReportProgress(ctx, lapi, tctx.Task.ID, assetSpec.Size, accumulator.Size, progressStart, 1)
+	progressCtx, cancelProgress := context.WithCancel(ctx)
+	defer cancelProgress()
+	go ReportProgress(progressCtx, lapi, tctx.Task.ID, assetSpec.Size, accumulator.Size, progressStart, 1)
 
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -111,6 +113,7 @@ func Prepare(tctx *TaskContext, assetSpec *livepeerAPI.AssetSpec, file io.ReadSe
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 	}
+	cancelProgress()
 	if ctxErr := ctx.Err(); err == nil && ctxErr != nil {
 		err = ctxErr
 	}

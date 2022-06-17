@@ -125,12 +125,12 @@ func NewSegmentSizeAccumulator() *SegmentSizeAccumulator {
 	return &SegmentSizeAccumulator{}
 }
 
-func (c SegmentSizeAccumulator) Size() uint64 {
-	return atomic.LoadUint64(&c.readSize)
+func (a *SegmentSizeAccumulator) Size() uint64 {
+	return atomic.LoadUint64(&a.readSize)
 }
 
-func (c SegmentSizeAccumulator) Accumulate(size uint64) {
-	atomic.AddUint64(&c.readSize, size)
+func (a *SegmentSizeAccumulator) Accumulate(size uint64) {
+	atomic.AddUint64(&a.readSize, size)
 }
 
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -261,7 +261,7 @@ out:
 	}
 	cancelProgress()
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := Prepare(tctx, metadata.AssetSpec, ws.Reader(), 0.5)
+	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader(), 0.5)
 	if err != nil {
 		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}
