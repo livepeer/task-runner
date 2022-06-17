@@ -130,9 +130,9 @@ func toAssetTrack(stream *ffprobe.Stream) (*api.AssetTrack, error) {
 		if !supportedVideoCodecs[stream.CodecName] {
 			return nil, fmt.Errorf("unsupported video codec: %s", stream.CodecName)
 		}
-		if !supportedPixelFormats[stream.PixFmt] {
-			return nil, fmt.Errorf("unsupported video pixel format: %s", stream.PixFmt)
-		}
+		// if !supportedPixelFormats[stream.PixFmt] {
+		// 	return nil, fmt.Errorf("unsupported video pixel format: %s", stream.PixFmt)
+		// }
 	}
 
 	startTime, err := strconv.ParseFloat(stream.StartTime, 64)

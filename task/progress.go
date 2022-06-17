@@ -17,7 +17,7 @@ const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
 func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size uint64, getCount func() uint64, startFraction, endFraction float64) {
-	glog.Infof(`Report Progress rev3 taskID=%s size=%d count=%d startFraction=%f endFraction=%f"`, taskID, size, getCount(), startFraction, endFraction)
+	glog.Infof(`Report Progress rev4 taskID=%s size=%d count=%d startFraction=%f endFraction=%f"`, taskID, size, getCount(), startFraction, endFraction)
 	if startFraction > endFraction || startFraction < 0 || endFraction < 0 || startFraction > 1 || endFraction > 1 {
 		glog.Errorf("Error reporting task progress taskID=%s startFraction=%f endFraction=%f", taskID, startFraction, endFraction)
 		return
