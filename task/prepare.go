@@ -54,7 +54,7 @@ var allProfiles = []api.Profile{
 	},
 }
 
-func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser) (string, error) {
+func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser, progressStart float64) (string, error) {
 	var (
 		ctx     = tctx.Context
 		lapi    = tctx.lapi
@@ -64,11 +64,11 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	streamName := fmt.Sprintf("vod_hls_recording_%s", assetId)
 	profiles, err := getPlaybackProfiles(assetSpec.VideoSpec)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	stream, err := lapi.CreateStream(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	defer lapi.DeleteStream(stream.ID)
 
@@ -89,6 +89,11 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		}
 	}
 
+	accumulator := NewAccumulator()
+	progressCtx, cancelProgress := context.WithCancel(ctx)
+	defer cancelProgress()
+	go ReportProgress(progressCtx, lapi, tctx.Task.ID, assetSpec.Size, accumulator.Size, progressStart, 1)
+
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
 			break
@@ -99,6 +104,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 			break
 		}
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
+		accumulator.Accumulate(uint64(len(seg.Data)))
 		started := time.Now()
 		_, err = lapi.PushSegmentR(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
 		if err != nil {
@@ -107,6 +113,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 	}
+	cancelProgress()
 	if ctxErr := ctx.Err(); err == nil && ctxErr != nil {
 		err = ctxErr
 	}

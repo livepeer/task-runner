@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
@@ -116,6 +117,22 @@ func fileWriter(size int64) WriteSeekCloser {
 	}
 }
 
+type Accumulator struct {
+	size uint64
+}
+
+func NewAccumulator() *Accumulator {
+	return &Accumulator{}
+}
+
+func (a *Accumulator) Size() uint64 {
+	return atomic.LoadUint64(&a.size)
+}
+
+func (a *Accumulator) Accumulate(size uint64) {
+	atomic.AddUint64(&a.size, size)
+}
+
 func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx             = tctx.Context
@@ -171,6 +188,10 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 	}
 	err = nil
+	accumulator := NewAccumulator()
+	progressCtx, cancelProgress := context.WithCancel(ctx)
+	defer cancelProgress()
+	go ReportProgress(progressCtx, lapi, tctx.Task.ID, uint64(sourceFileSize), accumulator.Size, 0, 0.5)
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -188,6 +209,7 @@ out:
 			glog.Errorf("Segment push playbackID=%s err=%v\n", inputPlaybackID, err)
 			break
 		}
+		accumulator.Accumulate(uint64(len(seg.Data)))
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 
 		for i, segData := range transcoded {
@@ -237,10 +259,12 @@ out:
 	if err != nil {
 		return nil, err
 	}
+	cancelProgress()
 	// RecordStream on output file for HLS playback
-	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader())
+	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader(), 0.5)
 	if err != nil {
 		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+		return nil, err
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingId

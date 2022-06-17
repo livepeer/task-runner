@@ -33,12 +33,15 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	secondaryReader, pipe := io.Pipe()
 	mainReader := NewReadCounter(io.TeeReader(contents, pipe))
 
+	progressCtx, cancelProgress := context.WithCancel(ctx)
+	defer cancelProgress()
+	go ReportProgress(progressCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count, 0, 0.5)
+
 	eg, egCtx := errgroup.WithContext(ctx)
 	var (
 		videoFilePath, metadataFilePath, fullPath string
 		metadata                                  *FileMetadata
 	)
-	go ReportProgress(egCtx, tctx.lapi, tctx.Task.ID, size, mainReader.Count)
 	// Probe the source file to retrieve metadata
 	eg.Go(func() (err error) {
 		metadata, err = Probe(egCtx, tctx.OutputAsset.ID, filename, mainReader)
@@ -63,6 +66,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		// TODO: Delete the source file
 		return nil, err
 	}
+	cancelProgress()
 	playbackRecordingID, err := prepareImportedAsset(tctx, metadata, fullPath)
 	if err != nil {
 		return nil, err
@@ -131,11 +135,10 @@ func prepareImportedAsset(tctx *TaskContext, metadata *FileMetadata, fullPath st
 	}
 	defer importedFile.Close()
 
-	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, importedFile)
+	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, importedFile, 0.5)
 	if err != nil {
 		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
-		// TODO: make these fatal once we're confident about prepare reliability
-		return "", nil
+		return "", err
 	}
 	return playbackRecordingID, nil
 }

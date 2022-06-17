@@ -16,7 +16,11 @@ var progressReportBuckets = []float64{0, 0.25, 0.5, 0.75, 1}
 const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
-func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size uint64, getCount func() uint64) {
+func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size uint64, getCount func() uint64, startFraction, endFraction float64) {
+	if startFraction > endFraction || startFraction < 0 || endFraction < 0 || startFraction > 1 || endFraction > 1 {
+		glog.Errorf("Error reporting task progress taskID=%s startFraction=%f endFraction=%f", taskID, startFraction, endFraction)
+		return
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic reporting task progress: value=%q stack:\n%s", r, string(debug.Stack()))
@@ -41,7 +45,8 @@ func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size u
 				progressBucket(progress) == progressBucket(lastProgress) {
 				continue
 			}
-			if err := lapi.UpdateTaskStatus(taskID, "running", progress); err != nil {
+			scaledProgress := scaleProgress(progress, startFraction, endFraction)
+			if err := lapi.UpdateTaskStatus(taskID, "running", scaledProgress); err != nil {
 				glog.Errorf("Error updating task progress taskID=%s progress=%v err=%q", taskID, progress, err)
 				continue
 			}
@@ -55,6 +60,10 @@ func calcProgress(count, size uint64) (val float64) {
 	val = math.Round(val*1000) / 1000
 	val = math.Min(val, 0.99)
 	return
+}
+
+func scaleProgress(progress, startFraction, endFraction float64) float64 {
+	return startFraction + progress*(endFraction-startFraction)
 }
 
 func progressBucket(progress float64) int {
