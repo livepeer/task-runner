@@ -15,7 +15,7 @@ COPY . .
 
 RUN make "version=$version"
 
-FROM debian:stretch-slim
+FROM debian:buster-slim
 
 RUN apt update \
   && apt install -y ffmpeg ca-certificates \
