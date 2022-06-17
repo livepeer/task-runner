@@ -137,9 +137,7 @@ func prepareImportedAsset(tctx *TaskContext, metadata *FileMetadata, fullPath st
 
 	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, importedFile, 0.5)
 	if err != nil {
-		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
-		// TODO: make these fatal once we're confident about prepare reliability
-		return "", nil
+		glog.Fatalf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}
 	return playbackRecordingID, nil
 }

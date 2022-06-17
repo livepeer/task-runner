@@ -64,11 +64,11 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	streamName := fmt.Sprintf("vod_hls_recording_%s", assetId)
 	profiles, err := getPlaybackProfiles(assetSpec.VideoSpec)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	stream, err := lapi.CreateStream(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	defer lapi.DeleteStream(stream.ID)
 

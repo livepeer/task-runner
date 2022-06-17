@@ -263,7 +263,7 @@ out:
 	// RecordStream on output file for HLS playback
 	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader(), 0.5)
 	if err != nil {
-		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+		glog.Fatalf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingId
