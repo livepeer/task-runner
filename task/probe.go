@@ -18,7 +18,7 @@ import (
 var (
 	supportedFormats      = []string{"mp4", "mov"}
 	supportedVideoCodecs  = map[string]bool{"h264": true}
-	supportedPixelFormats = map[string]bool{"yuv420p": true}
+	supportedPixelFormats = map[string]bool{"yuv420p": true, "yuvj420p": true}
 	supportedAudioCodecs  = map[string]bool{"aac": true}
 )
 

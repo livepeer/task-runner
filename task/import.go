@@ -69,7 +69,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	cancelProgress()
 	playbackRecordingID, err := prepareImportedAsset(tctx, metadata, fullPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error preparing asset: %w", err)
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingID
@@ -137,7 +137,7 @@ func prepareImportedAsset(tctx *TaskContext, metadata *FileMetadata, fullPath st
 
 	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, importedFile, 0.5)
 	if err != nil {
-		glog.Errorf("error preparing imported file assetId=%s err=%q", tctx.OutputAsset.ID, err)
+		glog.Errorf("Error preparing file assetId=%s taskType=import err=%q", tctx.OutputAsset.ID, err)
 		return "", err
 	}
 	return playbackRecordingID, nil
