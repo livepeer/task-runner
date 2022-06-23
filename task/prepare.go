@@ -15,8 +15,6 @@ import (
 const (
 	minVideoBitrate         = 100_000
 	absoluteMinVideoBitrate = 5_000
-	// NVIDIA cards with Turing architecture enforce a minimum width/height of 145 pixels on transcoded videos
-	minVideoDimensionPixels = 145
 )
 
 var allProfiles = []api.Profile{
@@ -134,11 +132,8 @@ func getPlaybackProfiles(assetVideoSpec *api.AssetVideoSpec) ([]api.Profile, err
 		return nil, fmt.Errorf("no video track found in asset spec")
 	}
 	filtered := make([]api.Profile, 0, len(allProfiles))
-	for _, baseProfile := range allProfiles {
-		profile := effectiveProfile(baseProfile, video)
-		lowerQualityThanSrc := profile.Height <= video.Height && profile.Bitrate < int(video.Bitrate)
-		compliesToMinSize := profile.Height >= minVideoDimensionPixels && profile.Width >= minVideoDimensionPixels
-		if lowerQualityThanSrc && compliesToMinSize {
+	for _, profile := range allProfiles {
+		if profile.Height <= video.Height && profile.Bitrate < int(video.Bitrate) {
 			filtered = append(filtered, profile)
 		}
 	}
@@ -146,15 +141,6 @@ func getPlaybackProfiles(assetVideoSpec *api.AssetVideoSpec) ([]api.Profile, err
 		return []api.Profile{lowBitrateProfile(video)}, nil
 	}
 	return filtered, nil
-}
-
-func effectiveProfile(profile api.Profile, video *api.AssetTrack) api.Profile {
-	if video.Width >= video.Height {
-		profile.Height = profile.Width * video.Height / video.Width
-	} else {
-		profile.Width = profile.Height * video.Width / video.Height
-	}
-	return profile
 }
 
 func lowBitrateProfile(video *api.AssetTrack) api.Profile {
