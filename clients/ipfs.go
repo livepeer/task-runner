@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -17,9 +18,25 @@ const (
 	pinataOptions = `{"cidVersion":1}`
 )
 
+type PinInfo struct {
+	ID          string `json:"id"`
+	IPFSPinHash string `json:"ipfs_pin_hash"`
+	Size        int64  `json:"size"`
+	Metadata    struct {
+		Name      string            `json:"name"`
+		KeyValues map[string]string `json:"keyvalues"`
+	} `json:"metadata"`
+}
+
+type PinList struct {
+	Count int64     `json:"count"`
+	Pins  []PinInfo `json:"rows"`
+}
+
 type IPFS interface {
 	PinContent(ctx context.Context, name, contentType string, data io.Reader) (cid string, metadata interface{}, err error)
 	Unpin(ctx context.Context, cid string) error
+	List(ctx context.Context, pageSize, pageIdx int) (*PinList, int, error)
 }
 
 func NewPinataClientJWT(jwt string, filesMetadata map[string]string) IPFS {
@@ -88,6 +105,22 @@ func (p *pinataClient) Unpin(ctx context.Context, cid string) error {
 		Method: "DELETE",
 		URL:    "/pinning/unpin/" + cid,
 	}, nil)
+}
+
+func (p *pinataClient) List(ctx context.Context, pageSize, pageIdx int) (pl *PinList, next int, err error) {
+	err = p.DoRequest(ctx, Request{
+		Method: "GET",
+		URL:    fmt.Sprintf("/data/pinList?status=pinned&pageLimit=%d&pageOffset=%d", pageSize, pageSize*pageIdx),
+	}, &pl)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	next = -1
+	if len(pl.Pins) >= pageSize {
+		next = pageIdx + 1
+	}
+	return pl, next, err
 }
 
 func marshalFilesMetadata(keyvalues map[string]string) []byte {
