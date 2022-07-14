@@ -36,7 +36,7 @@ type PinList struct {
 type IPFS interface {
 	PinContent(ctx context.Context, name, contentType string, data io.Reader) (cid string, metadata interface{}, err error)
 	Unpin(ctx context.Context, cid string) error
-	List(ctx context.Context, pageSize, pageIdx int) (*PinList, int, error)
+	List(ctx context.Context, pageSize, pageOffset int) (*PinList, int, error)
 }
 
 func NewPinataClientJWT(jwt string, filesMetadata map[string]string) IPFS {
@@ -107,10 +107,10 @@ func (p *pinataClient) Unpin(ctx context.Context, cid string) error {
 	}, nil)
 }
 
-func (p *pinataClient) List(ctx context.Context, pageSize, pageIdx int) (pl *PinList, next int, err error) {
+func (p *pinataClient) List(ctx context.Context, pageSize, pageOffset int) (pl *PinList, next int, err error) {
 	err = p.DoRequest(ctx, Request{
 		Method: "GET",
-		URL:    fmt.Sprintf("/data/pinList?status=pinned&pageLimit=%d&pageOffset=%d", pageSize, pageSize*pageIdx),
+		URL:    fmt.Sprintf("/data/pinList?status=pinned&pageLimit=%d&pageOffset=%d", pageSize, pageOffset),
 	}, &pl)
 	if err != nil {
 		return nil, -1, err
@@ -118,7 +118,7 @@ func (p *pinataClient) List(ctx context.Context, pageSize, pageIdx int) (pl *Pin
 
 	next = -1
 	if len(pl.Pins) >= pageSize {
-		next = pageIdx + 1
+		next = pageOffset + len(pl.Pins)
 	}
 	return pl, next, err
 }
