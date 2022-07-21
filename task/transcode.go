@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	segLen               = 5 * time.Second
+	segLen               = 2 * time.Second
 	maxFileSizeForMemory = 50_000_000
 )
 
