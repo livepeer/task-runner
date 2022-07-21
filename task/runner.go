@@ -129,6 +129,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
 	defer cancel()
 	output, err := r.handleTask(ctx, task)
+	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
 	// return the error directly so that if publishing the result fails we nack the message to try again
 	return r.publishTaskResult(ctx, task, output, err)
@@ -144,8 +145,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 
 	taskCtx, err := r.buildTaskContext(ctx, taskInfo)
 	if err != nil {
-		glog.Errorf("Error building task context taskId=%s err=%q id=%s", err, IsUnretriable(err), taskInfo.ID)
-		return nil, err
+		return nil, fmt.Errorf("error building task context: %w", err)
 	}
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
@@ -165,7 +165,6 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 
 	glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
 	output, err = handler(taskCtx)
-	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", taskType, taskID, output, err, IsUnretriable(err))
 	return output, err
 }
 
