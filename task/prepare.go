@@ -66,7 +66,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	if err != nil {
 		return "", err
 	}
-	stream, err := lapi.CreateStream(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
+	stream, err := lapi.CreateStreamR(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
 	if err != nil {
 		return "", err
 	}

@@ -159,7 +159,7 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 
 	streamName := fmt.Sprintf("vod_%s", time.Now().Format("2006-01-02T15:04:05Z07:00"))
 	profiles := []api.Profile{tctx.Params.Transcode.Profile}
-	stream, err := lapi.CreateStream(api.CreateStreamReq{Name: streamName, Profiles: profiles})
+	stream, err := lapi.CreateStreamR(api.CreateStreamReq{Name: streamName, Profiles: profiles})
 	if err != nil {
 		return nil, err
 	}
