@@ -221,6 +221,7 @@ func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, outp
 	msg := event.AMQPMessage{
 		Exchange:   r.ExchangeName,
 		Key:        fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
+		Persistent: true,
 		Body:       data.NewTaskResultEvent(task, errorInfo(err), output),
 		ResultChan: resultCh,
 	}
