@@ -12,8 +12,8 @@ import (
 )
 
 type APIHandlerOptions struct {
-	APIRoot    string
-	Prometheus bool
+	APIRoot, ServerName string
+	Prometheus          bool
 }
 
 type apiHandler struct {
@@ -31,7 +31,16 @@ func NewHandler(serverCtx context.Context, opts APIHandlerOptions) http.Handler 
 	}
 	router.Handler("POST", CataylistHookPath(opts.APIRoot, ":id"),
 		metrics.ObservedHandlerFunc("catalyst_hook", handler.catalystHook))
-	return router
+	return handler.withDefaultHeaders(router)
+}
+
+func (h *apiHandler) withDefaultHeaders(next http.Handler) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		if h.opts.ServerName != "" {
+			rw.Header().Set("Server", h.opts.ServerName)
+		}
+		next.ServeHTTP(rw, r)
+	}
 }
 
 func (h *apiHandler) healthcheck(rw http.ResponseWriter, r *http.Request) {

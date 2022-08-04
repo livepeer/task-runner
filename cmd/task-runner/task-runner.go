@@ -107,6 +107,7 @@ func Run(build BuildFlags) {
 
 	clients.UserAgent = "livepeer-task-runner/" + build.Version
 	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
+	cli.serverOpts.APIHandlerOptions.ServerName = clients.UserAgent
 
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	eg, ctx := errgroup.WithContext(ctx)
