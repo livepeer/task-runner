@@ -49,6 +49,7 @@ func (t *TaskContext) WithContext(ctx context.Context) *TaskContext {
 
 type Runner interface {
 	Start() error
+	HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error
 	Shutdown(ctx context.Context) error
 }
 
@@ -214,6 +215,23 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, drivers.OSSession, e
 	}
 	osSession := osDriver.NewSession("")
 	return asset, osSession, nil
+}
+
+func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error {
+	task, err := r.lapi.GetTask(taskId)
+	if err != nil {
+		return fmt.Errorf("failed to get task %s: %w", taskId, err)
+	}
+	if callback.Status == "error" || callback.Status == "completed" {
+		// TODO: Send task continuation or abortion event
+		return nil
+	}
+	progress := 0.95 * callback.CompletionRatio
+	err = r.lapi.UpdateTaskStatus(task.ID, "running", progress)
+	if err != nil {
+		return fmt.Errorf("failed to update task %s status: %w", taskId, err)
+	}
+	return nil
 }
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {
