@@ -39,6 +39,7 @@ type TaskContext struct {
 	data.TaskInfo
 	*api.Task
 	InputAsset, OutputAsset *api.Asset
+	InputOSObj, OutputOSObj *api.ObjectStore
 	inputOS, outputOS       drivers.OSSession
 }
 
@@ -56,10 +57,10 @@ type Runner interface {
 }
 
 type RunnerOptions struct {
-	AMQPUri            string
-	ExchangeName       string
-	QueueName          string
-	LivepeerAPIOptions api.ClientOptions
+	AMQPUri                     string
+	ExchangeName, QueueName     string
+	CatalystUrl, CatalystSecret string
+	LivepeerAPIOptions          api.ClientOptions
 	ExportTaskConfig
 
 	TaskHandlers map[string]TaskHandler
@@ -72,6 +73,7 @@ func NewRunner(opts RunnerOptions) Runner {
 	return &runner{
 		RunnerOptions: opts,
 		lapi:          api.NewAPIClient(opts.LivepeerAPIOptions),
+		catalyst:      clients.NewCatalyst(opts.CatalystUrl, opts.CatalystSecret),
 		ipfs: clients.NewPinataClientJWT(opts.PinataAccessToken, map[string]string{
 			"apiServer": opts.LivepeerAPIOptions.Server,
 			"createdBy": clients.UserAgent,
@@ -82,9 +84,10 @@ func NewRunner(opts RunnerOptions) Runner {
 type runner struct {
 	RunnerOptions
 
-	lapi *api.Client
-	ipfs clients.IPFS
-	amqp event.AMQPClient
+	lapi     *api.Client
+	ipfs     clients.IPFS
+	catalyst clients.Catalyst
+	amqp     event.AMQPClient
 }
 
 func (r *runner) Start() error {
@@ -194,35 +197,35 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	if err != nil {
 		return nil, err
 	}
-	inputAsset, inputOS, err := r.getAssetAndOS(task.InputAssetID)
+	inputAsset, inputOSObj, inputOS, err := r.getAssetAndOS(task.InputAssetID)
 	if err != nil {
 		return nil, err
 	}
-	outputAsset, outputOS, err := r.getAssetAndOS(task.OutputAssetID)
+	outputAsset, outputOSObj, outputOS, err := r.getAssetAndOS(task.OutputAssetID)
 	if err != nil {
 		return nil, err
 	}
-	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOS, outputOS}, nil
+	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOSObj, outputOSObj, inputOS, outputOS}, nil
 }
 
-func (r *runner) getAssetAndOS(assetID string) (*api.Asset, drivers.OSSession, error) {
+func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, drivers.OSSession, error) {
 	if assetID == "" {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	asset, err := r.lapi.GetAsset(assetID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	objectStore, err := r.lapi.GetObjectStore(asset.ObjectStoreID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	osDriver, err := drivers.ParseOSURL(objectStore.URL, true)
 	if err != nil {
-		return nil, nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
+		return nil, nil, nil, UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
 	}
 	osSession := osDriver.NewSession("")
-	return asset, osSession, nil
+	return asset, objectStore, osSession, nil
 }
 
 func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error {

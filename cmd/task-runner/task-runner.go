@@ -60,6 +60,8 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
+	fs.StringVar(&cli.runnerOpts.CatalystUrl, "catalyst-url", "", "Base URL to the Catalyst API")
+	fs.StringVar(&cli.runnerOpts.CatalystSecret, "catalyst-secret", "", "Auth secret for the Catalyst API")
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihcqgu4rmsrlkqvavkzsnu7h5n66jopckes6u5zrhs3kcffqvylge/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
