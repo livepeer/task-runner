@@ -237,9 +237,13 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
 	}
 	if callback.Status == "error" {
-		return r.publishTaskResult(ctx, taskId, nil, errors.New(callback.Error))
+		err := fmt.Errorf("got catalyst error: %s", callback.Error)
+		if !callback.Retriable {
+			err = UnretriableError{err}
+		}
+		return r.publishTaskResult(ctx, taskId, nil, err)
 	} else if callback.Status == "completed" {
-		return r.scheduleTaskStep(ctx, taskId, nextStep)
+		return r.scheduleTaskStep(ctx, taskId, nextStep, callback)
 	}
 	progress := 0.95 * callback.CompletionRatio
 	err = r.lapi.UpdateTaskStatus(task.ID, "running", progress)
@@ -249,11 +253,11 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	return nil
 }
 
-func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string) error {
+func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, input interface{}) error {
 	if step == "" {
 		return errors.New("can only schedule sub-steps of tasks")
 	}
-	task, err := r.getTaskInfo(taskID, step)
+	task, err := r.getTaskInfo(taskID, step, input)
 	if err != nil {
 		return err
 	}
@@ -265,8 +269,8 @@ func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string) erro
 	})
 }
 
-func (r *runner) publishTaskResult(ctx context.Context, taskID string, output *data.TaskOutput, err error) error {
-	task, err := r.getTaskInfo(taskID, "")
+func (r *runner) publishTaskResult(ctx context.Context, taskID string, output *data.TaskOutput, resultErr error) error {
+	task, err := r.getTaskInfo(taskID, "", nil)
 	if err != nil {
 		return err
 	}
@@ -274,7 +278,7 @@ func (r *runner) publishTaskResult(ctx context.Context, taskID string, output *d
 		Exchange:   r.ExchangeName,
 		Key:        fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
 		Persistent: true,
-		Body:       data.NewTaskResultEvent(*task, errorInfo(err), output),
+		Body:       data.NewTaskResultEvent(*task, errorInfo(resultErr), output),
 	}
 	if err := r.publishSafe(ctx, msg); err != nil {
 		glog.Errorf("Error enqueueing AMQP publish of task result event taskType=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
@@ -283,7 +287,7 @@ func (r *runner) publishTaskResult(ctx context.Context, taskID string, output *d
 	return nil
 }
 
-func (r *runner) getTaskInfo(id, step string) (*data.TaskInfo, error) {
+func (r *runner) getTaskInfo(id, step string, input interface{}) (*data.TaskInfo, error) {
 	task, err := r.lapi.GetTask(id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting task %q: %w", id, err)
@@ -292,11 +296,16 @@ func (r *runner) getTaskInfo(id, step string) (*data.TaskInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling task %q: %w", id, err)
 	}
+	inputRaw, err := json.Marshal(input)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling step input %q: %w", id, err)
+	}
 	return &data.TaskInfo{
-		ID:       id,
-		Type:     task.Type,
-		Snapshot: snapshot,
-		Step:     step,
+		ID:        id,
+		Type:      task.Type,
+		Snapshot:  snapshot,
+		Step:      step,
+		StepInput: inputRaw,
 	}, nil
 }
 

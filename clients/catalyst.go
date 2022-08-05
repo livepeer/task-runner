@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+
+	"github.com/livepeer/go-api-client"
 )
 
 type UploadVODRequest struct {
@@ -20,11 +22,12 @@ type OutputLocation struct {
 }
 
 type CatalystCallback struct {
-	Status          string       `json:"status"`
-	CompletionRatio float64      `json:"completion_ratio"`
-	Error           string       `json:"error"`
-	Retriable       bool         `json:"retriable"`
-	Outputs         []OutputInfo `json:"outputs"`
+	Status          string         `json:"status"`
+	CompletionRatio float64        `json:"completion_ratio"`
+	Error           string         `json:"error"`
+	Retriable       bool           `json:"retriable"`
+	Outputs         []OutputInfo   `json:"outputs"`
+	Spec            *api.AssetSpec `json:"spec"` // TODO: Update this to final schema
 }
 
 type OutputInfo struct {

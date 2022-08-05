@@ -119,6 +119,9 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 }
 
 func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *api.Asset, videoCID string) (string, error) {
+	if ipfs == nil {
+		ipfs = tctx.ipfs
+	}
 	params := tctx.Task.Params.Export.IPFS
 	template := params.NFTMetadataTemplate
 	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackRecordingID == "" {
