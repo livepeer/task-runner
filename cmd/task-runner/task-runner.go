@@ -111,8 +111,8 @@ func Run(build BuildFlags) {
 
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	eg, ctx := errgroup.WithContext(ctx)
+	runner := task.NewRunner(cli.runnerOpts)
 	eg.Go(func() error {
-		runner := task.NewRunner(cli.runnerOpts)
 		if err := runner.Start(); err != nil {
 			return fmt.Errorf("error starting runner: %w", err)
 		}
@@ -127,7 +127,7 @@ func Run(build BuildFlags) {
 	})
 	eg.Go(func() error {
 		glog.Info("Starting API server...")
-		err := api.ListenAndServe(ctx, cli.serverOpts)
+		err := api.ListenAndServe(ctx, runner, cli.serverOpts)
 		if err != nil {
 			return fmt.Errorf("api server error: %w", err)
 		}

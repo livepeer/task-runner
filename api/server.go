@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/task-runner/task"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -18,10 +19,10 @@ type ServerOptions struct {
 	APIHandlerOptions
 }
 
-func ListenAndServe(ctx context.Context, opts ServerOptions) error {
+func ListenAndServe(ctx context.Context, runner task.Runner, opts ServerOptions) error {
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", opts.Host, opts.Port),
-		Handler: NewHandler(ctx, opts.APIHandlerOptions),
+		Handler: NewHandler(ctx, opts.APIHandlerOptions, runner),
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {

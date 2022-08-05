@@ -2,12 +2,15 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/metrics"
+	"github.com/livepeer/task-runner/task"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -19,10 +22,11 @@ type APIHandlerOptions struct {
 type apiHandler struct {
 	opts      APIHandlerOptions
 	serverCtx context.Context
+	runner    task.Runner
 }
 
-func NewHandler(serverCtx context.Context, opts APIHandlerOptions) http.Handler {
-	handler := &apiHandler{opts, serverCtx}
+func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.Runner) http.Handler {
+	handler := &apiHandler{opts, serverCtx, runner}
 
 	router := httprouter.New()
 	router.HandlerFunc("GET", "/_healthz", handler.healthcheck)
@@ -49,9 +53,20 @@ func (h *apiHandler) healthcheck(rw http.ResponseWriter, r *http.Request) {
 
 func (h *apiHandler) catalystHook(rw http.ResponseWriter, r *http.Request) {
 	taskId := httprouter.ParamsFromContext(r.Context()).ByName("id")
-	// TODO: something
-	rw.WriteHeader(http.StatusOK)
-	rw.Write([]byte("task " + taskId))
+	nextStep := r.URL.Query().Get("nextStep")
+
+	var payload *clients.CatalystCallback
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondError(rw, http.StatusBadRequest, err)
+		return
+	}
+
+	err := h.runner.HandleCatalysis(r.Context(), taskId, nextStep, payload)
+	if err != nil {
+		respondError(rw, http.StatusInternalServerError, err)
+		return
+	}
+	rw.WriteHeader(http.StatusNoContent)
 }
 
 func CataylistHookPath(apiRoot, taskId string) string {
