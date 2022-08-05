@@ -229,9 +229,10 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	if err != nil {
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
 	}
-	if callback.Status == "error" || callback.Status == "completed" {
-		// TODO: Send task continuation or abortion event
-		return nil
+	if callback.Status == "error" {
+		return r.publishTaskResult(ctx, taskId, nil, errors.New(callback.Error))
+	} else if callback.Status == "completed" {
+		return r.scheduleTaskStep(ctx, taskId, nextStep)
 	}
 	progress := 0.95 * callback.CompletionRatio
 	err = r.lapi.UpdateTaskStatus(task.ID, "running", progress)
