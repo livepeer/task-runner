@@ -8,7 +8,7 @@ import (
 	"time"
 
 	api "github.com/livepeer/go-api-client"
-	"github.com/livepeer/go-livepeer/drivers"
+	"github.com/livepeer/go-tools/drivers"
 	"github.com/stretchr/testify/assert"
 )
 
