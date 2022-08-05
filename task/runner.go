@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime/debug"
@@ -132,8 +133,14 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	output, err := r.handleTask(ctx, task)
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
+	if output == nil {
+		// If the task doesn't output anything it means it's yielding execution
+		// until another event is received about it. Likely from a different step
+		// triggered by an external callback (e.g. catalyst's VOD upload callback).
+		return nil
+	}
 	// return the error directly so that if publishing the result fails we nack the message to try again
-	return r.publishTaskResult(ctx, task, output, err)
+	return r.publishTaskResult(ctx, task.ID, output, err)
 }
 
 func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output *data.TaskOutput, err error) {
@@ -155,7 +162,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
-	if taskCtx.Status.Phase == "running" {
+	if taskCtx.Status.Phase == "running" && taskCtx.Step == "" {
 		return nil, UnretriableError{errors.New("task has already been started before")}
 	}
 	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
@@ -234,28 +241,68 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	return nil
 }
 
-func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {
-	resultCh := make(chan event.PublishResult, 1)
+func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string) error {
+	if step == "" {
+		return errors.New("can only schedule sub-steps of tasks")
+	}
+	task, err := r.getTaskInfo(taskID, step)
+	if err != nil {
+		return err
+	}
+	return r.publishSafe(ctx, event.AMQPMessage{
+		Exchange:   r.ExchangeName,
+		Key:        fmt.Sprintf("task.trigger.%s", task.Type),
+		Persistent: true,
+		Body:       data.NewTaskTriggerEvent(*task),
+	})
+}
+
+func (r *runner) publishTaskResult(ctx context.Context, taskID string, output *data.TaskOutput, err error) error {
+	task, err := r.getTaskInfo(taskID, "")
+	if err != nil {
+		return err
+	}
 	msg := event.AMQPMessage{
 		Exchange:   r.ExchangeName,
 		Key:        fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
 		Persistent: true,
-		Body:       data.NewTaskResultEvent(task, errorInfo(err), output),
-		ResultChan: resultCh,
+		Body:       data.NewTaskResultEvent(*task, errorInfo(err), output),
 	}
-	if err := r.amqp.Publish(ctx, msg); err != nil {
+	if err := r.publishSafe(ctx, msg); err != nil {
 		glog.Errorf("Error enqueueing AMQP publish of task result event taskType=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
+		return fmt.Errorf("error publishing task result event: %w", err)
+	}
+	return nil
+}
+
+func (r *runner) getTaskInfo(id, step string) (*data.TaskInfo, error) {
+	task, err := r.lapi.GetTask(id)
+	if err != nil {
+		return nil, fmt.Errorf("error getting task %q: %w", id, err)
+	}
+	snapshot, err := json.Marshal(task)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling task %q: %w", id, err)
+	}
+	return &data.TaskInfo{
+		ID:       id,
+		Type:     task.Type,
+		Snapshot: snapshot,
+		Step:     step,
+	}, nil
+}
+
+func (r *runner) publishSafe(ctx context.Context, msg event.AMQPMessage) error {
+	resultCh := make(chan event.PublishResult, 1)
+	msg.ResultChan = resultCh
+	if err := r.amqp.Publish(ctx, msg); err != nil {
 		return err
 	}
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("waiting for publish confirmation of task result event: %w", ctx.Err())
+		return fmt.Errorf("waiting for publish confirmation: %w", ctx.Err())
 	case result := <-resultCh:
-		if err := result.Error; err != nil {
-			glog.Errorf("Failed publishing task result AMQP event taskType=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
-			return err
-		}
-		return nil
+		return result.Error
 	}
 }
 
