@@ -155,7 +155,7 @@ func filename(req *http.Request, resp *http.Response) string {
 	return ""
 }
 
-func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata *FileMetadata) (string, error) {
+func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata interface{}) (string, error) {
 	fullPath := metadataFileName(playbackID)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
