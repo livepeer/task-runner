@@ -26,6 +26,7 @@ const (
 
 var defaultTasks = map[string]TaskHandler{
 	"import":    TaskImport,
+	"upload":    TaskUpload,
 	"export":    TaskExport,
 	"transcode": TaskTranscode,
 }
