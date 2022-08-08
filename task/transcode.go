@@ -13,7 +13,6 @@ import (
 
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
-	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/joy4/av"
 	"github.com/livepeer/joy4/av/avutil"
 	"github.com/livepeer/joy4/format"
@@ -34,8 +33,8 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func readFileToMemory(fir *drivers.FileInfoReader) (io.ReadSeekCloser, error) {
-	fileInMem, err := io.ReadAll(fir.Body)
+func readFileToMemory(r io.Reader) (io.ReadSeekCloser, error) {
+	fileInMem, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
@@ -76,20 +75,20 @@ func getTempFile(size int64) (*os.File, error) {
 	return file, nil
 }
 
-func readFile(fir *drivers.FileInfoReader) (io.ReadSeekCloser, error) {
-	var fileSize int64
-	if fir.Size != nil {
-		fileSize = *fir.Size
+func readFile(name string, sizePtr *int64, content io.Reader) (io.ReadSeekCloser, error) {
+	var size int64
+	if sizePtr != nil {
+		size = *sizePtr
 	}
-	glog.Infof("Source file name=%s size=%d", fir.Name, fileSize)
-	if fir.Size != nil && *fir.Size < maxFileSizeForMemory {
+	glog.Infof("Source file name=%s size=%d", name, size)
+	if size > 0 && size < maxFileSizeForMemory {
 		// use memory
-		return readFileToMemory(fir)
+		return readFileToMemory(content)
 	}
-	if file, err := getTempFile(fileSize); err != nil {
-		return readFileToMemory(fir)
+	if file, err := getTempFile(size); err != nil {
+		return readFileToMemory(content)
 	} else {
-		if _, err = file.ReadFrom(fir.Body); err != nil {
+		if _, err = file.ReadFrom(content); err != nil {
 			file.Close()
 			os.Remove(file.Name())
 			return nil, err
@@ -146,8 +145,8 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading data from source OS url=%s err=%w", fullPath, err)
 	}
-	sourceFile, err := readFile(fir)
-	fir.Body.Close()
+	defer fir.Body.Close()
+	sourceFile, err := readFile(fir.Name, fir.Size, fir.Body)
 	if err != nil {
 		return nil, err
 	}
