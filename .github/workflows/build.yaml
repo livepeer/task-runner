@@ -34,15 +34,9 @@ jobs:
           # for ref value discussion
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Export OS and platform env
-        run: |
-          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
-          curl -sLO https://raw.githubusercontent.com/livepeer/go-livepeer/master/install_ffmpeg.sh
-          chmod a+x install_ffmpeg.sh
-
       - name: Restore go package cache
         id: cache-go-mod
-        uses: actions/cache@v3
+        uses: actions/cache@v3F
         with:
           path: |
             ~/.cache/go-build
@@ -50,19 +44,6 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.arch }}-go-
-
-      - name: Cache ffmpeg
-        id: cache-ffmpeg
-        uses: actions/cache@v3
-        with:
-          path: ~/compiled
-          key: ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-
-
-      - name: Install ffmpeg
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        run: ./install_ffmpeg.sh
 
       - name: Download dependencies
         if: steps.cache-go-mod.outputs.cache-hit != 'true'
@@ -108,13 +89,6 @@ jobs:
           # for ref value discussion
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Export OS and platform env
-        run: |
-          echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
-          command -v brew && brew install coreutils
-          curl -sLO https://raw.githubusercontent.com/livepeer/go-livepeer/master/install_ffmpeg.sh
-          chmod a+x install_ffmpeg.sh
-
       - name: Restore go package cache
         id: cache-go-mod
         uses: actions/cache@v3
@@ -125,19 +99,6 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.arch }}-go-
-
-      - name: Cache ffmpeg
-        id: cache-ffmpeg
-        uses: actions/cache@v3
-        with:
-          path: ~/compiled
-          key: ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-${{ hashFiles('**/install_ffmpeg.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-ffmpeg-
-
-      - name: Install ffmpeg
-        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
-        run: ./install_ffmpeg.sh
 
       - name: Download dependencies
         if: steps.cache-go-mod.outputs.cache-hit != 'true'
