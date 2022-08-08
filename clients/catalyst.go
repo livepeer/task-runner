@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/url"
+	"path"
 
 	"github.com/livepeer/go-api-client"
 )
@@ -36,22 +39,28 @@ type OutputInfo struct {
 	Videos   map[string]string `json:"videos"`
 }
 
-type Catalyst interface {
-	UploadVOD(ctx context.Context, upload UploadVODRequest) error
+type CatalystOptions struct {
+	BaseURL    string
+	Secret     string
+	OwnBaseURL *url.URL
 }
 
-func NewCatalyst(url, authSecret string) Catalyst {
-	return &catalyst{
-		BaseClient: BaseClient{
-			BaseUrl: url,
-			BaseHeaders: map[string]string{
-				"Authorization": "Bearer " + authSecret,
-			},
+type Catalyst interface {
+	UploadVOD(ctx context.Context, upload UploadVODRequest) error
+	CatalystHookURL(taskId, nextStep string) (string, error)
+}
+
+func NewCatalyst(opts CatalystOptions) Catalyst {
+	return &catalyst{opts, BaseClient{
+		BaseUrl: opts.BaseURL,
+		BaseHeaders: map[string]string{
+			"Authorization": "Bearer " + opts.Secret,
 		},
-	}
+	}}
 }
 
 type catalyst struct {
+	CatalystOptions
 	BaseClient
 }
 
@@ -66,4 +75,20 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 		Body:        bytes.NewReader(body),
 		ContentType: "application/json",
 	}, nil)
+}
+
+// Catalyst hook helpers
+
+func (c *catalyst) CatalystHookURL(taskId, nextStep string) (string, error) {
+	// Own base URL already includes root path, so no need to add it
+	path := fmt.Sprintf("%s?nextStep=%s", CatalystHookPath("", taskId), nextStep)
+	hookURL, err := c.OwnBaseURL.Parse(path)
+	if err != nil {
+		return "", err
+	}
+	return hookURL.String(), nil
+}
+
+func CatalystHookPath(apiRoot, taskId string) string {
+	return path.Join(apiRoot, fmt.Sprintf("/webhook/catalyst/task/%s", taskId))
 }

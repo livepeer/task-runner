@@ -57,10 +57,10 @@ type Runner interface {
 }
 
 type RunnerOptions struct {
-	AMQPUri                     string
-	ExchangeName, QueueName     string
-	CatalystUrl, CatalystSecret string
-	LivepeerAPIOptions          api.ClientOptions
+	AMQPUri                 string
+	ExchangeName, QueueName string
+	LivepeerAPIOptions      api.ClientOptions
+	Catalyst                *clients.CatalystOptions
 	ExportTaskConfig
 
 	TaskHandlers map[string]TaskHandler
@@ -73,7 +73,7 @@ func NewRunner(opts RunnerOptions) Runner {
 	return &runner{
 		RunnerOptions: opts,
 		lapi:          api.NewAPIClient(opts.LivepeerAPIOptions),
-		catalyst:      clients.NewCatalyst(opts.CatalystUrl, opts.CatalystSecret),
+		catalyst:      clients.NewCatalyst(*opts.Catalyst),
 		ipfs: clients.NewPinataClientJWT(opts.PinataAccessToken, map[string]string{
 			"apiServer": opts.LivepeerAPIOptions.Server,
 			"createdBy": clients.UserAgent,

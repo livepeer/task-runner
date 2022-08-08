@@ -26,8 +26,9 @@ type BuildFlags struct {
 }
 
 type cliFlags struct {
-	runnerOpts task.RunnerOptions
-	serverOpts api.ServerOptions
+	catalystOpts clients.CatalystOptions
+	runnerOpts   task.RunnerOptions
+	serverOpts   api.ServerOptions
 }
 
 func URLVarFlag(fs *flag.FlagSet, dest **url.URL, name, value, usage string) {
@@ -55,13 +56,17 @@ func parseFlags(build BuildFlags) cliFlags {
 	cli := cliFlags{}
 	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
 
+	// Catalyst options
+	fs.StringVar(&cli.catalystOpts.BaseURL, "catalyst-url", "http://localhost:4949", "Base URL to the Catalyst API")
+	URLVarFlag(fs, &cli.catalystOpts.OwnBaseURL, "own-base-url", "http://localhost:8080/task-runner", "Base URL to reach the current server. This must include the API root")
+	fs.StringVar(&cli.catalystOpts.Secret, "catalyst-secret", "IAmAuthorized", "Auth secret for the Catalyst API")
+
+	// Runner options
 	fs.StringVar(&cli.runnerOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol")
 	fs.StringVar(&cli.runnerOpts.ExchangeName, "exchange-name", "lp_tasks", "Name of exchange where the task events will be published to")
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
-	fs.StringVar(&cli.runnerOpts.CatalystUrl, "catalyst-url", "", "Base URL to the Catalyst API")
-	fs.StringVar(&cli.runnerOpts.CatalystSecret, "catalyst-secret", "", "Auth secret for the Catalyst API")
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihcqgu4rmsrlkqvavkzsnu7h5n66jopckes6u5zrhs3kcffqvylge/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
@@ -72,7 +77,6 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.DurationVar(&cli.serverOpts.ShutdownGracePeriod, "shutdown-grace-perod", 30*time.Second, "Grace period to wait for shutdown before using the force")
 	// API Handler
 	fs.StringVar(&cli.serverOpts.APIRoot, "api-root", "/task-runner", "Root path where to bind the API to")
-	fs.StringVar(&cli.serverOpts.CatalystSecret, "catalyst-secret", "IAmAuthorized", "Auth secret for the Catalyst API")
 	fs.BoolVar(&cli.serverOpts.Prometheus, "prometheus", false, "Whether to enable Prometheus metrics registry and expose /metrics endpoint")
 
 	mistJson := fs.Bool("j", false, "Print application info as json")
@@ -111,6 +115,7 @@ func Run(build BuildFlags) {
 	clients.UserAgent = "livepeer-task-runner/" + build.Version
 	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
 	cli.serverOpts.APIHandlerOptions.ServerName = clients.UserAgent
+	cli.runnerOpts.Catalyst, cli.serverOpts.Catalyst = &cli.catalystOpts, &cli.catalystOpts
 
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	eg, ctx := errgroup.WithContext(ctx)
