@@ -3,9 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"path"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/livepeer/task-runner/clients"
@@ -16,8 +14,8 @@ import (
 
 type APIHandlerOptions struct {
 	APIRoot, ServerName string
-	CatalystSecret      string
 	Prometheus          bool
+	Catalyst            *clients.CatalystOptions
 }
 
 type apiHandler struct {
@@ -36,8 +34,8 @@ func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.R
 	}
 
 	hookHandler := metrics.ObservedHandlerFunc("catalyst_hook", router.catalystHook)
-	hookHandler = authorized(opts.CatalystSecret, hookHandler)
-	router.Handler("POST", CataylistHookPath(opts.APIRoot, ":id"), hookHandler)
+	hookHandler = authorized(opts.Catalyst.Secret, hookHandler)
+	router.Handler("POST", clients.CatalystHookPath(opts.APIRoot, ":id"), hookHandler)
 	return router
 }
 
@@ -68,8 +66,4 @@ func (h *apiHandler) catalystHook(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rw.WriteHeader(http.StatusNoContent)
-}
-
-func CataylistHookPath(apiRoot, taskId string) string {
-	return path.Join(apiRoot, fmt.Sprintf("/webhook/catalyst/task/%s", taskId))
 }
