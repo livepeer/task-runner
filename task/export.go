@@ -102,7 +102,8 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 	if err != nil {
 		return nil, err
 	}
-	metadataCID, err := saveNFTMetadata(tctx, ipfs, asset, videoCID)
+	template, nftMetadata := params.IPFS.NFTMetadataTemplate, params.IPFS.NFTMetadata
+	metadataCID, err := saveNFTMetadata(tctx, ipfs, asset, videoCID, template, nftMetadata, tctx.ExportTaskConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -118,12 +119,9 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 	}, nil
 }
 
-func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *api.Asset, videoCID string) (string, error) {
-	if ipfs == nil {
-		ipfs = tctx.ipfs
-	}
-	params := tctx.Task.Params.Export.IPFS
-	template := params.NFTMetadataTemplate
+func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS,
+	asset *api.Asset, videoCID string, template api.NFTMetadataTemplate,
+	overrides map[string]interface{}, config ExportTaskConfig) (string, error) {
 	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackRecordingID == "" {
 		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
 	}
@@ -133,15 +131,15 @@ func saveNFTMetadata(tctx *TaskContext, ipfs clients.IPFS, asset *api.Asset, vid
 			template = api.NFTMetadataTemplateFile
 		}
 	}
-	nftMetadata := nftMetadata(asset, videoCID, template, tctx.ExportTaskConfig)
-	mergeJson(nftMetadata, params.NFTMetadata)
+	nftMetadata := nftMetadata(asset, videoCID, template, config)
+	mergeJson(nftMetadata, overrides)
 
 	rawMetadata, err := json.Marshal(nftMetadata)
 	if err != nil {
 		glog.Errorf("Error marshalling NFT metadata assetId=%s err=%q", asset.ID, err)
 		return "", err
 	}
-	cid, _, err := ipfs.PinContent(tctx, "metadata-"+asset.PlaybackID, "application/json", bytes.NewReader(rawMetadata))
+	cid, _, err := ipfs.PinContent(ctx, "metadata-"+asset.PlaybackID, "application/json", bytes.NewReader(rawMetadata))
 	if err != nil {
 		glog.Errorf("Error saving NFT metadata assetId=%s err=%q", asset.ID, err)
 		return "", err
