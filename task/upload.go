@@ -34,11 +34,13 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 					Type: "object_store",
 					URL:  os.URL,
 				},
-				{
-					Type:            "ipfs_pinata", // TODO: Add this based on asset.storage
-					PinataAccessKey: tctx.PinataAccessToken,
-				},
 			},
+		}
+		if tctx.OutputAsset.Storage.IPFS != nil {
+			uploadReq.OutputLocations = append(uploadReq.OutputLocations, clients.OutputLocation{
+				Type:            "ipfs_pinata",
+				PinataAccessKey: tctx.PinataAccessToken,
+			})
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
 			return nil, fmt.Errorf("failed to call catalyst: %v", err)
@@ -63,19 +65,21 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		for _, output := range callback.Outputs {
 			if output.Type == "object_store" {
 				videoFilePath = output.Manifest
-				// TODO: Save the output path in the asset somehow (internal field)?
 			} else if output.Type == "ipfs_pinata" {
-				asset := tctx.OutputAsset
-				asset.AssetSpec = *assetSpec
-				_, err := saveNFTMetadata(tctx, nil, asset, output.Manifest)
+				ipfs := *tctx.OutputAsset.Storage.IPFS
+				ipfs.CID = output.Manifest
+				metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, ipfs.CID,
+					ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
 				if err != nil {
 					return nil, fmt.Errorf("error saving NFT metadata: %v", err)
 				}
-				// TODO: Set IPFS hashes in the asset storage spec
+				ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
+				assetSpec.Storage.IPFS = &ipfs
 			}
 		}
 
 		return &data.TaskOutput{
+			// TODO: separate upload task output?
 			Import: &data.ImportTaskOutput{
 				VideoFilePath:    videoFilePath,
 				MetadataFilePath: metadataFilePath,
