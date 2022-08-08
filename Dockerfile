@@ -1,7 +1,6 @@
 FROM golang:1.16-buster as builder
 
 WORKDIR /app
-WORKDIR /app
 
 ENV GOFLAGS "-mod=readonly"
 
@@ -25,9 +24,7 @@ RUN ffmpeg -version
 RUN update-ca-certificates
 
 WORKDIR /app
-ENV PKG_CONFIG_PATH /root/compiled/lib/pkgconfig
 
-COPY --from=builder /root/compiled /root/compiled/
 COPY --from=builder /app/build/* .
 
 ENTRYPOINT [ "./task-runner" ]
