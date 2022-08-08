@@ -79,8 +79,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 
 		return &data.TaskOutput{
-			// TODO: separate upload task output?
-			Import: &data.ImportTaskOutput{
+			Upload: &data.UploadTaskOutput{
 				VideoFilePath:    videoFilePath,
 				MetadataFilePath: metadataFilePath,
 				AssetSpec:        assetSpec,
@@ -90,7 +89,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }
 
-func getFileUrl(os *api.ObjectStore, params api.ImportTaskParams) (string, error) {
+func getFileUrl(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
 	if params.UploadedObjectKey != "" {
 		u, err := url.Parse(os.PublicURL)
 		if err != nil {
