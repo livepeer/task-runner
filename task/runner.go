@@ -71,9 +71,10 @@ func NewRunner(opts RunnerOptions) Runner {
 		opts.TaskHandlers = defaultTasks
 	}
 	return &runner{
-		RunnerOptions: opts,
-		lapi:          api.NewAPIClient(opts.LivepeerAPIOptions),
-		catalyst:      clients.NewCatalyst(*opts.Catalyst),
+		RunnerOptions:   opts,
+		DelayedExchange: fmt.Sprintf("%s_delayed", opts.ExchangeName),
+		lapi:            api.NewAPIClient(opts.LivepeerAPIOptions),
+		catalyst:        clients.NewCatalyst(*opts.Catalyst),
 		ipfs: clients.NewPinataClientJWT(opts.PinataAccessToken, map[string]string{
 			"apiServer": opts.LivepeerAPIOptions.Server,
 			"createdBy": clients.UserAgent,
@@ -83,6 +84,7 @@ func NewRunner(opts RunnerOptions) Runner {
 
 type runner struct {
 	RunnerOptions
+	DelayedExchange string
 
 	lapi     *api.Client
 	ipfs     clients.IPFS
@@ -120,6 +122,23 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 	err = c.QueueBind(r.QueueName, "task.trigger.#", r.ExchangeName, false, nil)
 	if err != nil {
 		return fmt.Errorf("error binding task queue: %w", err)
+	}
+
+	err = c.ExchangeDeclare(r.DelayedExchange, "topic", true, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("error declaring delayed exchange: %w", err)
+	}
+	delayedArgs := amqp.Table{
+		"x-message-ttl":          int32(time.Minute / time.Millisecond),
+		"x-dead-letter-exchange": r.ExchangeName,
+	}
+	_, err = c.QueueDeclare(r.DelayedExchange, true, false, false, false, delayedArgs)
+	if err != nil {
+		return fmt.Errorf("error declaring delayed queue: %w", err)
+	}
+	err = c.QueueBind(r.DelayedExchange, "#", r.DelayedExchange, false, nil)
+	if err != nil {
+		return fmt.Errorf("error binding delayed queue: %w", err)
 	}
 	return nil
 }
@@ -255,6 +274,22 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	return nil
 }
 
+func (r *runner) delayTaskStep(ctx context.Context, taskID, step string, input interface{}) error {
+	if step == "" {
+		return errors.New("can only schedule sub-steps of tasks")
+	}
+	task, err := r.getTaskInfo(taskID, step, input)
+	if err != nil {
+		return err
+	}
+	return r.publishSafe(ctx, event.AMQPMessage{
+		Exchange:   r.DelayedExchange,
+		Key:        fmt.Sprintf("task.trigger.%s", task.Type),
+		Persistent: true,
+		Body:       data.NewTaskTriggerEvent(*task),
+	})
+}
+
 func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, input interface{}) error {
 	if step == "" {
 		return errors.New("can only schedule sub-steps of tasks")
@@ -312,6 +347,7 @@ func (r *runner) getTaskInfo(id, step string, input interface{}) (*data.TaskInfo
 }
 
 func (r *runner) publishSafe(ctx context.Context, msg event.AMQPMessage) error {
+	// TODO: Move this logic to AMQP client
 	resultCh := make(chan event.PublishResult, 1)
 	msg.ResultChan = resultCh
 	if err := r.amqp.Publish(ctx, msg); err != nil {
