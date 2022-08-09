@@ -253,6 +253,13 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	task, err := r.lapi.GetTask(taskId)
 	if err != nil {
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
+	} else if task.Status.Phase != "running" {
+		return fmt.Errorf("task %s is not running", taskId)
+	}
+	progress := 0.95 * callback.CompletionRatio
+	err = r.lapi.UpdateTaskStatus(task.ID, "running", progress)
+	if err != nil {
+		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
 	}
 	if callback.Status == "error" {
 		err := fmt.Errorf("got catalyst error: %s", callback.Error)
@@ -262,11 +269,6 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 		return r.publishTaskResult(ctx, taskId, nil, err)
 	} else if callback.Status == "completed" {
 		return r.scheduleTaskStep(ctx, taskId, nextStep, callback)
-	}
-	progress := 0.95 * callback.CompletionRatio
-	err = r.lapi.UpdateTaskStatus(task.ID, "running", progress)
-	if err != nil {
-		return fmt.Errorf("failed to update task %s status: %w", taskId, err)
 	}
 	return nil
 }
