@@ -16,6 +16,7 @@ import (
 
 type APIHandlerOptions struct {
 	APIRoot, ServerName string
+	CatalystSecret      string
 	Prometheus          bool
 }
 
@@ -33,8 +34,11 @@ func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.R
 	if opts.Prometheus {
 		router.Handler("GET", "/metrics", promhttp.Handler())
 	}
-	router.Handler("POST", CataylistHookPath(opts.APIRoot, ":id"),
-		metrics.ObservedHandlerFunc("catalyst_hook", handler.catalystHook))
+
+	hookHandler := metrics.ObservedHandlerFunc("catalyst_hook", handler.catalystHook)
+	hookHandler = authorized(opts.CatalystSecret, hookHandler)
+	router.Handler("POST", CataylistHookPath(opts.APIRoot, ":id"), hookHandler)
+
 	return handler.withDefaultHeaders(router)
 }
 

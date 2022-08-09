@@ -70,6 +70,7 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.DurationVar(&cli.serverOpts.ShutdownGracePeriod, "shutdown-grace-perod", 30*time.Second, "Grace period to wait for shutdown before using the force")
 	// API Handler
 	fs.StringVar(&cli.serverOpts.APIRoot, "api-root", "/task-runner", "Root path where to bind the API to")
+	fs.StringVar(&cli.serverOpts.CatalystSecret, "catalyst-secret", "IAmAuthorized", "Auth secret for the Catalyst API")
 	fs.BoolVar(&cli.serverOpts.Prometheus, "prometheus", false, "Whether to enable Prometheus metrics registry and expose /metrics endpoint")
 
 	mistJson := fs.Bool("j", false, "Print application info as json")
