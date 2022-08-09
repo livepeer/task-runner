@@ -95,21 +95,7 @@ func (r *runner) Start() error {
 		return errors.New("runner already started")
 	}
 
-	amqp, err := event.NewAMQPClient(r.AMQPUri, event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
-		err := c.ExchangeDeclare(r.ExchangeName, "topic", true, false, false, false, nil)
-		if err != nil {
-			return fmt.Errorf("error ensuring API exchange exists: %w", err)
-		}
-		_, err = c.QueueDeclare(r.QueueName, true, false, false, false, amqp.Table{"x-queue-type": "quorum"})
-		if err != nil {
-			return fmt.Errorf("error declaring task queue: %w", err)
-		}
-		err = c.QueueBind(r.QueueName, "task.trigger.#", r.ExchangeName, false, nil)
-		if err != nil {
-			return fmt.Errorf("error binding task queue: %w", err)
-		}
-		return nil
-	}))
+	amqp, err := event.NewAMQPClient(r.AMQPUri, event.NewAMQPConnectFunc(r.setupAmqpConnection))
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
@@ -119,6 +105,22 @@ func (r *runner) Start() error {
 	}
 
 	r.amqp = amqp
+	return nil
+}
+
+func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
+	err := c.ExchangeDeclare(r.ExchangeName, "topic", true, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("error ensuring API exchange exists: %w", err)
+	}
+	_, err = c.QueueDeclare(r.QueueName, true, false, false, false, amqp.Table{"x-queue-type": "quorum"})
+	if err != nil {
+		return fmt.Errorf("error declaring task queue: %w", err)
+	}
+	err = c.QueueBind(r.QueueName, "task.trigger.#", r.ExchangeName, false, nil)
+	if err != nil {
+		return fmt.Errorf("error binding task queue: %w", err)
+	}
 	return nil
 }
 
