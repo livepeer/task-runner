@@ -15,6 +15,12 @@ $(allCmds):
 run:
 	$(MAKE) -C ./cmd/$(cmd) run
 
+generate:
+	go generate ./...
+
+test: generate
+	go test `go list ./... | grep -v mocks`
+
 docker:
 	docker build $(foreach tag,$(tags),-t $(dockerimg):$(tag)) --build-arg version=$(version) .
 

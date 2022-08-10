@@ -18,6 +18,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+//go:generate ../gen_mocks.sh runner.go
+
 const (
 	globalTaskTimeout     = 10 * time.Minute
 	minTaskProcessingTime = 5 * time.Second
