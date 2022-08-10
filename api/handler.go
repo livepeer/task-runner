@@ -21,34 +21,31 @@ type APIHandlerOptions struct {
 }
 
 type apiHandler struct {
+	*httprouter.Router
 	opts      APIHandlerOptions
 	serverCtx context.Context
 	runner    task.Runner
 }
 
 func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.Runner) http.Handler {
-	handler := &apiHandler{opts, serverCtx, runner}
+	router := &apiHandler{httprouter.New(), opts, serverCtx, runner}
 
-	router := httprouter.New()
-	router.HandlerFunc("GET", "/_healthz", handler.healthcheck)
+	router.HandlerFunc("GET", "/_healthz", router.healthcheck)
 	if opts.Prometheus {
 		router.Handler("GET", "/metrics", promhttp.Handler())
 	}
 
-	hookHandler := metrics.ObservedHandlerFunc("catalyst_hook", handler.catalystHook)
+	hookHandler := metrics.ObservedHandlerFunc("catalyst_hook", router.catalystHook)
 	hookHandler = authorized(opts.CatalystSecret, hookHandler)
 	router.Handler("POST", CataylistHookPath(opts.APIRoot, ":id"), hookHandler)
-
-	return handler.withDefaultHeaders(router)
+	return router
 }
 
-func (h *apiHandler) withDefaultHeaders(next http.Handler) http.HandlerFunc {
-	return func(rw http.ResponseWriter, r *http.Request) {
-		if h.opts.ServerName != "" {
-			rw.Header().Set("Server", h.opts.ServerName)
-		}
-		next.ServeHTTP(rw, r)
+func (h *apiHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	if h.opts.ServerName != "" {
+		rw.Header().Set("Server", h.opts.ServerName)
 	}
+	h.Router.ServeHTTP(rw, r)
 }
 
 func (h *apiHandler) healthcheck(rw http.ResponseWriter, r *http.Request) {
