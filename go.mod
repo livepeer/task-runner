@@ -3,13 +3,10 @@ module github.com/livepeer/task-runner
 go 1.16
 
 require (
-	github.com/deepmap/oapi-codegen v1.8.2
-	github.com/getkin/kin-openapi v0.61.0
 	github.com/golang/glog v1.0.0
+	github.com/golang/mock v1.6.0
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/labstack/echo/v4 v4.2.1
 	github.com/livepeer/go-api-client v0.2.8-beta
-	github.com/livepeer/go-livepeer v0.5.31
 	github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
 	github.com/livepeer/livepeer-data v0.4.20-beta
