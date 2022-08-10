@@ -1,0 +1,47 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*"
+
+jobs:
+  test:
+    name: Test the code
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Set up go
+        id: go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.17
+
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          # Check https://github.com/livepeer/go-livepeer/pull/1891
+          # for ref value discussion
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Restore go package cache
+        id: cache-go-mod
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-${{ matrix.arch }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-go-
+
+      - name: Download dependencies
+        if: steps.cache-go-mod.outputs.cache-hit != 'true'
+        run: go mod download
+
+      - name: Test
+        run: |
+          make test
