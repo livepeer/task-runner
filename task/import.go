@@ -38,7 +38,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		var progressCtx context.Context
 		progressCtx, cancelProgress = context.WithCancel(ctx)
 		counter := NewReadCounter(r)
-		go ReportProgress(progressCtx, tctx.lapi, tctx.Task.ID, size, counter.Count, 0, 0.1)
+		go ReportProgress(progressCtx, tctx.lapi, tctx.Task.ID, size, counter.Count, from, to)
 		return counter
 	}
 
