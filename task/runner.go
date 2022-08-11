@@ -131,7 +131,10 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	output, err := r.handleTask(ctx, task)
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
-	// return the error directly so that if publishing the result fails we nack the message to try again
+	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	// return the error directly so that if publishing the result fails we nack
+	// the message to try again
 	return r.publishTaskResult(ctx, task, output, err)
 }
 
