@@ -62,7 +62,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
 		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
-			return nil, fmt.Errorf("cataylist task lost (last update %s ago)", updateAge)
+			return nil, fmt.Errorf("catalyst task lost (last update %s ago)", updateAge)
 		}
 		err := tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
 		if err != nil {
