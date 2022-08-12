@@ -19,9 +19,16 @@ type UploadVODRequest struct {
 }
 
 type OutputLocation struct {
-	Type            string `json:"type"`
-	URL             string `json:"url"`
-	PinataAccessKey string `json:"pinata_access_key"`
+	Type            string          `json:"type"`
+	URL             string          `json:"url"`
+	PinataAccessKey string          `json:"pinata_access_key"`
+	Outputs         *OutputsRequest `json:"outputs,omitempty"`
+}
+
+type OutputsRequest struct {
+	SourceMp4          bool `json:"source_mp4"`
+	SourceSegments     bool `json:"source_segments"`
+	TranscodedSegments bool `json:"transcoded_segments"`
 }
 
 type CatalystCallback struct {

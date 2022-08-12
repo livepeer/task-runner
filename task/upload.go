@@ -38,6 +38,11 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 				{
 					Type: "object_store",
 					URL:  os.URL,
+					Outputs: &clients.OutputsRequest{
+						SourceMp4:          true,
+						SourceSegments:     true,
+						TranscodedSegments: true,
+					},
 				},
 			},
 		}
@@ -45,6 +50,9 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 			uploadReq.OutputLocations = append(uploadReq.OutputLocations, clients.OutputLocation{
 				Type:            "ipfs_pinata",
 				PinataAccessKey: tctx.PinataAccessToken,
+				Outputs: &clients.OutputsRequest{
+					SourceMp4: true,
+				},
 			})
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
