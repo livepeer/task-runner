@@ -137,7 +137,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	output, err := r.handleTask(ctx, task)
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
-	if output == nil {
+	if output == nil && err == nil {
 		// If the task doesn't output anything it means it's yielding execution
 		// until another event is received about it. Likely from a different step
 		// triggered by an external callback (e.g. catalyst's VOD upload callback).
