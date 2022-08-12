@@ -16,7 +16,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		ctx        = tctx.Context
 		playbackID = tctx.OutputAsset.PlaybackID
 		step       = tctx.Step
-		params     = *tctx.Task.Params.Import
+		params     = *tctx.Task.Params.Upload
 		os         = tctx.OutputOSObj
 	)
 	url, err := getFileUrl(tctx.InputOSObj, params)
