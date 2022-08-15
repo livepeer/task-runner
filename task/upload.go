@@ -26,13 +26,9 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	switch step {
 	case "":
-		hookURL, err := tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize")
-		if err != nil {
-			return nil, fmt.Errorf("error building hook URL: %v", err)
-		}
 		uploadReq := clients.UploadVODRequest{
 			Url:         url,
-			CallbackUrl: hookURL,
+			CallbackUrl: tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize"),
 			Mp4Output:   true,
 			OutputLocations: []clients.OutputLocation{
 				{
