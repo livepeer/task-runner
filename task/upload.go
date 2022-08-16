@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"time"
 
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
@@ -48,6 +49,24 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
 			return nil, fmt.Errorf("failed to call catalyst: %v", err)
+		}
+		err = tctx.delayTaskStep(ctx, tctx.Task.ID, "checkCatalyst", nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %v", err)
+		}
+		return nil, nil
+	case "checkCatalyst":
+		task := tctx.Task
+		if task.Status.Phase != "running" {
+			return nil, nil
+		}
+		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
+		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
+			return nil, fmt.Errorf("catalyst task lost (last update %s ago)", updateAge)
+		}
+		err := tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to schedule next check: %v", err)
 		}
 		return nil, nil
 	case "finalize":
