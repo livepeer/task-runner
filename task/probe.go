@@ -83,6 +83,8 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 		track, err := toAssetTrack(stream)
 		if err != nil {
 			return nil, err
+		} else if track == nil {
+			continue
 		}
 		if track.Type == "video" {
 			if hasVideo {
@@ -122,7 +124,9 @@ func containsStr(slc []string, val string) bool {
 }
 
 func toAssetTrack(stream *ffprobe.Stream) (*api.AssetTrack, error) {
-	if stream.CodecType != "video" && stream.CodecType != "audio" {
+	if stream.CodecType == "data" {
+		return nil, nil
+	} else if stream.CodecType != "video" && stream.CodecType != "audio" {
 		return nil, fmt.Errorf("unsupported codec type: %s", stream.CodecType)
 	} else if stream.CodecType == "audio" && !supportedAudioCodecs[stream.CodecName] {
 		return nil, fmt.Errorf("unsupported audio codec: %s", stream.CodecName)
