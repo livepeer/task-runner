@@ -268,7 +268,7 @@ out:
 	assetSpec.PlaybackRecordingID = playbackRecordingId
 	return &data.TaskOutput{
 		Transcode: &data.TranscodeTaskOutput{
-			Asset: data.ImportTaskOutput{
+			Asset: data.UploadTaskOutput{
 				VideoFilePath:    videoFilePath,
 				MetadataFilePath: metadataFilePath,
 				AssetSpec:        assetSpec,
