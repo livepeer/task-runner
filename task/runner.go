@@ -221,6 +221,22 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, drivers.OSSession, e
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {
 	resultCh := make(chan event.PublishResult, 1)
+
+	if err != nil {
+		if strings.Contains(err.Error(), "unexpected EOF") {
+			err = errors.New("file download failed")
+		} else if strings.Contains(err.Error(), "error running ffprobe [] exit status 1") ||
+			strings.Contains(err.Error(), "Could not create stream ID") ||
+			strings.Contains(err.Error(), "502 Bad Gateway") ||
+			(strings.Contains(err.Error(), "EOF") && strings.Contains(err.Error(), "error processing file")) {
+			err = errors.New("error processing file")
+		} else if strings.Contains(err.Error(), "MultipartUpload: upload multipart failed") {
+			err = errors.New("error saving file to internal storage")
+		} else if strings.Contains(err.Error(), "mp4io: parse error") {
+			err = errors.New("file format unsupported, must be MP4")
+		}
+	}
+
 	msg := event.AMQPMessage{
 		Exchange:   r.ExchangeName,
 		Key:        fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
