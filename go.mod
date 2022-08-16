@@ -9,12 +9,19 @@ require (
 	github.com/livepeer/go-api-client v0.2.9-0.20220908143323-8ff49d9fddce
 	github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
-	github.com/livepeer/livepeer-data v0.4.14
+	github.com/livepeer/livepeer-data v0.4.20-beta
 	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
 	github.com/peterbourgon/ff v1.7.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/rabbitmq/amqp091-go v1.1.0
-	github.com/stretchr/testify v1.8.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	gopkg.in/vansante/go-ffprobe.v2 v2.0.3
 )
+
+// replace (
+//   github.com/livepeer/go-api-client => ../go-api-client
+//   github.com/livepeer/go-livepeer => ../go-livepeer
+//   github.com/livepeer/joy4 => ../joy4
+//   github.com/livepeer/livepeer-data => ../livepeer-data
+//   github.com/livepeer/stream-tester => ../stream-tester
+// )

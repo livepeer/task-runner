@@ -86,7 +86,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingID
-	return &data.TaskOutput{Import: &data.ImportTaskOutput{
+	return &data.TaskOutput{Import: &data.UploadTaskOutput{
 		VideoFilePath:    videoFilePath,
 		MetadataFilePath: metadataFilePath,
 		AssetSpec:        assetSpec,
@@ -157,7 +157,7 @@ func filename(req *http.Request, resp *http.Response) string {
 	return ""
 }
 
-func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata *FileMetadata) (string, error) {
+func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata interface{}) (string, error) {
 	fullPath := metadataFileName(playbackID)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
