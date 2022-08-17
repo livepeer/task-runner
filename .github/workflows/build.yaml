@@ -25,7 +25,9 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.17
-
+      - name: Export platform env
+        run: |
+         echo "GOARCH=${{ matrix.arch }}" >> $GITHUB_ENV
       - name: Check out code
         uses: actions/checkout@v3
         with:
