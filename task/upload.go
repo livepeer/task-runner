@@ -58,11 +58,11 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %v", err)
 		}
-		return nil, nil
+		return nil, ErrYieldExecution
 	case "checkCatalyst":
 		task := tctx.Task
 		if task.Status.Phase != "running" {
-			return nil, nil
+			return nil, ErrYieldExecution
 		}
 		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
 		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
@@ -72,7 +72,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to schedule next check: %v", err)
 		}
-		return nil, nil
+		return nil, ErrYieldExecution
 	case "finalize":
 		var callback *clients.CatalystCallback
 		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
