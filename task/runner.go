@@ -270,10 +270,10 @@ func humanizeError(err error) error {
 
 	if strings.Contains(errMsg, "unexpected eof") {
 		return errors.New("file download failed")
-	} else if strings.Contains(errMsg, "multipartUpload: upload multipart failed") {
+	} else if strings.Contains(errMsg, "multipartupload: upload multipart failed") {
 		return errors.New("internal error saving file to storage")
 	} else if strings.Contains(errMsg, "mp4io: parse error") {
-		return UnretriableError{errors.New("file format unsupported, must be MP4")}
+		return UnretriableError{errors.New("file format unsupported, must be a valid MP4")}
 	}
 
 	isProcessing := strings.Contains(errMsg, "error running ffprobe [] exit status 1") ||
@@ -283,6 +283,14 @@ func humanizeError(err error) error {
 
 	if isProcessing {
 		return errors.New("internal error processing file")
+	}
+
+	isTimeout := strings.Contains(errMsg, "context deadline exceeded") ||
+		strings.Contains(errMsg, "context canceled") ||
+		strings.Contains(errMsg, "context deadline exceeded")
+
+	if isTimeout {
+		return errors.New("execution timeout")
 	}
 
 	return err
