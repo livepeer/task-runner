@@ -221,6 +221,9 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, drivers.OSSession, e
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, err error) error {
 	resultCh := make(chan event.PublishResult, 1)
+
+	err = humanizeError(err)
+
 	msg := event.AMQPMessage{
 		Exchange:   r.ExchangeName,
 		Key:        fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
@@ -256,6 +259,41 @@ func errorInfo(err error) *data.ErrorInfo {
 		return nil
 	}
 	return &data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)}
+}
+
+func humanizeError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	errMsg := strings.ToLower(err.Error())
+
+	if strings.Contains(errMsg, "unexpected eof") {
+		return errors.New("file download failed")
+	} else if strings.Contains(errMsg, "multipartupload: upload multipart failed") {
+		return errors.New("internal error saving file to storage")
+	} else if strings.Contains(errMsg, "mp4io: parse error") {
+		return UnretriableError{errors.New("file format unsupported, must be a valid MP4")}
+	}
+
+	isProcessing := strings.Contains(errMsg, "error running ffprobe [] exit status 1") ||
+		strings.Contains(errMsg, "could not create stream id") ||
+		strings.Contains(errMsg, "502 bad gateway") ||
+		(strings.Contains(errMsg, "eof") && strings.Contains(errMsg, "error processing file"))
+
+	if isProcessing {
+		return errors.New("internal error processing file")
+	}
+
+	isTimeout := strings.Contains(errMsg, "context deadline exceeded") ||
+		strings.Contains(errMsg, "context canceled") ||
+		strings.Contains(errMsg, "context deadline exceeded")
+
+	if isTimeout {
+		return errors.New("execution timeout")
+	}
+
+	return err
 }
 
 func blockUntil(t <-chan time.Time) { <-t }
