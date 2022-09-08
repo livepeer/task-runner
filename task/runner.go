@@ -158,7 +158,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 	}
 
 	if taskCtx.Status.Phase == "running" {
-		return nil, UnretriableError{errors.New("task has already been started before")}
+		return nil, errors.New("task has already been started before")
 	}
 	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
 	if err != nil {
@@ -279,6 +279,7 @@ func humanizeError(err error) error {
 	isProcessing := strings.Contains(errMsg, "error running ffprobe [] exit status 1") ||
 		strings.Contains(errMsg, "could not create stream id") ||
 		strings.Contains(errMsg, "502 bad gateway") ||
+		strings.Contains(errMsg, "task has already been started before") ||
 		(strings.Contains(errMsg, "eof") && strings.Contains(errMsg, "error processing file"))
 
 	if isProcessing {
