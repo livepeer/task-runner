@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
+	"github.com/livepeer/stream-tester/m3u8"
 	"github.com/livepeer/stream-tester/model"
 	"github.com/livepeer/stream-tester/segmenter"
 )
@@ -120,6 +121,19 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	if err != nil && err != io.EOF {
 		return "", err
 	}
+
+	stream, err = lapi.GetStream(stream.ID, true)
+	if err != nil {
+		return "", fmt.Errorf("error getting recording stream: %w", err)
+	} else if stream.RecordingURL == "" {
+		return "", fmt.Errorf("missing recording URL in stream")
+	}
+	duration := time.Duration(assetSpec.VideoSpec.DurationSec * float64(time.Second))
+	err = m3u8.Check(ctx, stream.RecordingURL, duration)
+	if err != nil {
+		return "", fmt.Errorf("bad m3u8 playlist generated: %w", err)
+	}
+
 	return stream.ID, nil
 }
 

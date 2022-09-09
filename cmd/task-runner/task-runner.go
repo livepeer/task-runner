@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/livepeer/livepeer-data/pkg/mistconnector"
+	"github.com/livepeer/stream-tester/m3u8"
 	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/task"
 	"github.com/peterbourgon/ff"
@@ -95,6 +96,8 @@ func Run(build BuildFlags) {
 
 	clients.UserAgent = "livepeer-task-runner/" + build.Version
 	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
+	m3u8.InitCensus("task-runner", build.Version)
+
 	runner := task.NewRunner(cli.runnerOpts)
 
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
