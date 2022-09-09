@@ -93,7 +93,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}}, nil
 }
 
-func getFile(ctx context.Context, osSess drivers.OSSession, params api.ImportTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
+func getFile(ctx context.Context, osSess drivers.OSSession, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
 	if upedObjKey := params.UploadedObjectKey; upedObjKey != "" {
 		// TODO: We should simply "move" the file in case of direct import since we
 		// know the file is already in the object store. Independently, we also have
