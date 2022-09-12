@@ -726,8 +726,9 @@ github.com/labstack/gommon v0.3.0/go.mod h1:MULnywXg0yavhxWKc+lOruYdAhDwPK9wf0OL
 github.com/leanovate/gopter v0.2.9/go.mod h1:U2L/78B+KVFIx2VmW6onHJQzXtFb+p5y3y2Sh+Jxxv8=
 github.com/lib/pq v1.0.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
 github.com/lib/pq v1.8.0/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
-github.com/livepeer/go-api-client v0.2.9-0.20220908143323-8ff49d9fddce h1:YbZcqp276/5Dp/ys680emXveyt2UTHAirkhg1LUF5MQ=
 github.com/livepeer/go-api-client v0.2.9-0.20220908143323-8ff49d9fddce/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
+github.com/livepeer/go-api-client v0.2.9-0.20220912153207-0804874fecd2 h1:zr1NBgUJoLtJzgEM2Zeqo3+aKsucFWsyX9jWwczt9w0=
+github.com/livepeer/go-api-client v0.2.9-0.20220912153207-0804874fecd2/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-livepeer v0.5.31/go.mod h1:cpBikcGWApkx0cyR0Ht+uAym7j3uAwXGpPbvaOA8XUU=
 github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506 h1:qKon23c1RQPvL5Oya/hkImbaXNMkt6VdYtnh5jcIhoY=
 github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506/go.mod h1:aLVS1DT0ur9kpr0IlNI4DNcm9vVjRRUjDnwuEUm0BdQ=

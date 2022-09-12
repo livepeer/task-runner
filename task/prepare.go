@@ -67,7 +67,12 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	if err != nil {
 		return "", err
 	}
-	stream, err := lapi.CreateStreamR(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
+	stream, err := lapi.CreateStreamR(api.CreateStreamReq{
+		Name:                streamName,
+		Record:              true,
+		Profiles:            profiles,
+		RecordObjectStoreId: tctx.OutputAsset.PlaybackRecordingObjectStoreID,
+	})
 	if err != nil {
 		return "", err
 	}
