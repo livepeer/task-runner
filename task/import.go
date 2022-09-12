@@ -43,7 +43,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 
 	// Download the file to local disk (or memory).
-	input := measureProgress(contents, 0, 0.2)
+	input := measureProgress(contents, 0, 0.09)
 	sizeInt := int64(size)
 	sourceFile, err := readFile(filename, &sizeInt, input)
 	if err != nil {
@@ -52,7 +52,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	defer sourceFile.Close()
 
 	// Probe metadata from the source file and save it to object store.
-	input = measureProgress(sourceFile, 0.2, 0.25)
+	input = measureProgress(sourceFile, 0.09, 0.11)
 	metadata, err := Probe(ctx, tctx.OutputAsset.ID, filename, input)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error seeking to start of source file: %w", err)
 	}
-	input = measureProgress(sourceFile, 0.25, 0.5)
+	input = measureProgress(sourceFile, 0.11, 0.2)
 	fullPath := videoFileName(playbackID)
 	videoFilePath, err := osSess.SaveData(ctx, fullPath, input, nil, fileUploadTimeout)
 	if err != nil {
@@ -137,7 +137,7 @@ func prepareImportedAsset(tctx *TaskContext, metadata *FileMetadata, sourceFile 
 		return sessID, nil
 	}
 
-	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, sourceFile, 0.5)
+	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, sourceFile, 0.2)
 	if err != nil {
 		glog.Errorf("Error preparing file assetId=%s taskType=import err=%q", tctx.OutputAsset.ID, err)
 		return "", err
