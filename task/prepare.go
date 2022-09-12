@@ -129,7 +129,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		return "", fmt.Errorf("missing recording URL in stream")
 	}
 	duration := time.Duration(assetSpec.VideoSpec.DurationSec * float64(time.Second))
-	err = m3u8.Check(ctx, stream.RecordingURL, profiles, duration)
+	err = m3u8.Check(ctx, stream.RecordingURL, profiles, duration, 1*time.Minute)
 	if err != nil {
 		return "", fmt.Errorf("bad m3u8 playlist generated: %w", err)
 	}
