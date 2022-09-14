@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
+	"github.com/golang/glog"
 	"github.com/julienschmidt/httprouter"
 	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/metrics"
@@ -36,7 +38,15 @@ func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.R
 	hookHandler := metrics.ObservedHandlerFunc("catalyst_hook", router.catalystHook)
 	hookHandler = authorized(opts.Catalyst.Secret, hookHandler)
 	router.Handler("POST", clients.CatalystHookPath(opts.APIRoot, ":id"), hookHandler)
-	return router
+	return logger(router)
+}
+
+func logger(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		handler.ServeHTTP(w, r)
+		glog.Infof("API request handled. method=%s url=%s proto=%s duration=%v", r.Method, r.URL, r.Proto, time.Since(start))
+	})
 }
 
 func (h *apiHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
