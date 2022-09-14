@@ -95,7 +95,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 			return nil, fmt.Errorf("error saving metadata file: %v", err)
 		}
 		var (
-			assetSpec     = callback.Spec
+			assetSpec     = callback.InputVideo
 			videoFilePath string
 		)
 		for _, output := range callback.Outputs {
@@ -110,7 +110,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 					return nil, fmt.Errorf("error saving NFT metadata: %v", err)
 				}
 				ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
-				assetSpec.Storage.IPFS = &ipfs
+				// assetSpec.Storage.IPFS = &ipfs
 			}
 		}
 

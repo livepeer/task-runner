@@ -6,6 +6,7 @@ require (
 	github.com/golang/glog v1.0.0
 	github.com/golang/mock v1.6.0
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/livepeer/catalyst-api v0.0.11
 	github.com/livepeer/go-api-client v0.2.9-0.20220908143323-8ff49d9fddce
 	github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
@@ -44,6 +45,8 @@ require (
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/gosuri/uilive v0.0.3 // indirect
 	github.com/gosuri/uiprogress v0.0.1 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.15.0 // indirect
 	github.com/livepeer/m3u8 v0.11.1 // indirect

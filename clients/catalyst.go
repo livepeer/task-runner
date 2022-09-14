@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/livepeer/go-api-client"
+	"github.com/livepeer/catalyst-api/clients"
 )
 
 type UploadVODRequest struct {
@@ -31,26 +31,13 @@ type OutputsRequest struct {
 	TranscodedSegments bool `json:"transcoded_segments"`
 }
 
-type CatalystCallback struct {
-	Status          string         `json:"status"`
-	CompletionRatio float64        `json:"completion_ratio"`
-	Error           string         `json:"error"`
-	Unretriable     bool           `json:"unretriable"`
-	Outputs         []OutputInfo   `json:"outputs"`
-	Spec            *api.AssetSpec `json:"spec"` // TODO: Update this to final schema
-}
-
-type OutputInfo struct {
-	Type     string            `json:"type"`
-	Manifest string            `json:"manifest"`
-	Videos   map[string]string `json:"videos"`
-}
-
 type CatalystOptions struct {
 	BaseURL    string
 	Secret     string
 	OwnBaseURL *url.URL
 }
+
+type CatalystCallback = clients.TranscodeStatusCompletedMessage
 
 type Catalyst interface {
 	UploadVOD(ctx context.Context, upload UploadVODRequest) error
