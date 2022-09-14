@@ -94,24 +94,10 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error saving metadata file: %v", err)
 		}
-		var (
-			assetSpec     = callback.InputVideo
-			videoFilePath string
-		)
-		for _, output := range callback.Outputs {
-			if output.Type == "object_store" {
-				videoFilePath = output.Manifest
-			} else if output.Type == "ipfs_pinata" {
-				ipfs := *tctx.OutputAsset.Storage.IPFS
-				ipfs.CID = output.Manifest
-				metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, ipfs.CID,
-					ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
-				if err != nil {
-					return nil, fmt.Errorf("error saving NFT metadata: %v", err)
-				}
-				ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
-				// assetSpec.Storage.IPFS = &ipfs
-			}
+
+		assetSpec, videoFilePath, err := assetSpecFromCatalystCallback(tctx, callback)
+		if err != nil {
+			return nil, fmt.Errorf("error processing catalyst callback: %v", err)
 		}
 
 		return &data.TaskOutput{
@@ -138,4 +124,27 @@ func getFileUrl(os *api.ObjectStore, params api.UploadTaskParams) (string, error
 		return params.URL, nil
 	}
 	return "", fmt.Errorf("no URL or uploaded object key specified")
+}
+
+func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*api.AssetSpec, string, error) {
+	var (
+		// assetSpec     = callback.InputVideo
+		videoFilePath string
+	)
+	for _, output := range callback.Outputs {
+		if output.Type == "object_store" {
+			videoFilePath = output.Manifest
+		} else if output.Type == "ipfs_pinata" {
+			ipfs := *tctx.OutputAsset.Storage.IPFS
+			ipfs.CID = output.Manifest
+			metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, ipfs.CID,
+				ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
+			if err != nil {
+				return nil, "", fmt.Errorf("error saving NFT metadata: %v", err)
+			}
+			ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
+			// assetSpec.Storage.IPFS = &ipfs
+		}
+	}
+	return &api.AssetSpec{}, videoFilePath, nil
 }
