@@ -258,7 +258,10 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	taskInfo, task, err := r.getTaskInfo(taskId, "catalysis", nil)
 	if err != nil {
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
-	} else if task.Status.Phase != "running" {
+	}
+	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q rawCallback=%+v",
+		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error, *callback)
+	if task.Status.Phase != "running" {
 		return fmt.Errorf("task %s is not running", taskId)
 	}
 	progress := 0.95 * callback.CompletionRatio
