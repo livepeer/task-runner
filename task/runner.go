@@ -268,7 +268,7 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	}
 	if callback.Status == "error" {
 		err := fmt.Errorf("got catalyst error: %s", callback.Error)
-		if !callback.Retriable {
+		if callback.Unretriable {
 			err = UnretriableError{err}
 		}
 		return r.publishTaskResult(ctx, taskId, nil, err)

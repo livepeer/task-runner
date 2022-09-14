@@ -35,7 +35,7 @@ type CatalystCallback struct {
 	Status          string         `json:"status"`
 	CompletionRatio float64        `json:"completion_ratio"`
 	Error           string         `json:"error"`
-	Retriable       bool           `json:"retriable"`
+	Unretriable     bool           `json:"unretriable"`
 	Outputs         []OutputInfo   `json:"outputs"`
 	Spec            *api.AssetSpec `json:"spec"` // TODO: Update this to final schema
 }
