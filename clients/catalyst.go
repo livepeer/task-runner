@@ -19,9 +19,16 @@ type UploadVODRequest struct {
 }
 
 type OutputLocation struct {
-	Type            string `json:"type"`
-	URL             string `json:"url"`
-	PinataAccessKey string `json:"pinata_access_key"`
+	Type            string          `json:"type"`
+	URL             string          `json:"url"`
+	PinataAccessKey string          `json:"pinata_access_key"`
+	Outputs         *OutputsRequest `json:"outputs,omitempty"`
+}
+
+type OutputsRequest struct {
+	SourceMp4          bool `json:"source_mp4"`
+	SourceSegments     bool `json:"source_segments"`
+	TranscodedSegments bool `json:"transcoded_segments"`
 }
 
 type CatalystCallback struct {
@@ -47,7 +54,7 @@ type CatalystOptions struct {
 
 type Catalyst interface {
 	UploadVOD(ctx context.Context, upload UploadVODRequest) error
-	CatalystHookURL(taskId, nextStep string) (string, error)
+	CatalystHookURL(taskId, nextStep string) string
 }
 
 func NewCatalyst(opts CatalystOptions) Catalyst {
@@ -79,14 +86,11 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 
 // Catalyst hook helpers
 
-func (c *catalyst) CatalystHookURL(taskId, nextStep string) (string, error) {
+func (c *catalyst) CatalystHookURL(taskId, nextStep string) string {
 	// Own base URL already includes root path, so no need to add it
 	path := fmt.Sprintf("%s?nextStep=%s", CatalystHookPath("", taskId), nextStep)
-	hookURL, err := c.OwnBaseURL.Parse(path)
-	if err != nil {
-		return "", err
-	}
-	return hookURL.String(), nil
+	hookURL := c.OwnBaseURL.JoinPath(path)
+	return hookURL.String()
 }
 
 func CatalystHookPath(apiRoot, taskId string) string {

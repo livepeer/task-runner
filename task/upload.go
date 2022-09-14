@@ -18,26 +18,36 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		playbackID = tctx.OutputAsset.PlaybackID
 		step       = tctx.Step
 		params     = *tctx.Task.Params.Upload
-		os         = tctx.OutputOSObj
 	)
-	url, err := getFileUrl(tctx.InputOSObj, params)
+	inUrl, err := getFileUrl(tctx.InputOSObj, params)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %v", err)
 	}
 	switch step {
 	case "":
-		hookURL, err := tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize")
+		outURL, err := url.Parse(tctx.OutputOSObj.URL)
 		if err != nil {
-			return nil, fmt.Errorf("error building hook URL: %v", err)
+			return nil, fmt.Errorf("error parsing object store URL: %v", err)
 		}
 		uploadReq := clients.UploadVODRequest{
-			Url:         url,
-			CallbackUrl: hookURL,
+			Url:         inUrl,
+			CallbackUrl: tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize"),
 			Mp4Output:   true,
 			OutputLocations: []clients.OutputLocation{
 				{
 					Type: "object_store",
-					URL:  os.URL,
+					URL:  outURL.JoinPath(videoFileName(playbackID)).String(),
+					Outputs: &clients.OutputsRequest{
+						SourceMp4: true,
+					},
+				},
+				{
+					Type: "object_store",
+					URL:  outURL.JoinPath(hlsRootPlaylistFileName(playbackID)).String(),
+					Outputs: &clients.OutputsRequest{
+						SourceSegments:     true,
+						TranscodedSegments: true,
+					},
 				},
 			},
 		}
@@ -45,6 +55,9 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 			uploadReq.OutputLocations = append(uploadReq.OutputLocations, clients.OutputLocation{
 				Type:            "ipfs_pinata",
 				PinataAccessKey: tctx.PinataAccessToken,
+				Outputs: &clients.OutputsRequest{
+					SourceMp4: true,
+				},
 			})
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
@@ -54,11 +67,11 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %v", err)
 		}
-		return nil, nil
+		return nil, ErrYieldExecution
 	case "checkCatalyst":
 		task := tctx.Task
 		if task.Status.Phase != "running" {
-			return nil, nil
+			return nil, ErrYieldExecution
 		}
 		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
 		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
@@ -68,7 +81,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to schedule next check: %v", err)
 		}
-		return nil, nil
+		return nil, ErrYieldExecution
 	case "finalize":
 		var callback *clients.CatalystCallback
 		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
