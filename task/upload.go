@@ -127,10 +127,38 @@ func getFileUrl(os *api.ObjectStore, params api.UploadTaskParams) (string, error
 }
 
 func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*api.AssetSpec, string, error) {
-	var (
-		// assetSpec     = callback.InputVideo
-		videoFilePath string
-	)
+	assetSpec := &api.AssetSpec{
+		Name: tctx.OutputAsset.Name,
+		Type: "video",
+		Size: uint64(callback.InputVideo.SizeBytes),
+		VideoSpec: &api.AssetVideoSpec{
+			Format:      callback.InputVideo.Format,
+			DurationSec: callback.InputVideo.Duration,
+			Bitrate:     0,
+			Tracks:      make([]*api.AssetTrack, len(callback.InputVideo.Tracks)),
+		},
+		Storage: tctx.OutputAsset.Storage,
+	}
+	for i, track := range callback.InputVideo.Tracks {
+		assetSpec.VideoSpec.Bitrate += float64(track.Bitrate)
+		assetSpec.VideoSpec.Tracks[i] = &api.AssetTrack{
+			Type:        track.Type,
+			Codec:       track.Codec,
+			StartTime:   track.StartTimeSec,
+			DurationSec: track.DurationSec,
+			Bitrate:     float64(track.Bitrate),
+
+			Width:       track.VideoTrack.Width,
+			Height:      track.VideoTrack.Height,
+			PixelFormat: track.VideoTrack.PixelFormat,
+			FPS:         float64(track.VideoTrack.FPS) / 1000,
+
+			Channels:   track.AudioTrack.Channels,
+			SampleRate: track.AudioTrack.SampleRate,
+		}
+	}
+
+	videoFilePath := ""
 	for _, output := range callback.Outputs {
 		if output.Type == "object_store" {
 			videoFilePath = output.Manifest
@@ -143,8 +171,8 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 				return nil, "", fmt.Errorf("error saving NFT metadata: %v", err)
 			}
 			ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
-			// assetSpec.Storage.IPFS = &ipfs
+			assetSpec.Storage.IPFS = &ipfs
 		}
 	}
-	return &api.AssetSpec{}, videoFilePath, nil
+	return assetSpec, videoFilePath, nil
 }
