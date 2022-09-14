@@ -45,7 +45,7 @@ func logger(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		handler.ServeHTTP(w, r)
-		glog.Infof("API request handled. method=%s url=%s proto=%s duration=%v", r.Method, r.URL, r.Proto, time.Since(start))
+		glog.Infof("API request handled. method=%s url=%q proto=%s duration=%v", r.Method, r.URL, r.Proto, time.Since(start))
 	})
 }
 
@@ -66,13 +66,13 @@ func (h *apiHandler) catalystHook(rw http.ResponseWriter, r *http.Request) {
 
 	var payload *clients.CatalystCallback
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		respondError(rw, http.StatusBadRequest, err)
+		respondError(r, rw, http.StatusBadRequest, err)
 		return
 	}
 
 	err := h.runner.HandleCatalysis(r.Context(), taskId, nextStep, payload)
 	if err != nil {
-		respondError(rw, http.StatusInternalServerError, err)
+		respondError(r, rw, http.StatusInternalServerError, err)
 		return
 	}
 	rw.WriteHeader(http.StatusNoContent)
