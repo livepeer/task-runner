@@ -29,41 +29,14 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	switch step {
 	case "":
-		outURL, err := url.Parse(tctx.OutputOSObj.URL)
+		outputLocations, err := assetOutputLocations(tctx)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing object store URL: %v", err)
+			return nil, err
 		}
 		uploadReq := clients.UploadVODRequest{
-			Url:         inUrl,
-			CallbackUrl: tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize"),
-			OutputLocations: []clients.OutputLocation{
-				{
-					Type: "object_store",
-					URL:  outURL.JoinPath(videoFileName(playbackID)).String(),
-					Outputs: &clients.OutputsRequest{
-						SourceMp4: true,
-					},
-				},
-				{
-					Type: "object_store",
-					URL:  outURL.JoinPath(hlsRootPlaylistFileName(playbackID)).String(),
-					Outputs: &clients.OutputsRequest{
-						SourceSegments:     true,
-						TranscodedSegments: true,
-					},
-				},
-			},
-		}
-		if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
-			// TODO: This interface is likely going to change so that pinata is just a
-			// `object_store` output
-			uploadReq.OutputLocations = append(uploadReq.OutputLocations, clients.OutputLocation{
-				Type:            "ipfs_pinata",
-				PinataAccessKey: tctx.PinataAccessToken,
-				Outputs: &clients.OutputsRequest{
-					SourceMp4: true,
-				},
-			})
+			Url:             inUrl,
+			CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize"),
+			OutputLocations: outputLocations,
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
 			return nil, fmt.Errorf("failed to call catalyst: %v", err)
@@ -207,4 +180,45 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		assetSpec.Storage.IPFS = &ipfs
 	}
 	return assetSpec, videoFilePath, nil
+}
+
+func assetOutputLocations(tctx *TaskContext) ([]clients.OutputLocation, error) {
+	var (
+		asset             = tctx.OutputAsset
+		outOS             = tctx.OutputOSObj
+		pinataAccessToken = tctx.PinataAccessToken
+	)
+	outURL, err := url.Parse(outOS.URL)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing object store URL: %v", err)
+	}
+	locations := []clients.OutputLocation{
+		{
+			Type: "object_store",
+			URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
+			Outputs: &clients.OutputsRequest{
+				SourceMp4: true,
+			},
+		},
+		{
+			Type: "object_store",
+			URL:  outURL.JoinPath(hlsRootPlaylistFileName(asset.PlaybackID)).String(),
+			Outputs: &clients.OutputsRequest{
+				SourceSegments:     true,
+				TranscodedSegments: true,
+			},
+		},
+	}
+	if FlagCatalystSupportsIPFS && asset.Storage.IPFS != nil {
+		// TODO: This interface is likely going to change so that pinata is just a
+		// `object_store` output
+		locations = append(locations, clients.OutputLocation{
+			Type:            "ipfs_pinata",
+			PinataAccessKey: pinataAccessToken,
+			Outputs: &clients.OutputsRequest{
+				SourceMp4: true,
+			},
+		})
+	}
+	return locations, nil
 }
