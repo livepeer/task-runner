@@ -25,7 +25,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	)
 	inUrl, err := getFileUrl(tctx.InputOSObj, params)
 	if err != nil {
-		return nil, fmt.Errorf("error building file URL: %v", err)
+		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
 	switch step {
 	case "":
@@ -39,11 +39,11 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 			OutputLocations: outputLocations,
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
-			return nil, fmt.Errorf("failed to call catalyst: %v", err)
+			return nil, fmt.Errorf("failed to call catalyst: %w", err)
 		}
 		err = tctx.delayTaskStep(ctx, tctx.Task.ID, "checkCatalyst", nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %v", err)
+			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %w", err)
 		}
 		return nil, ErrYieldExecution
 	case "checkCatalyst":
@@ -57,13 +57,13 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		err := tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to schedule next check: %v", err)
+			return nil, fmt.Errorf("failed to schedule next check: %w", err)
 		}
 		return nil, ErrYieldExecution
 	case "finalize":
 		var callback *clients.CatalystCallback
 		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
-			return nil, fmt.Errorf("error parsing step input: %v", err)
+			return nil, fmt.Errorf("error parsing step input: %w", err)
 		}
 		if callback.Status != "success" {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
@@ -162,19 +162,19 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 			)
 			file, err := tctx.outputOS.ReadData(tctx, videoFilePath)
 			if err != nil {
-				return nil, "", fmt.Errorf("error reading exported video file: %v", err)
+				return nil, "", fmt.Errorf("error reading exported video file: %w", err)
 			}
 			defer file.Body.Close()
 			cid, _, err = tctx.ipfs.PinContent(tctx, "asset-"+playbackID, contentType, file.Body)
 			if err != nil {
-				return nil, "", fmt.Errorf("error pinning file to IPFS: %v", err)
+				return nil, "", fmt.Errorf("error pinning file to IPFS: %w", err)
 			}
 			ipfs.CID = cid
 		}
 		metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, cid,
 			ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
 		if err != nil {
-			return nil, "", fmt.Errorf("error pining NFT metadata to IPFS: %v", err)
+			return nil, "", fmt.Errorf("error pining NFT metadata to IPFS: %w", err)
 		}
 		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
 		assetSpec.Storage.IPFS = &ipfs
@@ -190,7 +190,7 @@ func assetOutputLocations(tctx *TaskContext) ([]clients.OutputLocation, error) {
 	)
 	outURL, err := url.Parse(outOS.URL)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing object store URL: %v", err)
+		return nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
 	locations := []clients.OutputLocation{
 		{
