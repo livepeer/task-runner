@@ -7,6 +7,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
@@ -15,6 +16,14 @@ import (
 // Feature flag whether to use Catalyst's IPFS support or not. Should be tunable
 // via a CLI flag for easy configuration on deployment.
 var FlagCatalystSupportsIPFS = false
+
+type OutputName string
+
+var (
+	OutputNameOSSourceMP4   = OutputName("source_mp4")
+	OutputNameOSPlaylistHLS = OutputName("playlist_hls")
+	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
+)
 
 func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
@@ -29,7 +38,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	switch step {
 	case "":
-		outputLocations, err := assetOutputLocations(tctx)
+		_, outputLocations, err := assetOutputLocations(tctx)
 		if err != nil {
 			return nil, err
 		}
@@ -136,13 +145,35 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		}
 	}
 
-	var catalystCid, videoFilePath string
-	for _, output := range callback.Outputs {
-		if output.Type == "object_store" {
-			// todo: handle the different object_store outputs
-			videoFilePath = output.Manifest
-		} else {
-			return nil, "", fmt.Errorf("unknown catalyst output type: %s", output.Type)
+	outputNames, outputReqs, err := assetOutputLocations(tctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("error getting asset output requests: %w", err)
+	}
+
+	var videoFilePath, catalystCid string
+	for idx, output := range callback.Outputs {
+		outName := outputNames[idx]
+		outReq := outputReqs[idx]
+		if output.Type != outReq.Type {
+			return nil, "", fmt.Errorf("output type mismatch: %s != %s", output.Type, outReq.Type)
+		}
+		switch outName {
+		case OutputNameOSSourceMP4:
+			if len(output.Videos) != 1 {
+				return nil, "", fmt.Errorf("unexpected number of videos in source MP4 output: %d", len(output.Videos))
+			}
+			video := output.Videos[0]
+			if video.Type != "mp4" {
+				return nil, "", fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
+			}
+			videoFilePath = video.Location
+		case OutputNameOSPlaylistHLS:
+			// TODO: We don't really know how to handle this yet. Just log.
+			glog.Infof("Received OS HLS playlist output! manifest=%q output=%+v", output.Manifest, output)
+		case OutputNameIPFSSourceMP4:
+			catalystCid = output.Manifest
+		default:
+			return nil, "", fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
 	}
 
@@ -182,7 +213,7 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 	return assetSpec, videoFilePath, nil
 }
 
-func assetOutputLocations(tctx *TaskContext) ([]clients.OutputLocation, error) {
+func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	var (
 		asset             = tctx.OutputAsset
 		outOS             = tctx.OutputOSObj
@@ -190,35 +221,39 @@ func assetOutputLocations(tctx *TaskContext) ([]clients.OutputLocation, error) {
 	)
 	outURL, err := url.Parse(outOS.URL)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing object store URL: %w", err)
+		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	locations := []clients.OutputLocation{
-		{
-			Type: "object_store",
-			URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
-			Outputs: &clients.OutputsRequest{
-				SourceMp4: true,
+	names, locations :=
+		[]OutputName{OutputNameIPFSSourceMP4, OutputNameOSPlaylistHLS},
+		[]clients.OutputLocation{
+			{
+				Type: "object_store",
+				URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
+				Outputs: &clients.OutputsRequest{
+					SourceMp4: true,
+				},
 			},
-		},
-		{
-			Type: "object_store",
-			URL:  outURL.JoinPath(hlsRootPlaylistFileName(asset.PlaybackID)).String(),
-			Outputs: &clients.OutputsRequest{
-				SourceSegments:     true,
-				TranscodedSegments: true,
+			{
+				Type: "object_store",
+				URL:  outURL.JoinPath(hlsRootPlaylistFileName(asset.PlaybackID)).String(),
+				Outputs: &clients.OutputsRequest{
+					SourceSegments:     true,
+					TranscodedSegments: true,
+				},
 			},
-		},
-	}
+		}
 	if FlagCatalystSupportsIPFS && asset.Storage.IPFS != nil {
 		// TODO: This interface is likely going to change so that pinata is just a
 		// `object_store` output
-		locations = append(locations, clients.OutputLocation{
-			Type:            "ipfs_pinata",
-			PinataAccessKey: pinataAccessToken,
-			Outputs: &clients.OutputsRequest{
-				SourceMp4: true,
-			},
-		})
+		names, locations =
+			append(names, OutputNameIPFSSourceMP4),
+			append(locations, clients.OutputLocation{
+				Type:            "ipfs_pinata",
+				PinataAccessKey: pinataAccessToken,
+				Outputs: &clients.OutputsRequest{
+					SourceMp4: true,
+				},
+			})
 	}
-	return locations, nil
+	return names, locations, nil
 }
