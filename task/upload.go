@@ -12,6 +12,10 @@ import (
 	"github.com/livepeer/task-runner/clients"
 )
 
+// Feature flag whether to use Catalyst's IPFS support or not. Should be tunable
+// via a CLI flag for easy configuration on deployment.
+var FlagCatalystSupportsIPFS = false
+
 func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
 		ctx        = tctx.Context
@@ -50,7 +54,9 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 				},
 			},
 		}
-		if tctx.OutputAsset.Storage.IPFS != nil {
+		if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
+			// TODO: This interface is likely going to change so that pinata is just a
+			// `object_store` output
 			uploadReq.OutputLocations = append(uploadReq.OutputLocations, clients.OutputLocation{
 				Type:            "ipfs_pinata",
 				PinataAccessKey: tctx.PinataAccessToken,
@@ -157,21 +163,48 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		}
 	}
 
-	videoFilePath := ""
+	var catalystCid, videoFilePath string
 	for _, output := range callback.Outputs {
 		if output.Type == "object_store" {
+			// todo: handle the different object_store outputs
 			videoFilePath = output.Manifest
-		} else if output.Type == "ipfs_pinata" {
-			ipfs := *tctx.OutputAsset.Storage.IPFS
-			ipfs.CID = output.Manifest
-			metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, ipfs.CID,
-				ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
-			if err != nil {
-				return nil, "", fmt.Errorf("error saving NFT metadata: %v", err)
-			}
-			ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
-			assetSpec.Storage.IPFS = &ipfs
+		} else {
+			return nil, "", fmt.Errorf("unknown catalyst output type: %s", output.Type)
 		}
+	}
+
+	if tctx.OutputAsset.Storage.IPFS != nil {
+		var (
+			ipfs = *tctx.OutputAsset.Storage.IPFS
+			cid  string
+		)
+		if FlagCatalystSupportsIPFS {
+			cid = catalystCid
+		} else {
+			// TODO: Remove this branch once we have reliable catalyst IPFS support
+			var (
+				ipfs        = *tctx.OutputAsset.Storage.IPFS
+				playbackID  = tctx.OutputAsset.PlaybackID
+				contentType = "video/" + tctx.OutputAsset.VideoSpec.Format
+			)
+			file, err := tctx.outputOS.ReadData(tctx, videoFilePath)
+			if err != nil {
+				return nil, "", fmt.Errorf("error reading exported video file: %v", err)
+			}
+			defer file.Body.Close()
+			cid, _, err = tctx.ipfs.PinContent(tctx, "asset-"+playbackID, contentType, file.Body)
+			if err != nil {
+				return nil, "", fmt.Errorf("error pinning file to IPFS: %v", err)
+			}
+			ipfs.CID = cid
+		}
+		metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, cid,
+			ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
+		if err != nil {
+			return nil, "", fmt.Errorf("error pining NFT metadata to IPFS: %v", err)
+		}
+		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
+		assetSpec.Storage.IPFS = &ipfs
 	}
 	return assetSpec, videoFilePath, nil
 }
