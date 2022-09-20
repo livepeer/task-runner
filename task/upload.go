@@ -32,7 +32,6 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		uploadReq := clients.UploadVODRequest{
 			Url:         inUrl,
 			CallbackUrl: tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize"),
-			Mp4Output:   true,
 			OutputLocations: []clients.OutputLocation{
 				{
 					Type: "object_store",

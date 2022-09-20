@@ -14,14 +14,13 @@ import (
 type UploadVODRequest struct {
 	Url             string           `json:"url"`
 	CallbackUrl     string           `json:"callback_url"`
-	Mp4Output       bool             `json:"mp4_output"`
 	OutputLocations []OutputLocation `json:"output_locations,omitempty"`
 }
 
 type OutputLocation struct {
 	Type            string          `json:"type"`
-	URL             string          `json:"url"`
-	PinataAccessKey string          `json:"pinata_access_key"`
+	URL             string          `json:"url,omitempty"`
+	PinataAccessKey string          `json:"pinata_access_key,omitempty"`
 	Outputs         *OutputsRequest `json:"outputs,omitempty"`
 }
 
