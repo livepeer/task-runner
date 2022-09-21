@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 
+	"github.com/golang/glog"
 	"github.com/livepeer/catalyst-api/clients"
 )
 
@@ -62,12 +63,14 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 	if err != nil {
 		return err
 	}
-	return c.DoRequest(ctx, Request{
+	err = c.DoRequest(ctx, Request{
 		Method:      "POST",
 		URL:         "/api/vod",
 		Body:        bytes.NewReader(body),
 		ContentType: "application/json",
 	}, nil)
+	glog.Infof("Catalyst upload VOD request: rawReq=%q err=%q reqObj=%+v", body, err, upload)
+	return err
 }
 
 // Catalyst hook helpers
