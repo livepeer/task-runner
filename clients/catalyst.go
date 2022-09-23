@@ -77,8 +77,10 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 
 func (c *catalyst) CatalystHookURL(taskId, nextStep string) string {
 	// Own base URL already includes root path, so no need to add it
-	path := fmt.Sprintf("%s?nextStep=%s", CatalystHookPath("", taskId), nextStep)
-	hookURL := c.OwnBaseURL.JoinPath(path)
+	hookURL := c.OwnBaseURL.JoinPath(CatalystHookPath("", taskId))
+	query := hookURL.Query()
+	query.Set("nextStep", nextStep)
+	hookURL.RawQuery = query.Encode()
 	return hookURL.String()
 }
 
