@@ -197,10 +197,10 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
-	if taskCtx.Status.Phase == "running" && taskCtx.Step == "" {
+	if taskCtx.Status.Phase == api.TaskPhaseRunning && taskCtx.Step == "" {
 		return nil, errors.New("task has already been started before")
 	}
-	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
+	err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
 	if err != nil {
 		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 		// execute the task anyway
@@ -266,11 +266,11 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	}
 	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q rawCallback=%+v",
 		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error, *callback)
-	if task.Status.Phase != "running" {
+	if task.Status.Phase != api.TaskPhaseRunning {
 		return fmt.Errorf("task %s is not running", taskId)
 	}
 	progress := 0.95 * callback.CompletionRatio
-	err = r.lapi.UpdateTaskStatus(task.ID, "running", progress)
+	err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
 	if err != nil {
 		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
 	}

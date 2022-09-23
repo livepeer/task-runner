@@ -59,7 +59,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		return nil, ErrYieldExecution
 	case "checkCatalyst":
 		task := tctx.Task
-		if task.Status.Phase != "running" {
+		if task.Status.Phase != api.TaskPhaseRunning {
 			return nil, ErrYieldExecution
 		}
 		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
