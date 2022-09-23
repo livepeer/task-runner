@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	catalyst "github.com/livepeer/catalyst-api/clients"
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
@@ -25,11 +24,7 @@ const (
 	maxConcurrentTasks    = 3
 )
 
-var (
-	ErrYieldExecution     = errors.New("yield execution")
-	catalystStatusSuccess = catalyst.TranscodeStatusCompleted.String()
-	catalystStatusError   = catalyst.TranscodeStatusError.String()
-)
+var ErrYieldExecution = errors.New("yield execution")
 
 var defaultTasks = map[string]TaskHandler{
 	"import":    TaskImport,
@@ -274,13 +269,13 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	if err != nil {
 		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
 	}
-	if callback.Status == catalystStatusError {
+	if callback.Status == clients.CatalystStatusError {
 		err := fmt.Errorf("got catalyst error: %s", callback.Error)
 		if callback.Unretriable {
 			err = UnretriableError{err}
 		}
 		return r.publishTaskResult(ctx, taskInfo, nil, err)
-	} else if callback.Status == catalystStatusSuccess {
+	} else if callback.Status == clients.CatalystStatusSuccess {
 		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
 	}
 	return nil

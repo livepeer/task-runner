@@ -4,12 +4,19 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"path"
 
 	"github.com/golang/glog"
 	"github.com/livepeer/catalyst-api/clients"
+)
+
+var (
+	ErrYieldExecution     = errors.New("yield execution")
+	CatalystStatusSuccess = clients.TranscodeStatusCompleted.String()
+	CatalystStatusError   = clients.TranscodeStatusError.String()
 )
 
 type UploadVODRequest struct {
