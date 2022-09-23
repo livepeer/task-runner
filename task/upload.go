@@ -155,7 +155,8 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 
 	var videoFilePath, catalystCid string
 	for idx, output := range callback.Outputs {
-		if output.Type == "s3-google" {
+		// TODO: Remove this once catalyst returns real data
+		if output.Type == "google-s3" {
 			return nil, "", UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
 		}
 		outName := outputNames[idx]
