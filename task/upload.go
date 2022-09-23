@@ -11,6 +11,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
+	"github.com/livepeer/stream-tester/model"
 	"github.com/livepeer/task-runner/clients"
 )
 
@@ -145,6 +146,7 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 			SampleRate: track.AudioTrack.SampleRate,
 		}
 	}
+	glog.V(model.DEBUG).Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v", tctx.Task.ID, assetSpec)
 
 	outputNames, outputReqs, err := assetOutputLocations(tctx)
 	if err != nil {
