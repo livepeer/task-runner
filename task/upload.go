@@ -11,7 +11,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
-	"github.com/livepeer/stream-tester/model"
 	"github.com/livepeer/task-runner/clients"
 )
 
@@ -219,7 +218,8 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		assetSpec.Storage.IPFS = &ipfs
 	}
 
-	glog.V(model.DEBUG).Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v", tctx.Task.ID, assetSpec)
+	assetSpecJson, _ := json.Marshal(assetSpec)
+	glog.Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, assetSpec, assetSpecJson)
 	if isMockResult {
 		return nil, "", UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
 	}
