@@ -4,24 +4,31 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"path"
 
-	"github.com/livepeer/go-api-client"
+	"github.com/golang/glog"
+	"github.com/livepeer/catalyst-api/clients"
+)
+
+var (
+	ErrYieldExecution     = errors.New("yield execution")
+	CatalystStatusSuccess = clients.TranscodeStatusCompleted.String()
+	CatalystStatusError   = clients.TranscodeStatusError.String()
 )
 
 type UploadVODRequest struct {
 	Url             string           `json:"url"`
 	CallbackUrl     string           `json:"callback_url"`
-	Mp4Output       bool             `json:"mp4_output"`
 	OutputLocations []OutputLocation `json:"output_locations,omitempty"`
 }
 
 type OutputLocation struct {
 	Type            string          `json:"type"`
-	URL             string          `json:"url"`
-	PinataAccessKey string          `json:"pinata_access_key"`
+	URL             string          `json:"url,omitempty"`
+	PinataAccessKey string          `json:"pinata_access_key,omitempty"`
 	Outputs         *OutputsRequest `json:"outputs,omitempty"`
 }
 
@@ -31,26 +38,13 @@ type OutputsRequest struct {
 	TranscodedSegments bool `json:"transcoded_segments"`
 }
 
-type CatalystCallback struct {
-	Status          string         `json:"status"`
-	CompletionRatio float64        `json:"completion_ratio"`
-	Error           string         `json:"error"`
-	Retriable       bool           `json:"retriable"`
-	Outputs         []OutputInfo   `json:"outputs"`
-	Spec            *api.AssetSpec `json:"spec"` // TODO: Update this to final schema
-}
-
-type OutputInfo struct {
-	Type     string            `json:"type"`
-	Manifest string            `json:"manifest"`
-	Videos   map[string]string `json:"videos"`
-}
-
 type CatalystOptions struct {
 	BaseURL    string
 	Secret     string
 	OwnBaseURL *url.URL
 }
+
+type CatalystCallback = clients.TranscodeStatusCompletedMessage
 
 type Catalyst interface {
 	UploadVOD(ctx context.Context, upload UploadVODRequest) error
@@ -76,20 +70,24 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 	if err != nil {
 		return err
 	}
-	return c.DoRequest(ctx, Request{
+	err = c.DoRequest(ctx, Request{
 		Method:      "POST",
 		URL:         "/api/vod",
 		Body:        bytes.NewReader(body),
 		ContentType: "application/json",
 	}, nil)
+	glog.Infof("Catalyst upload VOD request: rawReq=%q err=%q reqObj=%+v", body, err, upload)
+	return err
 }
 
 // Catalyst hook helpers
 
 func (c *catalyst) CatalystHookURL(taskId, nextStep string) string {
 	// Own base URL already includes root path, so no need to add it
-	path := fmt.Sprintf("%s?nextStep=%s", CatalystHookPath("", taskId), nextStep)
-	hookURL := c.OwnBaseURL.JoinPath(path)
+	hookURL := c.OwnBaseURL.JoinPath(CatalystHookPath("", taskId))
+	query := hookURL.Query()
+	query.Set("nextStep", nextStep)
+	hookURL.RawQuery = query.Encode()
 	return hookURL.String()
 }
 

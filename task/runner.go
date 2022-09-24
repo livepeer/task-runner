@@ -170,7 +170,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 	// return the error directly so that if publishing the result fails we nack the message to try again
-	return r.publishTaskResult(ctx, task.ID, output, err)
+	return r.publishTaskResult(ctx, task, output, err)
 }
 
 func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output *data.TaskOutput, err error) {
@@ -192,10 +192,10 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
-	if taskCtx.Status.Phase == "running" && taskCtx.Step == "" {
+	if taskCtx.Status.Phase == api.TaskPhaseRunning && taskCtx.Step == "" {
 		return nil, errors.New("task has already been started before")
 	}
-	err = r.lapi.UpdateTaskStatus(taskID, "running", 0)
+	err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
 	if err != nil {
 		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 		// execute the task anyway
@@ -255,25 +255,28 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, dr
 }
 
 func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error {
-	task, err := r.lapi.GetTask(taskId)
+	taskInfo, task, err := r.getTaskInfo(taskId, "catalysis", nil)
 	if err != nil {
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
-	} else if task.Status.Phase != "running" {
+	}
+	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q rawCallback=%+v",
+		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error, *callback)
+	if task.Status.Phase != api.TaskPhaseRunning {
 		return fmt.Errorf("task %s is not running", taskId)
 	}
 	progress := 0.95 * callback.CompletionRatio
-	err = r.lapi.UpdateTaskStatus(task.ID, "running", progress)
+	err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
 	if err != nil {
 		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
 	}
-	if callback.Status == "error" {
+	if callback.Status == clients.CatalystStatusError {
 		err := fmt.Errorf("got catalyst error: %s", callback.Error)
-		if !callback.Retriable {
+		if callback.Unretriable {
 			err = UnretriableError{err}
 		}
-		return r.publishTaskResult(ctx, taskId, nil, err)
-	} else if callback.Status == "completed" {
-		return r.scheduleTaskStep(ctx, taskId, nextStep, callback)
+		return r.publishTaskResult(ctx, taskInfo, nil, err)
+	} else if callback.Status == clients.CatalystStatusSuccess {
+		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
 	}
 	return nil
 }
@@ -282,89 +285,78 @@ func (r *runner) delayTaskStep(ctx context.Context, taskID, step string, input i
 	if step == "" {
 		return errors.New("can only schedule sub-steps of tasks")
 	}
-	task, err := r.getTaskInfo(taskID, step, input)
+	task, _, err := r.getTaskInfo(taskID, step, input)
 	if err != nil {
 		return err
 	}
-	return r.publishSafe(ctx, event.AMQPMessage{
-		Exchange:   r.DelayedExchange,
-		Key:        fmt.Sprintf("task.trigger.%s", task.Type),
-		Persistent: true,
-		Body:       data.NewTaskTriggerEvent(*task),
-	})
+	return r.publishLogged(ctx, task, r.DelayedExchange,
+		fmt.Sprintf("task.trigger.%s", task.Type),
+		data.NewTaskTriggerEvent(task))
 }
 
 func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, input interface{}) error {
 	if step == "" {
 		return errors.New("can only schedule sub-steps of tasks")
 	}
-	task, err := r.getTaskInfo(taskID, step, input)
+	task, _, err := r.getTaskInfo(taskID, step, input)
 	if err != nil {
 		return err
 	}
-	return r.publishSafe(ctx, event.AMQPMessage{
-		Exchange:   r.ExchangeName,
-		Key:        fmt.Sprintf("task.trigger.%s", task.Type),
-		Persistent: true,
-		Body:       data.NewTaskTriggerEvent(*task),
-	})
-}
-
-func (r *runner) publishTaskResult(ctx context.Context, taskID string, output *data.TaskOutput, resultErr error) error {
-	task, err := r.getTaskInfo(taskID, "", nil)
-	if err != nil {
-		return err
-	}
-
-	resultErr = humanizeError(resultErr)
-	msg := event.AMQPMessage{
-		Exchange:   r.ExchangeName,
-		Key:        fmt.Sprintf("task.result.%s.%s", task.Type, task.ID),
-		Persistent: true,
-		Body:       data.NewTaskResultEvent(*task, errorInfo(resultErr), output),
-	}
-	if err := r.publishSafe(ctx, msg); err != nil {
-		glog.Errorf("Error enqueueing AMQP publish of task result event taskType=%q id=%s err=%q message=%+v", task.Type, task.ID, err, msg)
+	key, body := fmt.Sprintf("task.trigger.%s", task.Type), data.NewTaskTriggerEvent(task)
+	if err := r.publishLogged(ctx, task, r.ExchangeName, key, body); err != nil {
 		return fmt.Errorf("error publishing task result event: %w", err)
 	}
 	return nil
 }
 
-func (r *runner) getTaskInfo(id, step string, input interface{}) (*data.TaskInfo, error) {
+func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, resultErr error) error {
+	resultErr = humanizeError(resultErr)
+	key, body := fmt.Sprintf("task.result.%s.%s", task.Type, task.ID), data.NewTaskResultEvent(task, errorInfo(resultErr), output)
+	if err := r.publishLogged(ctx, task, r.ExchangeName, key, body); err != nil {
+		return fmt.Errorf("error publishing task result event: %w", err)
+	}
+	return nil
+}
+
+func (r *runner) getTaskInfo(id, step string, input interface{}) (data.TaskInfo, *api.Task, error) {
 	task, err := r.lapi.GetTask(id)
 	if err != nil {
-		return nil, fmt.Errorf("error getting task %q: %w", id, err)
+		return data.TaskInfo{}, nil, fmt.Errorf("error getting task %q: %w", id, err)
 	}
 	snapshot, err := json.Marshal(task)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling task %q: %w", id, err)
+		return data.TaskInfo{}, task, fmt.Errorf("error marshalling task %q: %w", id, err)
 	}
-	inputRaw, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling step input %q: %w", id, err)
+	var stepInput json.RawMessage
+	if input != nil {
+		stepInput, err = json.Marshal(input)
+		if err != nil {
+			return data.TaskInfo{}, task, fmt.Errorf("error marshalling step input %q: %w", id, err)
+		}
 	}
-	return &data.TaskInfo{
+	return data.TaskInfo{
 		ID:        id,
 		Type:      task.Type,
 		Snapshot:  snapshot,
 		Step:      step,
-		StepInput: inputRaw,
-	}, nil
+		StepInput: stepInput,
+	}, task, nil
 }
 
-func (r *runner) publishSafe(ctx context.Context, msg event.AMQPMessage) error {
-	// TODO: Move this logic to AMQP client
-	resultCh := make(chan event.PublishResult, 1)
-	msg.ResultChan = resultCh
+func (r *runner) publishLogged(ctx context.Context, task data.TaskInfo, exchange, key string, body interface{}) error {
+	msg := event.AMQPMessage{
+		Exchange:   exchange,
+		Key:        key,
+		Body:       body,
+		Persistent: true,
+		WaitResult: true,
+	}
+	glog.Infof("Publishing AMQP message. taskType=%q id=%s step=%q exchange=%q key=%q body=%+v", task.Type, task.ID, task.Step, exchange, key, body)
 	if err := r.amqp.Publish(ctx, msg); err != nil {
+		glog.Errorf("Error publishing AMQP message. taskType=%q id=%s step=%q exchange=%q key=%q err=%q body=%+v", task.Type, task.ID, task.Step, exchange, key, err, body)
 		return err
 	}
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("waiting for publish confirmation: %w", ctx.Err())
-	case result := <-resultCh:
-		return result.Error
-	}
+	return nil
 }
 
 func (r *runner) Shutdown(ctx context.Context) error {

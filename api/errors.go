@@ -13,7 +13,7 @@ type errorResponse struct {
 	Errors []string `json:"errors"`
 }
 
-func respondError(rw http.ResponseWriter, defaultStatus int, errs ...error) {
+func respondError(r *http.Request, rw http.ResponseWriter, defaultStatus int, errs ...error) {
 	status := defaultStatus
 	response := errorResponse{}
 	for _, err := range errs {
@@ -22,6 +22,7 @@ func respondError(rw http.ResponseWriter, defaultStatus int, errs ...error) {
 			status = http.StatusNotFound
 		}
 	}
+	glog.Warningf("API ended in error. method=%s url=%q status=%d, errors=%+v", r.Method, r.URL, status, response.Errors)
 	respondJson(rw, status, response)
 }
 
