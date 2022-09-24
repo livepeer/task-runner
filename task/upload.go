@@ -75,6 +75,8 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
 			return nil, fmt.Errorf("error parsing step input: %w", err)
 		}
+		glog.Infof("Processing upload task catalyst callback. taskId=%s status=%q rawCallback=%+v",
+			tctx.Task.ID, callback.Status, *callback)
 		if callback.Status != "success" {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
