@@ -237,21 +237,21 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
 	names, locations :=
-		[]OutputName{OutputNameIPFSSourceMP4, OutputNameOSPlaylistHLS},
+		[]OutputName{OutputNameOSPlaylistHLS, OutputNameOSSourceMP4},
 		[]clients.OutputLocation{
-			{
-				Type: "object_store",
-				URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
-				Outputs: &clients.OutputsRequest{
-					SourceMp4: true,
-				},
-			},
 			{
 				Type: "object_store",
 				URL:  outURL.JoinPath(hlsRootPlaylistFileName(asset.PlaybackID)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceSegments:     true,
 					TranscodedSegments: true,
+				},
+			},
+			{
+				Type: "object_store",
+				URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
+				Outputs: &clients.OutputsRequest{
+					SourceMp4: true,
 				},
 			},
 		}
