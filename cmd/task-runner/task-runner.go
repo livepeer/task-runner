@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/url"
 	"os"
 	"os/signal"
@@ -13,9 +14,11 @@ import (
 	"github.com/golang/glog"
 	"github.com/livepeer/livepeer-data/pkg/mistconnector"
 	"github.com/livepeer/stream-tester/m3u8"
+	"github.com/livepeer/task-runner/api"
 	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/task"
 	"github.com/peterbourgon/ff"
+	"golang.org/x/sync/errgroup"
 )
 
 // Build flags to be overwritten at build-time and passed to Run()
@@ -24,7 +27,9 @@ type BuildFlags struct {
 }
 
 type cliFlags struct {
-	runnerOpts task.RunnerOptions
+	catalystOpts clients.CatalystOptions
+	runnerOpts   task.RunnerOptions
+	serverOpts   api.ServerOptions
 }
 
 func URLVarFlag(fs *flag.FlagSet, dest **url.URL, name, value, usage string) {
@@ -52,6 +57,12 @@ func parseFlags(build BuildFlags) cliFlags {
 	cli := cliFlags{}
 	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
 
+	// Catalyst options
+	fs.StringVar(&cli.catalystOpts.BaseURL, "catalyst-url", "http://localhost:4949", "Base URL to the Catalyst API")
+	URLVarFlag(fs, &cli.catalystOpts.OwnBaseURL, "own-base-url", "http://localhost:8080/task-runner", "Base URL to reach the current server. This must include the API root")
+	fs.StringVar(&cli.catalystOpts.Secret, "catalyst-secret", "IAmAuthorized", "Auth secret for the Catalyst API")
+
+	// Runner options
 	fs.StringVar(&cli.runnerOpts.AMQPUri, "amqp-uri", "amqp://guest:guest@localhost:5672/livepeer", "URI for RabbitMQ server to consume from. Specified in the AMQP protocol")
 	fs.StringVar(&cli.runnerOpts.ExchangeName, "exchange-name", "lp_tasks", "Name of exchange where the task events will be published to")
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange")
@@ -60,6 +71,14 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihcqgu4rmsrlkqvavkzsnu7h5n66jopckes6u5zrhs3kcffqvylge/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
+
+	// Server options
+	fs.StringVar(&cli.serverOpts.Host, "host", "localhost", "Hostname to bind to")
+	fs.UintVar(&cli.serverOpts.Port, "port", 8080, "Port to listen on")
+	fs.DurationVar(&cli.serverOpts.ShutdownGracePeriod, "shutdown-grace-perod", 30*time.Second, "Grace period to wait for shutdown before using the force")
+	// API Handler
+	fs.StringVar(&cli.serverOpts.APIRoot, "api-root", "/task-runner", "Root path where to bind the API to")
+	fs.BoolVar(&cli.serverOpts.Prometheus, "prometheus", false, "Whether to enable Prometheus metrics registry and expose /metrics endpoint")
 
 	mistJson := fs.Bool("j", false, "Print application info as json")
 
@@ -96,22 +115,37 @@ func Run(build BuildFlags) {
 
 	clients.UserAgent = "livepeer-task-runner/" + build.Version
 	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
+	cli.serverOpts.APIHandlerOptions.ServerName = clients.UserAgent
+	cli.runnerOpts.Catalyst, cli.serverOpts.Catalyst = &cli.catalystOpts, &cli.catalystOpts
 	m3u8.InitCensus("task-runner", build.Version)
 
 	runner := task.NewRunner(cli.runnerOpts)
-
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	err := runner.Start()
-	if err != nil {
-		glog.Fatalf("Failed to start runner: %v", err)
-	}
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		if err := runner.Start(); err != nil {
+			return fmt.Errorf("error starting runner: %w", err)
+		}
+		<-ctx.Done()
+		shutCtx, cancel := context.WithTimeout(context.Background(), cli.serverOpts.ShutdownGracePeriod)
+		defer cancel()
+		glog.Infof("Task runner shutting down...")
+		if err := runner.Shutdown(shutCtx); err != nil {
+			return fmt.Errorf("runner shutdown error: %w", err)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		glog.Info("Starting API server...")
+		err := api.ListenAndServe(ctx, runner, cli.serverOpts)
+		if err != nil {
+			return fmt.Errorf("api server error: %w", err)
+		}
+		return nil
+	})
 
-	<-ctx.Done()
-	shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	glog.Infof("Task runner shutting down...")
-	if err := runner.Shutdown(shutCtx); err != nil {
-		glog.Fatalf("Runner shutdown error: %v", err)
+	if err := eg.Wait(); err != nil {
+		glog.Fatalf("Fatal error on task-runner: %v", err)
 	}
 }
 

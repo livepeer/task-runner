@@ -1,15 +1,12 @@
-name: Publish
+# This publishes only the regular amd64 image to DockerHub. Only for a quicker
+# iteration since the cross-architecture build is really slow.
+name: AMD64 Docker image build
 on: push
 
 jobs:
   docker:
     runs-on: ubuntu-20.04
     steps:
-      - name: Set up Docker Buildx
-        uses: crazy-max/ghaction-docker-buildx@v1
-        with:
-          version: latest
-
       - name: docker login
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -25,9 +22,14 @@ jobs:
       - name: Tags
         id: tags
         uses: livepeer/action-gh-release-tags@v0
+        with:
+          tags-prefix: amd64
 
-      - name: docker build & push
-        run: make docker_ci "tags=${{ steps.tags.outputs.tags }}"
+      - name: docker build
+        run: make docker "tags=${{ steps.tags.outputs.tags }}"
+
+      - name: docker push
+        run: make docker_push "tags=${{ steps.tags.outputs.tags }}"
 
       - name: notify livepeer-infra
         run: curl -X POST https://holy-bread-207a.livepeer.workers.dev
