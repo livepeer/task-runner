@@ -81,12 +81,12 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		metadataFilePath, err := saveMetadataFile(tctx, tctx.outputOS, playbackID, callback)
 		if err != nil {
-			return nil, fmt.Errorf("error saving metadata file: %v", err)
+			return nil, fmt.Errorf("error saving metadata file: %w", err)
 		}
 
 		assetSpec, videoFilePath, err := assetSpecFromCatalystCallback(tctx, callback)
 		if err != nil {
-			return nil, fmt.Errorf("error processing catalyst callback: %v", err)
+			return nil, fmt.Errorf("error processing catalyst callback: %w", err)
 		}
 
 		return &data.TaskOutput{
