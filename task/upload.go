@@ -146,7 +146,6 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 			SampleRate: track.AudioTrack.SampleRate,
 		}
 	}
-	glog.V(model.DEBUG).Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v", tctx.Task.ID, assetSpec)
 
 	outputNames, outputReqs, err := assetOutputLocations(tctx)
 	if err != nil {
@@ -154,10 +153,12 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 	}
 
 	var videoFilePath, catalystCid string
+	var isMockResult bool
 	for idx, output := range callback.Outputs {
 		// TODO: Remove this once catalyst returns real data
 		if output.Type == "google-s3" {
-			return nil, "", UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
+			isMockResult = true
+			output.Type = "object_store"
 		}
 		outName := outputNames[idx]
 		outReq := outputReqs[idx]
@@ -175,8 +176,8 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 			}
 			videoFilePath = video.Location
 		case OutputNameOSPlaylistHLS:
-			// TODO: We don't really know how to handle this yet. Just log.
-			glog.Infof("Received OS HLS playlist output! manifest=%q output=%+v", output.Manifest, output)
+			// TODO: We don't really know how to handle this yet. Just log
+			glog.Infof("Received OS HLS playlist output! taskId=%s manifest=%q output=%+v", tctx.Task.ID, output.Manifest, output)
 		case OutputNameIPFSSourceMP4:
 			catalystCid = output.Manifest
 		default:
@@ -216,6 +217,11 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		}
 		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
 		assetSpec.Storage.IPFS = &ipfs
+	}
+
+	glog.V(model.DEBUG).Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v", tctx.Task.ID, assetSpec)
+	if isMockResult {
+		return nil, "", UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
 	}
 	return assetSpec, videoFilePath, nil
 }
