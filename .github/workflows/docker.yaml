@@ -1,4 +1,4 @@
-name: Build and publish ${{ github.event.repository.name }} docker images
+name: Build and publish task-runner docker images
 
 on:
   pull_request_target:

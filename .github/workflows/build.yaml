@@ -85,7 +85,7 @@ jobs:
         if: matrix.platform.name == 'windows'
         run: |
           cd build/
-          mv task-runner.exe livepeer-task-runner.exe
+          mv task-runner livepeer-task-runner.exe
           zip -9q "../releases/livepeer-task-runner-${GOOS}-${GOARCH}.zip" livepeer-task-runner.exe
 
       - name: Archive binaries for not windows
@@ -128,8 +128,7 @@ jobs:
         id: branch-manifest
         uses: livepeer/branch-manifest-action@latest
         with:
-          project-name: analyzer
-          bucket-key: ${{ github.event.repository.name }}
+          project-name: ${{ github.event.repository.name }}
 
       - name: Authenticate to Google Cloud
         id: auth
