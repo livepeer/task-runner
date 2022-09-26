@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/golang/glog v1.0.0
-	github.com/golang/mock v1.6.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/livepeer/catalyst-api v0.0.11
 	github.com/livepeer/go-api-client v0.3.1

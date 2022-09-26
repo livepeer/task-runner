@@ -1,30 +1,32 @@
-FROM golang:1.19-buster as builder
+FROM	golang:1.19-buster	as	builder
 
-WORKDIR /app
+WORKDIR	/app
 
-ENV GOFLAGS "-mod=readonly"
+ENV	GOFLAGS	"-mod=readonly"
 
-COPY go.mod go.sum ./
+COPY	go.mod	go.sum	./
 
-RUN go mod download
+RUN	go mod download
 
-ARG version
-RUN echo $version
+ARG	version
+RUN	echo $version
 
-COPY . .
+COPY	.	.
 
-RUN make "version=$version"
+RUN	make "version=$version"
 
-FROM debian:buster-slim
+FROM	debian:buster-slim
 
-RUN apt update \
-  && apt install -y ffmpeg ca-certificates \
-  && apt clean && apt autoclean
-RUN ffmpeg -version
-RUN update-ca-certificates
+RUN	apt update \
+	&& apt install -yqq ffmpeg ca-certificates \
+	&& apt clean \
+	&& apt autoclean
 
-WORKDIR /app
+RUN	ffmpeg -version \
+	&& update-ca-certificates
 
-COPY --from=builder /app/build/* .
+WORKDIR	/app
 
-ENTRYPOINT [ "./task-runner" ]
+COPY --from=builder	/app/build/*	/usr/local/bin/
+
+ENTRYPOINT	["/usr/local/bin/task-runner"]
