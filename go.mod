@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rabbitmq/amqp091-go v1.5.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
-	gopkg.in/vansante/go-ffprobe.v2 v2.0.3
+	gopkg.in/vansante/go-ffprobe.v2 v2.1.1
 )
 
 require (
