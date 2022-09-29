@@ -78,7 +78,7 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 			Tracks:      make([]*api.AssetTrack, 0, len(probeData.Streams)),
 		},
 	}
-	var hasVideo bool
+	var hasVideo, hasAudio bool
 	for _, stream := range probeData.Streams {
 		track, err := toAssetTrack(stream)
 		if err != nil {
@@ -92,10 +92,14 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 			}
 			hasVideo = true
 		}
+		hasAudio = hasAudio || track.Type == "audio"
 		spec.VideoSpec.Tracks = append(spec.VideoSpec.Tracks, track)
 	}
 	if !hasVideo {
 		return nil, fmt.Errorf("no video track found in file")
+	}
+	if !hasAudio {
+		return nil, fmt.Errorf("no audio track found in file")
 	}
 	return spec, nil
 }
