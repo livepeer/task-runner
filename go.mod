@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/golang/glog v1.0.0
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/livepeer/catalyst-api v0.0.11
+	github.com/livepeer/catalyst-api v0.0.12
 	github.com/livepeer/go-api-client v0.3.1
 	github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
@@ -34,6 +34,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/eventials/go-tus v0.0.0-20220610120217-05d0564bb571 // indirect
+	github.com/go-kit/log v0.2.0 // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -50,7 +52,7 @@ require (
 	github.com/klauspost/compress v1.15.0 // indirect
 	github.com/livepeer/m3u8 v0.11.1 // indirect
 	github.com/mattn/go-ieproxy v0.0.0-20190702010315-6dee0af9227d // indirect
-	github.com/mattn/go-isatty v0.0.12 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
