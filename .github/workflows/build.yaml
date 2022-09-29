@@ -70,7 +70,7 @@ jobs:
           regex: '^(master|main|v[0-9]+\.\d+\.\d+)$'
 
       - name: Codesign and notarize binaries
-        if: ${{ steps.match-tag.outputs.match != '' }}
+        if: ${{ steps.match-tag.outputs.match != '' && matrix.platform.name == 'darwin' }}
         uses: livepeer/action-gh-codesign-apple@latest
         with:
           developer-certificate-id: ${{ secrets.CI_MACOS_CERTIFICATE_ID }}
@@ -86,14 +86,14 @@ jobs:
         run: |
           cd build/
           mv task-runner livepeer-task-runner.exe
-          zip -9q "../releases/livepeer-task-runner-${GOOS}-${GOARCH}.zip" livepeer-task-runner.exe
+          zip -9q "../releases/livepeer-task-runner-${GOOS}-${GOARCH}.zip" ./livepeer-task-runner.exe
 
       - name: Archive binaries for not windows
         if: matrix.platform.name != 'windows'
         run: |
           cd build/
           mv task-runner livepeer-task-runner
-          tar -czf "../releases/livepeer-task-runner-${GOOS}-${GOARCH}.tar.gz" livepeer-task-runner
+          tar -czf "../releases/livepeer-task-runner-${GOOS}-${GOARCH}.tar.gz" ./livepeer-task-runner
 
       - name: Upload artifacts for processing further in linux
         uses: actions/upload-artifact@master
