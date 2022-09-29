@@ -175,7 +175,6 @@ github.com/golang/mock v1.4.1/go.mod h1:UOMv5ysSaYNkG+OFQykRIcU/QvvxJf3p21QfJ2Bt
 github.com/golang/mock v1.4.3/go.mod h1:UOMv5ysSaYNkG+OFQykRIcU/QvvxJf3p21QfJ2Bt3cw=
 github.com/golang/mock v1.4.4/go.mod h1:l3mdAwkq5BuhzHwde/uurv3sEJeZMXNpwsxVWU71h+4=
 github.com/golang/mock v1.5.0/go.mod h1:CWnOUgYIOo4TcNZ0wHX3YZCqsaM1I1Jvs6v3mP3KVu8=
-github.com/golang/mock v1.6.0 h1:ErTB+efbowRARo13NNdxyJji2egdxLGQhRaY+DUumQc=
 github.com/golang/mock v1.6.0/go.mod h1:p6yTPP+5HYm5mzsMV8JkE6ZKdX+/wYM6Hr+LicevLPs=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
@@ -309,8 +308,6 @@ github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
 github.com/livepeer/catalyst-api v0.0.11 h1:jSzibwVt/GPijg/v8FmDC1hKz4Kb6ZEPDwWnt9Xu8Ag=
 github.com/livepeer/catalyst-api v0.0.11/go.mod h1:nGA6dxnS7Y3EAJOz42FwbvZk4t8UZVXqKrjloCQipwE=
 github.com/livepeer/go-api-client v0.2.8/go.mod h1:IfbAC0/32zhhkzYO/5uCssx3/R3rjHNjyRhPhhS0enY=
-github.com/livepeer/go-api-client v0.3.0 h1:eEoQfDmwKYJXr5f/sdyHy9yaA85I4UNCx1QDKY15k8Q=
-github.com/livepeer/go-api-client v0.3.0/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-api-client v0.3.1 h1:461v1PKUu0DtQnvBGg/m5IRJE5bnc8NEgFFJ6AZz0zQ=
 github.com/livepeer/go-api-client v0.3.1/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506 h1:qKon23c1RQPvL5Oya/hkImbaXNMkt6VdYtnh5jcIhoY=
