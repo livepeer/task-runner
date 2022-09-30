@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - dev
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
