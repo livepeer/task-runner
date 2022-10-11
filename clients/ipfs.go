@@ -22,6 +22,7 @@ type PinInfo struct {
 	ID          string `json:"id"`
 	IPFSPinHash string `json:"ipfs_pin_hash"`
 	Size        int64  `json:"size"`
+	DatePinned  string `json:"date_pinned"`
 	Metadata    struct {
 		Name      string            `json:"name"`
 		KeyValues map[string]string `json:"keyvalues"`
@@ -29,8 +30,7 @@ type PinInfo struct {
 }
 
 type PinList struct {
-	Count int64     `json:"count"`
-	Pins  []PinInfo `json:"rows"`
+	Pins []PinInfo `json:"rows"`
 }
 
 type IPFS interface {
@@ -110,7 +110,7 @@ func (p *pinataClient) Unpin(ctx context.Context, cid string) error {
 func (p *pinataClient) List(ctx context.Context, pageSize, pageOffset int) (pl *PinList, next int, err error) {
 	err = p.DoRequest(ctx, Request{
 		Method: "GET",
-		URL:    fmt.Sprintf("/data/pinList?status=pinned&pageLimit=%d&pageOffset=%d", pageSize, pageOffset),
+		URL:    fmt.Sprintf("/data/pinList?status=pinned&includeCount=false&pageLimit=%d&pageOffset=%d", pageSize, pageOffset),
 	}, &pl)
 	if err != nil {
 		return nil, -1, err
