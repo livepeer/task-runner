@@ -153,7 +153,7 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		return nil, "", fmt.Errorf("error getting asset output requests: %w", err)
 	}
 
-	var videoFilePath, catalystCid string
+	var videoFilePath string
 	var isMockResult bool
 	for idx, output := range callback.Outputs {
 		// TODO: Remove this once catalyst returns real data
@@ -180,52 +180,64 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 			// TODO: We don't really know how to handle this yet. Just log
 			glog.Infof("Received OS HLS playlist output! taskId=%s manifest=%q output=%+v", tctx.Task.ID, output.Manifest, output)
 		case OutputNameIPFSSourceMP4:
-			catalystCid = output.Manifest
+			assetSpec.Storage.IPFS.CID = output.Manifest
 		default:
 			return nil, "", fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
 	}
 
-	if tctx.OutputAsset.Storage.IPFS != nil {
-		var (
-			ipfs = *tctx.OutputAsset.Storage.IPFS
-			cid  string
-		)
-		if FlagCatalystSupportsIPFS {
-			cid = catalystCid
-		} else {
-			// TODO: Remove this branch once we have reliable catalyst IPFS support
-			var (
-				ipfs        = *tctx.OutputAsset.Storage.IPFS
-				playbackID  = tctx.OutputAsset.PlaybackID
-				contentType = "video/" + tctx.OutputAsset.VideoSpec.Format
-			)
-			file, err := tctx.outputOS.ReadData(tctx, videoFilePath)
-			if err != nil {
-				return nil, "", fmt.Errorf("error reading exported video file: %w", err)
-			}
-			defer file.Body.Close()
-			cid, _, err = tctx.ipfs.PinContent(tctx, "asset-"+playbackID, contentType, file.Body)
-			if err != nil {
-				return nil, "", fmt.Errorf("error pinning file to IPFS: %w", err)
-			}
-			ipfs.CID = cid
-		}
-		metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, cid,
-			ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
-		if err != nil {
-			return nil, "", fmt.Errorf("error pining NFT metadata to IPFS: %w", err)
-		}
-		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
-		assetSpec.Storage.IPFS = &ipfs
+	assetSpec, err = complementCatalystPipeline(tctx, *assetSpec)
+	if err != nil {
+		return nil, "", err
 	}
-
 	assetSpecJson, _ := json.Marshal(assetSpec)
 	glog.Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, assetSpec, assetSpecJson)
 	if isMockResult {
 		return nil, "", UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
 	}
 	return assetSpec, videoFilePath, nil
+}
+
+func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*api.AssetSpec, error) {
+	filename, size, contents, err := getFile(tctx, tctx.inputOS, *tctx.Params.Upload)
+	if err != nil {
+		return nil, fmt.Errorf("error getting source file: %w", err)
+	}
+	defer contents.Close()
+	sizeInt := int64(size)
+	sourceFile, err := readFile(filename, &sizeInt, contents)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading source file to disk: %w", err)
+	}
+	defer sourceFile.Close()
+
+	if tctx.OutputAsset.Storage.IPFS != nil {
+		ipfs := *tctx.OutputAsset.Storage.IPFS
+		if FlagCatalystSupportsIPFS {
+			if ipfs.CID == "" {
+				return nil, fmt.Errorf("missing IPFS CID from Catalyst response")
+			}
+		} else {
+			// TODO: Remove this branch once we have reliable catalyst IPFS support
+			var (
+				playbackID  = tctx.OutputAsset.PlaybackID
+				contentType = "video/" + tctx.OutputAsset.VideoSpec.Format
+			)
+			cid, _, err := tctx.ipfs.PinContent(tctx, "asset-"+playbackID, contentType, sourceFile)
+			if err != nil {
+				return nil, fmt.Errorf("error pinning file to IPFS: %w", err)
+			}
+			ipfs.CID = cid
+		}
+		metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, ipfs.CID,
+			ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error pining NFT metadata to IPFS: %w", err)
+		}
+		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
+		assetSpec.Storage.IPFS = &ipfs
+	}
+	return &assetSpec, nil
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
