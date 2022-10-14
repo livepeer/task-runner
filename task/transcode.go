@@ -188,9 +188,9 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	err = nil
 	accumulator := NewAccumulator()
-	progressCtx, cancelProgress := context.WithCancel(ctx)
-	defer cancelProgress()
-	go ReportProgress(progressCtx, lapi, tctx.Task.ID, uint64(sourceFileSize), accumulator.Size, 0, 0.5)
+	progress := NewProgressReporter(ctx, lapi, tctx.Task.ID)
+	defer progress.Stop()
+	progress.TrackCount(accumulator.Size, uint64(sourceFileSize), 0.5)
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -258,7 +258,7 @@ out:
 	if err != nil {
 		return nil, err
 	}
-	cancelProgress()
+	progress.Stop()
 	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader(), 0.5)
 	if err != nil {
 		glog.Errorf("Error preparing file assetId=%s taskType=transcode err=%q", tctx.OutputAsset.ID, err)

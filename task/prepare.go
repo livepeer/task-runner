@@ -95,9 +95,10 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	}
 
 	accumulator := NewAccumulator()
-	progressCtx, cancelProgress := context.WithCancel(ctx)
-	defer cancelProgress()
-	go ReportProgress(progressCtx, lapi, tctx.Task.ID, assetSpec.Size, accumulator.Size, progressStart, 1)
+	progress := NewProgressReporter(ctx, lapi, tctx.Task.ID)
+	defer progress.Stop()
+	progress.TrackCount(accumulator.Size, assetSpec.Size, progressStart)
+	progress.TrackCount(accumulator.Size, assetSpec.Size, 1)
 
 	minDurTimer := time.After(minProcessingDur)
 	for seg := range segmentsIn {
@@ -119,7 +120,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 	}
-	cancelProgress()
+	progress.Stop()
 	if ctxErr := ctx.Err(); err == nil && ctxErr != nil {
 		err = ctxErr
 	}

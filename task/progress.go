@@ -35,12 +35,10 @@ type ProgressReporter struct {
 func NewProgressReporter(ctx context.Context, lapi *api.Client, taskID string) *ProgressReporter {
 	ctx, cancel := context.WithCancel(ctx)
 	p := &ProgressReporter{
-		ctx:        ctx,
-		cancel:     cancel,
-		lapi:       lapi,
-		taskID:     taskID,
-		scaleStart: 0,
-		scaleEnd:   1,
+		ctx:    ctx,
+		cancel: cancel,
+		lapi:   lapi,
+		taskID: taskID,
 	}
 	go p.mainLoop()
 	return p
@@ -53,19 +51,26 @@ func (p *ProgressReporter) Stop() {
 func (p *ProgressReporter) TrackFunc(getProgress func() float64, endProgress float64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.getProgress, p.scaleStart = getProgress, p.lastProgress
-	if endProgress < p.lastProgress || endProgress > 1 {
-		glog.Errorf("Invalid endProgress set taskID=%s lastProgress=%f endProgress=%f", p.taskID, p.lastProgress, endProgress)
-		endProgress = p.lastProgress
+	if endProgress < p.scaleStart || endProgress > 1 {
+		glog.Errorf("Invalid end progress set taskID=%s lastProgress=%f endProgress=%f", p.taskID, p.lastProgress, endProgress)
+		if endProgress > 1 {
+			endProgress = 1
+		} else {
+			endProgress = p.scaleStart
+		}
 	}
-	p.scaleEnd = endProgress
+	p.getProgress, p.scaleStart, p.scaleEnd = getProgress, p.scaleEnd, endProgress
+}
+
+func (p *ProgressReporter) TrackCount(getCount func() uint64, size uint64, endProgress float64) {
+	p.TrackFunc(func() float64 {
+		return float64(getCount()) / float64(size)
+	}, endProgress)
 }
 
 func (p *ProgressReporter) TrackReader(r io.Reader, size uint64, endProgress float64) *ReadCounter {
 	counter := NewReadCounter(r)
-	p.TrackFunc(func() float64 {
-		return float64(counter.Count()) / float64(size)
-	}, endProgress)
+	p.TrackCount(counter.Count, size, endProgress)
 	return counter
 }
 
