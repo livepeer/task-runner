@@ -20,6 +20,8 @@ var (
 	FlagCatalystSupportsIPFS = false
 	// Feature flag whether to use Catalyst for copying source file to object store.
 	FlagCatalystCopiesSourceFile = false
+	// Feature flag whether Catalyst is able to generate all required probe info.
+	FlagCatalystProbesFile = false
 )
 
 type OutputName string
@@ -32,10 +34,9 @@ var (
 
 func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
-		ctx        = tctx.Context
-		playbackID = tctx.OutputAsset.PlaybackID
-		step       = tctx.Step
-		params     = *tctx.Task.Params.Upload
+		ctx    = tctx.Context
+		step   = tctx.Step
+		params = *tctx.Task.Params.Upload
 	)
 	inUrl, err := getFileUrl(tctx.InputOSObj, params)
 	if err != nil {
@@ -84,23 +85,12 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if callback.Status != "success" {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
-		metadataFilePath, err := saveMetadataFile(tctx, tctx.outputOS, playbackID, callback)
-		if err != nil {
-			return nil, fmt.Errorf("error saving metadata file: %w", err)
-		}
 
-		assetSpec, videoFilePath, err := assetSpecFromCatalystCallback(tctx, callback)
+		taskOutput, err := processCatalystCallback(tctx, callback)
 		if err != nil {
 			return nil, fmt.Errorf("error processing catalyst callback: %w", err)
 		}
-
-		return &data.TaskOutput{
-			Upload: &data.UploadTaskOutput{
-				VideoFilePath:    videoFilePath,
-				MetadataFilePath: metadataFilePath,
-				AssetSpec:        assetSpec,
-			},
-		}, nil
+		return &data.TaskOutput{Upload: taskOutput}, nil
 	}
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }
@@ -120,7 +110,7 @@ func getFileUrl(os *api.ObjectStore, params api.UploadTaskParams) (string, error
 	return "", fmt.Errorf("no URL or uploaded object key specified")
 }
 
-func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*api.AssetSpec, string, error) {
+func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
 	assetSpec := &api.AssetSpec{
 		Name: tctx.OutputAsset.Name,
 		Type: "video",
@@ -154,7 +144,7 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 
 	outputNames, outputReqs, err := assetOutputLocations(tctx)
 	if err != nil {
-		return nil, "", fmt.Errorf("error getting asset output requests: %w", err)
+		return nil, fmt.Errorf("error getting asset output requests: %w", err)
 	}
 
 	var videoFilePath string
@@ -168,16 +158,16 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		outName := outputNames[idx]
 		outReq := outputReqs[idx]
 		if output.Type != outReq.Type {
-			return nil, "", fmt.Errorf("output type mismatch: %s != %s", output.Type, outReq.Type)
+			return nil, fmt.Errorf("output type mismatch: %s != %s", output.Type, outReq.Type)
 		}
 		switch outName {
 		case OutputNameOSSourceMP4:
 			if len(output.Videos) != 1 {
-				return nil, "", fmt.Errorf("unexpected number of videos in source MP4 output: %d", len(output.Videos))
+				return nil, fmt.Errorf("unexpected number of videos in source MP4 output: %d", len(output.Videos))
 			}
 			video := output.Videos[0]
 			if video.Type != "mp4" {
-				return nil, "", fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
+				return nil, fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
 			}
 			videoFilePath = video.Location
 		case OutputNameOSPlaylistHLS:
@@ -186,23 +176,30 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
 		default:
-			return nil, "", fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
+			return nil, fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
 	}
-
-	assetSpec, err = complementCatalystPipeline(tctx, *assetSpec)
-	if err != nil {
-		return nil, "", err
+	if FlagCatalystCopiesSourceFile && videoFilePath == "" {
+		return nil, fmt.Errorf("no video file path found in catalyst output")
 	}
+
+	output, err := complementCatalystPipeline(tctx, *assetSpec, callback)
+	if err != nil {
+		return nil, err
+	}
+	if videoFilePath != "" {
+		output.VideoFilePath = videoFilePath
+	}
+
 	assetSpecJson, _ := json.Marshal(assetSpec)
 	glog.Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, assetSpec, assetSpecJson)
 	if isMockResult {
-		return nil, "", UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
+		return nil, UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
 	}
-	return assetSpec, videoFilePath, nil
+	return output, nil
 }
 
-func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*api.AssetSpec, error) {
+func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
 	var (
 		playbackID = tctx.OutputAsset.PlaybackID
 		params     = *tctx.Task.Params.Upload
@@ -220,9 +217,10 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*ap
 	}
 	defer sourceFile.Close()
 
+	var videoFilePath string
 	if !FlagCatalystCopiesSourceFile {
 		fullPath := videoFileName(playbackID)
-		videoFilePath, err := osSess.SaveData(tctx, fullPath, sourceFile, nil, fileUploadTimeout)
+		videoFilePath, err = osSess.SaveData(tctx, fullPath, sourceFile, nil, fileUploadTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 		}
@@ -246,6 +244,11 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*ap
 				return nil, fmt.Errorf("error pinning file to IPFS: %w", err)
 			}
 			ipfs.CID = cid
+
+			_, err = sourceFile.Seek(0, io.SeekStart)
+			if err != nil {
+				return nil, fmt.Errorf("error seeking to start of source file: %w", err)
+			}
 		}
 		if ipfs.CID == "" {
 			return nil, fmt.Errorf("missing IPFS CID from Catalyst response")
@@ -258,7 +261,27 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*ap
 		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
 		assetSpec.Storage.IPFS = &ipfs
 	}
-	return &assetSpec, nil
+
+	metadata := &FileMetadata{}
+	if !FlagCatalystProbesFile {
+		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, NewReadCounter(sourceFile))
+		if err != nil {
+			return nil, err
+		}
+		probed := metadata.AssetSpec
+		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
+	}
+	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, callback
+	metadataFilePath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("error saving metadata file: %w", err)
+	}
+
+	return &data.UploadTaskOutput{
+		VideoFilePath:    videoFilePath,
+		MetadataFilePath: metadataFilePath,
+		AssetSpec:        assetSpec,
+	}, nil
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {

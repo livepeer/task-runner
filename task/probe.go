@@ -12,6 +12,7 @@ import (
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/stream-tester/model"
+	"github.com/livepeer/task-runner/clients"
 	ffprobe "gopkg.in/vansante/go-ffprobe.v2"
 )
 
@@ -23,10 +24,11 @@ var (
 )
 
 type FileMetadata struct {
-	MD5       string             `json:"md5"`
-	SHA256    string             `json:"sha256"`
-	Ffprobe   *ffprobe.ProbeData `json:"ffprobe"`
-	AssetSpec *api.AssetSpec     `json:"assetSpec"`
+	AssetSpec      *api.AssetSpec            `json:"assetSpec"`
+	MD5            string                    `json:"md5,omitempty"`
+	SHA256         string                    `json:"sha256,omitempty"`
+	Ffprobe        *ffprobe.ProbeData        `json:"ffprobe,omitempty"`
+	CatalystResult *clients.CatalystCallback `json:"catalystResult,omitempty"`
 }
 
 func Probe(ctx context.Context, assetId, filename string, data *ReadCounter) (*FileMetadata, error) {
