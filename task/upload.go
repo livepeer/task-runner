@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"path"
 	"time"
@@ -14,9 +15,12 @@ import (
 	"github.com/livepeer/task-runner/clients"
 )
 
-// Feature flag whether to use Catalyst's IPFS support or not. Should be tunable
-// via a CLI flag for easy configuration on deployment.
-var FlagCatalystSupportsIPFS = false
+var (
+	// Feature flag whether to use Catalyst's IPFS support or not.
+	FlagCatalystSupportsIPFS = false
+	// Feature flag whether to use Catalyst for copying source file to object store.
+	FlagCatalystCopiesSourceFile = false
+)
 
 type OutputName string
 
@@ -199,7 +203,12 @@ func assetSpecFromCatalystCallback(tctx *TaskContext, callback *clients.Catalyst
 }
 
 func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*api.AssetSpec, error) {
-	filename, size, contents, err := getFile(tctx, tctx.inputOS, *tctx.Params.Upload)
+	var (
+		playbackID = tctx.OutputAsset.PlaybackID
+		params     = *tctx.Task.Params.Upload
+		osSess     = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
+	)
+	filename, size, contents, err := getFile(tctx, osSess, params)
 	if err != nil {
 		return nil, fmt.Errorf("error getting source file: %w", err)
 	}
@@ -211,13 +220,22 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*ap
 	}
 	defer sourceFile.Close()
 
+	if !FlagCatalystCopiesSourceFile {
+		fullPath := videoFileName(playbackID)
+		videoFilePath, err := osSess.SaveData(tctx, fullPath, sourceFile, nil, fileUploadTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+		}
+		glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
+		_, err = sourceFile.Seek(0, io.SeekStart)
+		if err != nil {
+			return nil, fmt.Errorf("error seeking to start of source file: %w", err)
+		}
+	}
+
 	if tctx.OutputAsset.Storage.IPFS != nil {
 		ipfs := *tctx.OutputAsset.Storage.IPFS
-		if FlagCatalystSupportsIPFS {
-			if ipfs.CID == "" {
-				return nil, fmt.Errorf("missing IPFS CID from Catalyst response")
-			}
-		} else {
+		if !FlagCatalystSupportsIPFS {
 			// TODO: Remove this branch once we have reliable catalyst IPFS support
 			var (
 				playbackID  = tctx.OutputAsset.PlaybackID
@@ -228,6 +246,9 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*ap
 				return nil, fmt.Errorf("error pinning file to IPFS: %w", err)
 			}
 			ipfs.CID = cid
+		}
+		if ipfs.CID == "" {
+			return nil, fmt.Errorf("missing IPFS CID from Catalyst response")
 		}
 		metadataCID, err := saveNFTMetadata(tctx, tctx.ipfs, tctx.OutputAsset, ipfs.CID,
 			ipfs.Spec.NFTMetadataTemplate, ipfs.Spec.NFTMetadata, tctx.ExportTaskConfig)
@@ -251,7 +272,7 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
 	names, locations :=
-		[]OutputName{OutputNameOSPlaylistHLS, OutputNameOSSourceMP4},
+		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
@@ -261,14 +282,18 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 					TranscodedSegments: true,
 				},
 			},
-			{
+		}
+	if FlagCatalystCopiesSourceFile {
+		names, locations =
+			append(names, OutputNameOSSourceMP4),
+			append(locations, clients.OutputLocation{
 				Type: "object_store",
 				URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceMp4: true,
 				},
-			},
-		}
+			})
+	}
 	if FlagCatalystSupportsIPFS && asset.Storage.IPFS != nil {
 		// TODO: This interface is likely going to change so that pinata is just a
 		// `object_store` output
