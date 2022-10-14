@@ -28,11 +28,10 @@ type ImportTaskConfig struct {
 
 func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
-		ctx            = tctx.Context
-		playbackID     = tctx.OutputAsset.PlaybackID
-		params         = *tctx.Task.Params.Import
-		osSess         = tctx.outputOS // Import deals with outputOS only (URL -> ObjectStorage)
-		cancelProgress context.CancelFunc
+		ctx        = tctx.Context
+		playbackID = tctx.OutputAsset.PlaybackID
+		params     = *tctx.Task.Params.Import
+		osSess     = tctx.outputOS // Import deals with outputOS only (URL -> ObjectStorage)
 	)
 	filename, size, contents, err := getFile(ctx, osSess, tctx.ImportTaskConfig, params)
 	if err != nil {
@@ -40,20 +39,11 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	defer contents.Close()
 
-	defer func() { cancelProgress() }()
-	measureProgress := func(r io.Reader, from, to float64) *ReadCounter {
-		if cancelProgress != nil {
-			cancelProgress()
-		}
-		var progressCtx context.Context
-		progressCtx, cancelProgress = context.WithCancel(ctx)
-		counter := NewReadCounter(r)
-		go ReportProgress(progressCtx, tctx.lapi, tctx.Task.ID, size, counter.Count, from, to)
-		return counter
-	}
+	progress := NewProgressReporter(tctx, tctx.lapi, tctx.Task.ID)
+	defer progress.Stop()
 
 	// Download the file to local disk (or memory).
-	input := measureProgress(contents, 0, 0.09)
+	input := progress.TrackReader(contents, size, 0.09)
 	sizeInt := int64(size)
 	sourceFile, err := readFile(filename, &sizeInt, input)
 	if err != nil {
@@ -62,7 +52,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	defer sourceFile.Close()
 
 	// Probe metadata from the source file and save it to object store.
-	input = measureProgress(sourceFile, 0.09, 0.11)
+	input = progress.TrackReader(sourceFile, size, 0.11)
 	metadata, err := Probe(ctx, tctx.OutputAsset.ID, filename, input)
 	if err != nil {
 		return nil, err
@@ -77,14 +67,14 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error seeking to start of source file: %w", err)
 	}
-	input = measureProgress(sourceFile, 0.11, 0.2)
+	input = progress.TrackReader(sourceFile, size, 0.2)
 	fullPath := videoFileName(playbackID)
 	videoFilePath, err := osSess.SaveData(ctx, fullPath, input, nil, fileUploadTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 	}
 	glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
-	cancelProgress()
+	progress.Stop()
 
 	_, err = sourceFile.Seek(0, io.SeekStart)
 	if err != nil {

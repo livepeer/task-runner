@@ -2,9 +2,11 @@ package task
 
 import (
 	"context"
+	"io"
 	"math"
 	"runtime/debug"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -16,54 +18,103 @@ var progressReportBuckets = []float64{0, 0.25, 0.5, 0.75, 1}
 const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
-func ReportProgress(ctx context.Context, lapi *api.Client, taskID string, size uint64, getCount func() uint64, startFraction, endFraction float64) {
-	if startFraction > endFraction || startFraction < 0 || endFraction < 0 || startFraction > 1 || endFraction > 1 {
-		glog.Errorf("Error reporting task progress taskID=%s startFraction=%f endFraction=%f", taskID, startFraction, endFraction)
-		return
+type ProgressReporter struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	lapi   *api.Client
+	taskID string
+
+	mu                   sync.Mutex
+	getProgress          func() float64
+	scaleStart, scaleEnd float64
+
+	lastReport   time.Time
+	lastProgress float64
+}
+
+func NewProgressReporter(ctx context.Context, lapi *api.Client, taskID string) *ProgressReporter {
+	ctx, cancel := context.WithCancel(ctx)
+	p := &ProgressReporter{
+		ctx:        ctx,
+		cancel:     cancel,
+		lapi:       lapi,
+		taskID:     taskID,
+		scaleStart: 0,
+		scaleEnd:   1,
 	}
+	go p.mainLoop()
+	return p
+}
+
+func (p *ProgressReporter) Stop() {
+	p.cancel()
+}
+
+func (p *ProgressReporter) TrackFunc(getProgress func() float64, endProgress float64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.getProgress, p.scaleStart = getProgress, p.lastProgress
+	if endProgress < p.lastProgress || endProgress > 1 {
+		glog.Errorf("Invalid endProgress set taskID=%s lastProgress=%f endProgress=%f", p.taskID, p.lastProgress, endProgress)
+		endProgress = p.lastProgress
+	}
+	p.scaleEnd = endProgress
+}
+
+func (p *ProgressReporter) TrackReader(r io.Reader, size uint64, endProgress float64) *ReadCounter {
+	counter := NewReadCounter(r)
+	p.TrackFunc(func() float64 {
+		return float64(counter.Count()) / float64(size)
+	}, endProgress)
+	return counter
+}
+
+func (p *ProgressReporter) mainLoop() {
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic reporting task progress: value=%q stack:\n%s", r, string(debug.Stack()))
 		}
 	}()
-	if size <= 0 {
-		return
-	}
-	var (
-		timer        = time.NewTicker(progressCheckInterval)
-		lastProgress = float64(0)
-		lastReport   time.Time
-	)
+	timer := time.NewTicker(progressCheckInterval)
 	defer timer.Stop()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-p.ctx.Done():
 			return
 		case <-timer.C:
-			progress := calcProgress(getCount(), size)
-			if time.Since(lastReport) < minProgressReportInterval &&
-				progressBucket(progress) == progressBucket(lastProgress) {
-				continue
-			}
-			scaledProgress := scaleProgress(progress, startFraction, endFraction)
-			if err := lapi.UpdateTaskStatus(taskID, "running", scaledProgress); err != nil {
-				glog.Errorf("Error updating task progress taskID=%s progress=%v err=%q", taskID, progress, err)
-				continue
-			}
-			lastReport, lastProgress = time.Now(), progress
+			p.reportOnce()
 		}
 	}
 }
 
-func calcProgress(count, size uint64) (val float64) {
-	val = float64(count) / float64(size)
-	val = math.Round(val*1000) / 1000
-	val = math.Min(val, 0.99)
-	return
+func (p *ProgressReporter) reportOnce() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.getProgress == nil {
+		return
+	}
+
+	progress := calcProgress(p.getProgress(), p.scaleStart, p.scaleEnd)
+	if progress <= p.lastProgress {
+		glog.Errorf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", p.taskID, p.lastProgress, progress)
+		return
+	}
+	if time.Since(p.lastReport) < minProgressReportInterval &&
+		progressBucket(progress) == progressBucket(p.lastProgress) {
+		return
+	}
+	if err := p.lapi.UpdateTaskStatus(p.taskID, "running", progress); err != nil {
+		glog.Errorf("Error updating task progress taskID=%s progress=%v err=%q", p.taskID, progress, err)
+		return
+	}
+	p.lastReport, p.lastProgress = time.Now(), progress
 }
 
-func scaleProgress(progress, startFraction, endFraction float64) float64 {
-	return startFraction + progress*(endFraction-startFraction)
+func calcProgress(val, startFraction, endFraction float64) float64 {
+	val = math.Round(val*1000) / 1000
+	val = math.Min(val, 0.99)
+	val = startFraction + val*(endFraction-startFraction)
+	return val
 }
 
 func progressBucket(progress float64) int {
