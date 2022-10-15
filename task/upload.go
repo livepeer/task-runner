@@ -151,7 +151,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 	var isMockResult bool
 	for idx, output := range callback.Outputs {
 		// TODO: Remove this once catalyst returns real data
-		if output.Type == "google-s3" {
+		if output.Type == "google-s3" || output.Type == "google-s4" {
 			isMockResult = true
 			output.Type = "object_store"
 		}
