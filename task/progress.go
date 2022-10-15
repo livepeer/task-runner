@@ -116,14 +116,10 @@ func (p *ProgressReporter) reportOnce() {
 }
 
 func calcProgress(val, startFraction, endFraction float64) float64 {
-	if val > 1 {
-		val = 1
-	} else if val < 0 {
-		val = 0
-	}
-	val = math.Round(val*1000) / 1000
+	val = math.Max(val, 0)
 	val = math.Min(val, 0.99)
 	val = startFraction + val*(endFraction-startFraction)
+	val = math.Round(val*1000) / 1000
 	return val
 }
 
