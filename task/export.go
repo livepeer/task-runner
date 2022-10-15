@@ -45,8 +45,7 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 	ctx, cancel := context.WithTimeout(ctx, fileUploadTimeout)
 	defer cancel()
 	tctx = tctx.WithContext(ctx)
-	content := NewProgressReporter(ctx, tctx.lapi, tctx.Task.ID).
-		TrackReader(file.Body, size, 1)
+	content := tctx.Progress.TrackReader(file.Body, size, 1)
 	output, err := uploadFile(tctx, asset, content)
 	if err != nil {
 		return nil, err

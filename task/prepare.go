@@ -59,7 +59,7 @@ var allProfiles = []api.Profile{
 	},
 }
 
-func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser, progressStart float64) (string, error) {
+func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser) (string, error) {
 	var (
 		ctx     = tctx.Context
 		lapi    = tctx.lapi
@@ -95,10 +95,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	}
 
 	accumulator := NewAccumulator()
-	progress := NewProgressReporter(ctx, lapi, tctx.Task.ID)
-	defer progress.Stop()
-	progress.TrackCount(accumulator.Size, assetSpec.Size, progressStart)
-	progress.TrackCount(accumulator.Size, assetSpec.Size, 1)
+	tctx.Progress.TrackCount(accumulator.Size, assetSpec.Size, 1)
 
 	minDurTimer := time.After(minProcessingDur)
 	for seg := range segmentsIn {
@@ -120,7 +117,6 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		}
 		glog.V(model.VERBOSE).Infof("Transcode %d took %s\n", len(transcoded), time.Since(started))
 	}
-	progress.Stop()
 	if ctxErr := ctx.Err(); err == nil && ctxErr != nil {
 		err = ctxErr
 	}

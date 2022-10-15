@@ -48,18 +48,18 @@ func (p *ProgressReporter) Stop() {
 	p.cancel()
 }
 
-func (p *ProgressReporter) TrackFunc(getProgress func() float64, endProgress float64) {
+func (p *ProgressReporter) TrackFunc(getProgress func() float64, end float64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if endProgress < p.scaleStart || endProgress > 1 {
-		glog.Errorf("Invalid end progress set taskID=%s lastProgress=%f endProgress=%f", p.taskID, p.lastProgress, endProgress)
-		if endProgress > 1 {
-			endProgress = 1
+	if end < p.scaleStart || end > 1 {
+		glog.Errorf("Invalid end progress set taskID=%s lastProgress=%f endProgress=%f", p.taskID, p.lastProgress, end)
+		if end > 1 {
+			end = 1
 		} else {
-			endProgress = p.scaleStart
+			end = p.scaleStart
 		}
 	}
-	p.getProgress, p.scaleStart, p.scaleEnd = getProgress, p.scaleEnd, endProgress
+	p.getProgress, p.scaleStart, p.scaleEnd = getProgress, p.scaleEnd, end
 }
 
 func (p *ProgressReporter) TrackCount(getCount func() uint64, size uint64, endProgress float64) {
@@ -116,6 +116,11 @@ func (p *ProgressReporter) reportOnce() {
 }
 
 func calcProgress(val, startFraction, endFraction float64) float64 {
+	if val > 1 {
+		val = 1
+	} else if val < 0 {
+		val = 0
+	}
 	val = math.Round(val*1000) / 1000
 	val = math.Min(val, 0.99)
 	val = startFraction + val*(endFraction-startFraction)

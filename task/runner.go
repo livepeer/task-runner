@@ -40,6 +40,7 @@ type TaskContext struct {
 	*runner
 	data.TaskInfo
 	*api.Task
+	Progress                *ProgressReporter
 	InputAsset, OutputAsset *api.Asset
 	InputOSObj, OutputOSObj *api.ObjectStore
 	inputOS, outputOS       drivers.OSSession
@@ -186,6 +187,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 	if err != nil {
 		return nil, fmt.Errorf("error building task context: %w", err)
 	}
+	defer taskCtx.Progress.Stop()
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
 	handler, ok := r.TaskHandlers[strings.ToLower(taskType)]
@@ -232,7 +234,8 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	if err != nil {
 		return nil, err
 	}
-	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOSObj, outputOSObj, inputOS, outputOS}, nil
+	progress := NewProgressReporter(ctx, r.lapi, task.ID)
+	return &TaskContext{ctx, r, info, task, progress, inputAsset, outputAsset, inputOSObj, outputOSObj, inputOS, outputOS}, nil
 }
 
 func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, drivers.OSSession, error) {
