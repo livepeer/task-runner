@@ -99,7 +99,7 @@ func (p *ProgressReporter) reportOnce() {
 		return
 	}
 
-	progress := calcProgress(p.getProgress(), p.scaleStart, p.scaleEnd)
+	progress := p.calcProgress()
 	if progress <= p.lastProgress {
 		glog.Errorf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", p.taskID, p.lastProgress, progress)
 		return
@@ -115,10 +115,11 @@ func (p *ProgressReporter) reportOnce() {
 	p.lastReport, p.lastProgress = time.Now(), progress
 }
 
-func calcProgress(val, startFraction, endFraction float64) float64 {
+func (p *ProgressReporter) calcProgress() float64 {
+	val := p.getProgress()
 	val = math.Max(val, 0)
 	val = math.Min(val, 0.99)
-	val = startFraction + val*(endFraction-startFraction)
+	val = p.scaleStart + val*(p.scaleEnd-p.scaleStart)
 	val = math.Round(val*1000) / 1000
 	return val
 }
