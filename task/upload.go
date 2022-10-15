@@ -86,6 +86,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
 
+		tctx.Progress.Set(0.9)
 		taskOutput, err := processCatalystCallback(tctx, callback)
 		if err != nil {
 			return nil, fmt.Errorf("error processing catalyst callback: %w", err)
@@ -210,25 +211,33 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		return nil, fmt.Errorf("error getting source file: %w", err)
 	}
 	defer contents.Close()
+	input := tctx.Progress.TrackReader(contents, size, 0.94)
 	sizeInt := int64(size)
-	sourceFile, err := readFile(filename, &sizeInt, contents)
+	rawSourceFile, err := readFile(filename, &sizeInt, input)
 	if err != nil {
 		return nil, fmt.Errorf("error downloading source file to disk: %w", err)
 	}
-	defer sourceFile.Close()
+	defer rawSourceFile.Close()
+	readLocalFile := func(endProgress float64) (*ReadCounter, error) {
+		_, err = rawSourceFile.Seek(0, io.SeekStart)
+		if err != nil {
+			return nil, fmt.Errorf("error seeking to start of source file: %w", err)
+		}
+		return tctx.Progress.TrackReader(rawSourceFile, size, endProgress), nil
+	}
 
 	var videoFilePath string
 	if !FlagCatalystCopiesSourceFile {
+		input, err := readLocalFile(0.95)
+		if err != nil {
+			return nil, err
+		}
 		fullPath := videoFileName(playbackID)
-		videoFilePath, err = osSess.SaveData(tctx, fullPath, sourceFile, nil, fileUploadTimeout)
+		videoFilePath, err = osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 		}
 		glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
-		_, err = sourceFile.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, fmt.Errorf("error seeking to start of source file: %w", err)
-		}
 	}
 
 	if tctx.OutputAsset.Storage.IPFS != nil {
@@ -239,16 +248,15 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 				playbackID  = tctx.OutputAsset.PlaybackID
 				contentType = "video/" + tctx.OutputAsset.VideoSpec.Format
 			)
-			cid, _, err := tctx.ipfs.PinContent(tctx, "asset-"+playbackID, contentType, sourceFile)
+			input, err = readLocalFile(0.99)
+			if err != nil {
+				return nil, err
+			}
+			cid, _, err := tctx.ipfs.PinContent(tctx, "asset-"+playbackID, contentType, input)
 			if err != nil {
 				return nil, fmt.Errorf("error pinning file to IPFS: %w", err)
 			}
 			ipfs.CID = cid
-
-			_, err = sourceFile.Seek(0, io.SeekStart)
-			if err != nil {
-				return nil, fmt.Errorf("error seeking to start of source file: %w", err)
-			}
 		}
 		if ipfs.CID == "" {
 			return nil, fmt.Errorf("missing IPFS CID from Catalyst response")
@@ -264,7 +272,11 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 
 	metadata := &FileMetadata{}
 	if !FlagCatalystProbesFile {
-		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, NewReadCounter(sourceFile))
+		input, err = readLocalFile(1)
+		if err != nil {
+			return nil, err
+		}
+		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, input)
 		if err != nil {
 			return nil, err
 		}

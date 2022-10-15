@@ -268,7 +268,7 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	if task.Status.Phase != api.TaskPhaseRunning {
 		return fmt.Errorf("task %s is not running", taskId)
 	}
-	progress := 0.95 * callback.CompletionRatio
+	progress := 0.9 * callback.CompletionRatio
 	err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
 	if err != nil {
 		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)

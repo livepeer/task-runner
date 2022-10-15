@@ -48,7 +48,7 @@ func (p *ProgressReporter) Stop() {
 	p.cancel()
 }
 
-func (p *ProgressReporter) TrackFunc(getProgress func() float64, end float64) {
+func (p *ProgressReporter) Track(getProgress func() float64, end float64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if end < p.scaleStart || end > 1 {
@@ -62,8 +62,12 @@ func (p *ProgressReporter) TrackFunc(getProgress func() float64, end float64) {
 	p.getProgress, p.scaleStart, p.scaleEnd = getProgress, p.scaleEnd, end
 }
 
+func (p *ProgressReporter) Set(val float64) {
+	p.Track(func() float64 { return 1 }, val)
+}
+
 func (p *ProgressReporter) TrackCount(getCount func() uint64, size uint64, endProgress float64) {
-	p.TrackFunc(func() float64 {
+	p.Track(func() float64 {
 		return float64(getCount()) / float64(size)
 	}, endProgress)
 }
