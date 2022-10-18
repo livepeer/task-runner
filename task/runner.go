@@ -195,13 +195,15 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
-	if taskCtx.Status.Phase == api.TaskPhaseRunning && taskCtx.Step == "" {
-		return nil, errors.New("task has already been started before")
-	}
-	err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
-	if err != nil {
-		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
-		// execute the task anyway
+	if isFirstStep := taskCtx.Step == ""; isFirstStep {
+		if taskCtx.Status.Phase == api.TaskPhaseRunning {
+			return nil, errors.New("task has already been started before")
+		}
+		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
+		if err != nil {
+			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
+			// execute the task anyway
+		}
 	}
 
 	glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
