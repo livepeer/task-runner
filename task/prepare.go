@@ -18,6 +18,10 @@ const (
 	absoluteMinVideoBitrate = 5_000
 	// NVIDIA cards with Turing architecture enforce a minimum width/height of 145 pixels on transcoded videos
 	minVideoDimensionPixels = 145
+	// This is the minimum processing duration we enforce to make sure we get
+	// recording URLs from broadcaster made avaiable. Too small files often get
+	// transcoded too fast and dont give time for metrics to update.
+	minProcessingDur = 1 * time.Minute
 )
 
 var allProfiles = []api.Profile{
@@ -95,6 +99,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	defer cancelProgress()
 	go ReportProgress(progressCtx, lapi, tctx.Task.ID, assetSpec.Size, accumulator.Size, progressStart, 1)
 
+	minDurTimer := time.After(minProcessingDur)
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
 			break
@@ -122,6 +127,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		return "", err
 	}
 
+	<-minDurTimer
 	stream, err = lapi.GetStream(stream.ID, true)
 	if err != nil {
 		return "", fmt.Errorf("error getting recording stream: %w", err)
