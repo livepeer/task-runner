@@ -276,11 +276,8 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
 	}
 	if callback.Status == clients.CatalystStatusError {
-		err := fmt.Errorf("got catalyst error: %s", callback.Error)
-		if callback.Unretriable {
-			err = UnretriableError{err}
-		}
-		return r.publishTaskResult(ctx, taskInfo, nil, err)
+		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
+		return r.publishTaskResult(ctx, taskInfo, nil, catalystError(callback))
 	} else if callback.Status == clients.CatalystStatusSuccess {
 		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
 	}
@@ -412,6 +409,16 @@ func humanizeError(err error) error {
 		return errors.New("execution timeout")
 	}
 
+	return err
+}
+
+func catalystError(callback *clients.CatalystCallback) error {
+	// TODO: Let some errors passthrough here e.g. user input errors
+	// err := fmt.Errorf("catalyst error: %s", callback.Error)
+	err := errors.New("internal error catalysing file")
+	if callback.Unretriable {
+		err = UnretriableError{err}
+	}
 	return err
 }
 
