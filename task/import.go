@@ -18,6 +18,7 @@ import (
 )
 
 const IPFS_PREFIX = "ipfs://"
+const ARWEAVE_PREFIX = "ar://"
 
 type ImportTaskConfig struct {
 	// Ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from
@@ -123,12 +124,13 @@ func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig
 		return getFileIPFS(ctx, cfg.ImportIPFSGatewayURLs, cid)
 	}
 
-	// TODO: Implement Arweave support
-	// arPrefix := "ar://"
-	// if strings.HasPrefix(params.URL, arPrefix) {
-	// 	txID := strings.TrimPrefix(params.URL, arPrefix)
-	// 	return getFileArweave(ctx, txID)
-	// }
+	if strings.HasPrefix(params.URL, ARWEAVE_PREFIX) {
+		txID := strings.TrimPrefix(params.URL, ARWEAVE_PREFIX)
+		// arweave.net is the main gateway for Arweave right now
+		// In the future, given more gateways, we can pass a list of gateway URLs similar to what we do for IPFS
+		gatewayUrl := "https://arweave.net/" + txID
+		return getFileWithUrl(ctx, gatewayUrl)
+	}
 
 	return getFileWithUrl(ctx, params.URL)
 }
