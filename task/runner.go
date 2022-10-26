@@ -64,6 +64,7 @@ type RunnerOptions struct {
 	LivepeerAPIOptions      api.ClientOptions
 	Catalyst                *clients.CatalystOptions
 	ExportTaskConfig
+	ImportTaskConfig
 
 	TaskHandlers map[string]TaskHandler
 }
