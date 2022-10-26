@@ -17,6 +17,8 @@ import (
 	"github.com/livepeer/livepeer-data/pkg/data"
 )
 
+const IPFS_PREFIX = "ipfs://"
+
 type ImportTaskConfig struct {
 	// Ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from
 	ImportIPFSGatewayURLs []string
@@ -116,9 +118,8 @@ func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig
 		return "", 0, nil, fmt.Errorf("no import URL or direct upload object key: %+v", params)
 	}
 
-	ipfsPrefix := "ipfs://"
-	if strings.HasPrefix(params.URL, ipfsPrefix) {
-		cid := strings.TrimPrefix(params.URL, ipfsPrefix)
+	if strings.HasPrefix(params.URL, IPFS_PREFIX) {
+		cid := strings.TrimPrefix(params.URL, IPFS_PREFIX)
 		return getFileIPFS(ctx, cfg.ImportIPFSGatewayURLs, cid)
 	}
 
