@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -53,6 +54,15 @@ func URLVarFlag(fs *flag.FlagSet, dest **url.URL, name, value, usage string) {
 	})
 }
 
+func StringsVarFlag(fs *flag.FlagSet, dest *[]string, name, value, usage string) {
+	*dest = strings.Split(value, ",")
+
+	fs.Func(name, usage, func(s string) error {
+		*dest = strings.Split(s, ",")
+		return nil
+	})
+}
+
 func parseFlags(build BuildFlags) cliFlags {
 	cli := cliFlags{}
 	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
@@ -71,6 +81,7 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihcqgu4rmsrlkqvavkzsnu7h5n66jopckes6u5zrhs3kcffqvylge/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
+	StringsVarFlag(fs, &cli.runnerOpts.ImportIPFSGatewayURLs, "import-ipfs-gateway-urls", "Comma delimited ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from", "https://w3s.link/ipfs/,https://ipfs.io/ipfs/,https://cloudflare-ipfs.com/ipfs/")
 
 	// Server options
 	fs.StringVar(&cli.serverOpts.Host, "host", "localhost", "Hostname to bind to")

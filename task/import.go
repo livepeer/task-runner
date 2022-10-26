@@ -9,12 +9,20 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 )
+
+const IPFS_PREFIX = "ipfs://"
+
+type ImportTaskConfig struct {
+	// Ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from
+	ImportIPFSGatewayURLs []string
+}
 
 func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	var (
@@ -24,7 +32,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 		osSess         = tctx.outputOS // Import deals with outputOS only (URL -> ObjectStorage)
 		cancelProgress context.CancelFunc
 	)
-	filename, size, contents, err := getFile(ctx, osSess, params)
+	filename, size, contents, err := getFile(ctx, osSess, tctx.ImportTaskConfig, params)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +101,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}}, nil
 }
 
-func getFile(ctx context.Context, osSess drivers.OSSession, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
+func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
 	if upedObjKey := params.UploadedObjectKey; upedObjKey != "" {
 		// TODO: We should simply "move" the file in case of direct import since we
 		// know the file is already in the object store. Independently, we also have
@@ -110,7 +118,35 @@ func getFile(ctx context.Context, osSess drivers.OSSession, params api.UploadTas
 		return "", 0, nil, fmt.Errorf("no import URL or direct upload object key: %+v", params)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", params.URL, nil)
+	if strings.HasPrefix(params.URL, IPFS_PREFIX) {
+		cid := strings.TrimPrefix(params.URL, IPFS_PREFIX)
+		return getFileIPFS(ctx, cfg.ImportIPFSGatewayURLs, cid)
+	}
+
+	// TODO: Implement Arweave support
+	// arPrefix := "ar://"
+	// if strings.HasPrefix(params.URL, arPrefix) {
+	// 	txID := strings.TrimPrefix(params.URL, arPrefix)
+	// 	return getFileArweave(ctx, txID)
+	// }
+
+	return getFileWithUrl(ctx, params.URL)
+}
+
+func getFileIPFS(ctx context.Context, gateways []string, cid string) (name string, size uint64, content io.ReadCloser, err error) {
+	for _, gateway := range gateways {
+		name, size, content, err = getFileWithUrl(ctx, gateway+cid)
+		if err == nil {
+			return name, size, content, nil
+		}
+		glog.Infof("Failed to get file from IPFS cid=%v url=%v err=%v", cid, gateway, err)
+	}
+
+	return "", 0, nil, err
+}
+
+func getFileWithUrl(ctx context.Context, url string) (name string, size uint64, content io.ReadCloser, err error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return "", 0, nil, UnretriableError{fmt.Errorf("error creating http request: %w", err)}
 	}
