@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 
@@ -137,7 +138,13 @@ func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig
 
 func getFileIPFS(ctx context.Context, gateways []string, cid string) (name string, size uint64, content io.ReadCloser, err error) {
 	for _, gateway := range gateways {
-		name, size, content, err = getFileWithUrl(ctx, gateway+cid)
+		url, err := url.Parse(gateway)
+		if err != nil {
+			glog.Errorf("error parsing gateway url=%q err=%q", gateway, err)
+			continue
+		}
+		url = url.JoinPath(cid)
+		name, size, content, err = getFileWithUrl(ctx, url.String())
 		if err == nil {
 			return name, size, content, nil
 		}
