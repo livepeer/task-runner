@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 
@@ -22,7 +23,7 @@ const ARWEAVE_PREFIX = "ar://"
 
 type ImportTaskConfig struct {
 	// Ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from
-	ImportIPFSGatewayURLs []string
+	ImportIPFSGatewayURLs []*url.URL
 }
 
 func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
@@ -135,9 +136,10 @@ func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig
 	return getFileWithUrl(ctx, params.URL)
 }
 
-func getFileIPFS(ctx context.Context, gateways []string, cid string) (name string, size uint64, content io.ReadCloser, err error) {
+func getFileIPFS(ctx context.Context, gateways []*url.URL, cid string) (name string, size uint64, content io.ReadCloser, err error) {
 	for _, gateway := range gateways {
-		name, size, content, err = getFileWithUrl(ctx, gateway+cid)
+		url := gateway.JoinPath(cid).String()
+		name, size, content, err = getFileWithUrl(ctx, url)
 		if err == nil {
 			return name, size, content, nil
 		}

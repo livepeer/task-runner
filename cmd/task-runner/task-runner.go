@@ -33,33 +33,45 @@ type cliFlags struct {
 	serverOpts   api.ServerOptions
 }
 
-func URLVarFlag(fs *flag.FlagSet, dest **url.URL, name, value, usage string) {
-	defaultUrl, err := url.Parse(value)
+func parseURL(s string, dest **url.URL) error {
+	u, err := url.Parse(s)
 	if err != nil {
+		return err
+	}
+	if _, err = url.ParseQuery(u.RawQuery); err != nil {
+		return err
+	}
+	*dest = u
+	return nil
+}
+
+func URLVarFlag(fs *flag.FlagSet, dest **url.URL, name, value, usage string) {
+	if err := parseURL(value, dest); err != nil {
 		panic(err)
 	}
-	*dest = defaultUrl
-
 	fs.Func(name, usage, func(s string) error {
-		u, err := url.Parse(s)
-		if err != nil {
-			return err
-		}
-		_, err = url.ParseQuery(u.RawQuery)
-		if err != nil {
-			return err
-		}
-		*dest = u
-		return nil
+		return parseURL(s, dest)
 	})
 }
 
-func StringsVarFlag(fs *flag.FlagSet, dest *[]string, name, value, usage string) {
-	*dest = strings.Split(value, ",")
+func parseURLs(s string, dest *[]*url.URL) error {
+	strs := strings.Split(s, ",")
+	urls := make([]*url.URL, len(strs))
+	for i, str := range strs {
+		if err := parseURL(str, &urls[i]); err != nil {
+			return err
+		}
+	}
+	*dest = urls
+	return nil
+}
 
+func URLSliceVarFlag(fs *flag.FlagSet, dest *[]*url.URL, name, value, usage string) {
+	if err := parseURLs(value, dest); err != nil {
+		panic(err)
+	}
 	fs.Func(name, usage, func(s string) error {
-		*dest = strings.Split(s, ",")
-		return nil
+		return parseURLs(s, dest)
 	})
 }
 
@@ -81,7 +93,7 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihcqgu4rmsrlkqvavkzsnu7h5n66jopckes6u5zrhs3kcffqvylge/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
-	StringsVarFlag(fs, &cli.runnerOpts.ImportIPFSGatewayURLs, "import-ipfs-gateway-urls", "https://w3s.link/ipfs/,https://ipfs.io/ipfs/,https://cloudflare-ipfs.com/ipfs/", "Comma delimited ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from")
+	URLSliceVarFlag(fs, &cli.runnerOpts.ImportIPFSGatewayURLs, "import-ipfs-gateway-urls", "https://w3s.link/ipfs/,https://ipfs.io/ipfs/,https://cloudflare-ipfs.com/ipfs/", "Comma delimited ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from")
 
 	// Server options
 	fs.StringVar(&cli.serverOpts.Host, "host", "localhost", "Hostname to bind to")
