@@ -313,6 +313,7 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 				Type: "object_store",
 				URL:  outURL.JoinPath(hlsRootPlaylistFileName(asset.PlaybackID)).String(),
 				Outputs: &clients.OutputsRequest{
+					SourceSegments:     true,
 					TranscodedSegments: true,
 				},
 			},
