@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -38,7 +39,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		step   = tctx.Step
 		params = *tctx.Task.Params.Upload
 	)
-	inUrl, err := getFileUrl(tctx.OutputOSObj, params)
+	inUrl, err := getFileUrl(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -96,7 +97,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }
 
-func getFileUrl(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
+func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
 	if params.UploadedObjectKey != "" {
 		u, err := url.Parse(os.PublicURL)
 		if err != nil {
@@ -105,10 +106,24 @@ func getFileUrl(os *api.ObjectStore, params api.UploadTaskParams) (string, error
 		u.Path = path.Join(u.Path, params.UploadedObjectKey)
 		return u.String(), nil
 	}
-	if params.URL != "" {
-		return params.URL, nil
+	if params.URL == "" {
+		return "", fmt.Errorf("no URL or uploaded object key specified")
 	}
-	return "", fmt.Errorf("no URL or uploaded object key specified")
+
+	if strings.HasPrefix(params.URL, IPFS_PREFIX) {
+		cid := strings.TrimPrefix(params.URL, IPFS_PREFIX)
+		if len(cfg.ImportIPFSGatewayURLs) == 0 {
+			return "", fmt.Errorf("no IPFS gateways configured")
+		}
+		return cfg.ImportIPFSGatewayURLs[0].JoinPath(cid).String(), nil
+	}
+	if strings.HasPrefix(params.URL, ARWEAVE_PREFIX) {
+		txID := strings.TrimPrefix(params.URL, ARWEAVE_PREFIX)
+		// arweave.net is the main gateway for Arweave right now
+		// In the future, given more gateways, we can receive a config gateway URL similar to what we do for IPFS
+		return "https://arweave.net/" + txID, nil
+	}
+	return params.URL, nil
 }
 
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
