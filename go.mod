@@ -12,7 +12,7 @@ require (
 	github.com/livepeer/livepeer-data v0.4.21-0.20220914205445-86106aae4785
 	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
 	github.com/peterbourgon/ff v1.7.1
-	github.com/prometheus/client_golang v1.13.0
+	github.com/prometheus/client_golang v1.13.1
 	github.com/rabbitmq/amqp091-go v1.5.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	gopkg.in/vansante/go-ffprobe.v2 v2.1.1
