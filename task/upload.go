@@ -38,7 +38,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		step   = tctx.Step
 		params = *tctx.Task.Params.Upload
 	)
-	inUrl, err := getFileUrl(tctx.InputOSObj, params)
+	inUrl, err := getFileUrl(tctx.OutputOSObj, params)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
