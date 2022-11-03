@@ -248,7 +248,7 @@ out:
 	}
 	glog.Infof("Saved file with playbackID=%s to url=%s", outAsset.PlaybackID, videoFilePath)
 
-	metadata, err := Probe(ctx, outAsset.ID, outAsset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()))
+	metadata, err := Probe(ctx, outAsset.ID, outAsset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()), true)
 	if err != nil {
 		return nil, err
 	}

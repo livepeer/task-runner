@@ -50,7 +50,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 
 	// Probe metadata from the source file and save it to object store.
 	input = tctx.Progress.TrackReader(sourceFile, size, 0.11)
-	metadata, err := Probe(ctx, tctx.OutputAsset.ID, filename, input)
+	metadata, err := Probe(ctx, tctx.OutputAsset.ID, filename, input, true)
 	if err != nil {
 		return nil, err
 	}

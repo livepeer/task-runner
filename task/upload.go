@@ -276,7 +276,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		if err != nil {
 			return nil, err
 		}
-		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, input)
+		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, input, false)
 		if err != nil {
 			return nil, err
 		}

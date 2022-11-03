@@ -31,7 +31,7 @@ type FileMetadata struct {
 	CatalystResult *clients.CatalystCallback `json:"catalystResult,omitempty"`
 }
 
-func Probe(ctx context.Context, assetId, filename string, data *ReadCounter) (*FileMetadata, error) {
+func Probe(ctx context.Context, assetId, filename string, data *ReadCounter, strict bool) (*FileMetadata, error) {
 	hasher := NewReadHasher(data)
 	probeData, err := ffprobe.ProbeReader(ctx, hasher)
 	if err != nil {
@@ -42,7 +42,7 @@ func Probe(ctx context.Context, assetId, filename string, data *ReadCounter) (*F
 		return nil, fmt.Errorf("error reading input: %w", err)
 	}
 	size, md5, sha256 := data.Count(), hasher.MD5(), hasher.SHA256()
-	assetSpec, err := toAssetSpec(filename, probeData, size, []api.AssetHash{
+	assetSpec, err := toAssetSpec(filename, strict, probeData, size, []api.AssetHash{
 		{Hash: md5, Algorithm: "md5"},
 		{Hash: sha256, Algorithm: "sha256"}})
 	if err != nil {
@@ -56,11 +56,11 @@ func Probe(ctx context.Context, assetId, filename string, data *ReadCounter) (*F
 	}, nil
 }
 
-func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, hash []api.AssetHash) (*api.AssetSpec, error) {
+func toAssetSpec(filename string, strict bool, probeData *ffprobe.ProbeData, size uint64, hash []api.AssetHash) (*api.AssetSpec, error) {
 	if filename == "" && probeData.Format.Filename != "pipe:" {
 		filename = probeData.Format.Filename
 	}
-	format, err := findFormat(supportedFormats, probeData.Format.FormatName, filename)
+	format, err := findFormat(supportedFormats, probeData.Format.FormatName, filename, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -82,14 +82,14 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 	}
 	var hasVideo, hasAudio bool
 	for _, stream := range probeData.Streams {
-		track, err := toAssetTrack(stream)
+		track, err := toAssetTrack(stream, strict)
 		if err != nil {
 			return nil, err
 		} else if track == nil {
 			continue
 		}
 		if track.Type == "video" {
-			if hasVideo {
+			if hasVideo && strict {
 				return nil, fmt.Errorf("multiple video tracks in file")
 			}
 			hasVideo = true
@@ -100,13 +100,13 @@ func toAssetSpec(filename string, probeData *ffprobe.ProbeData, size uint64, has
 	if !hasVideo {
 		return nil, fmt.Errorf("no video track found in file")
 	}
-	if !hasAudio {
+	if !hasAudio && strict {
 		return nil, fmt.Errorf("no audio track found in file")
 	}
 	return spec, nil
 }
 
-func findFormat(supportedFormats []string, format, filename string) (string, error) {
+func findFormat(supportedFormats []string, format, filename string, strict bool) (string, error) {
 	actualFormats := strings.Split(format, ",")
 	extension := path.Ext(filename)
 	if containsStr(supportedFormats, extension) && containsStr(actualFormats, extension) {
@@ -116,6 +116,9 @@ func findFormat(supportedFormats []string, format, filename string) (string, err
 		if containsStr(actualFormats, f) {
 			return f, nil
 		}
+	}
+	if !strict {
+		return actualFormats[0], nil
 	}
 	return "", fmt.Errorf("unsupported format: %s", format)
 }
@@ -129,19 +132,21 @@ func containsStr(slc []string, val string) bool {
 	return false
 }
 
-func toAssetTrack(stream *ffprobe.Stream) (*api.AssetTrack, error) {
+func toAssetTrack(stream *ffprobe.Stream, strict bool) (*api.AssetTrack, error) {
 	if stream.CodecType == "data" {
 		return nil, nil
-	} else if stream.CodecType != "video" && stream.CodecType != "audio" {
-		return nil, fmt.Errorf("unsupported codec type: %s", stream.CodecType)
-	} else if stream.CodecType == "audio" && !supportedAudioCodecs[stream.CodecName] {
-		return nil, fmt.Errorf("unsupported audio codec: %s", stream.CodecName)
 	} else if stream.CodecType == "video" {
 		if !supportedVideoCodecs[stream.CodecName] {
 			return nil, fmt.Errorf("unsupported video codec: %s", stream.CodecName)
 		}
 		if stream.PixFmt != "" && !supportedPixelFormats[stream.PixFmt] {
 			return nil, fmt.Errorf("unsupported video pixel format: %s", stream.PixFmt)
+		}
+	} else if strict {
+		if stream.CodecType != "video" && stream.CodecType != "audio" {
+			return nil, fmt.Errorf("unsupported codec type: %s", stream.CodecType)
+		} else if stream.CodecType == "audio" && !supportedAudioCodecs[stream.CodecName] {
+			return nil, fmt.Errorf("unsupported audio codec: %s", stream.CodecName)
 		}
 	}
 
