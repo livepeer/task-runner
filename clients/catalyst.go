@@ -70,13 +70,14 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 	if err != nil {
 		return err
 	}
+	var res json.RawMessage
 	err = c.DoRequest(ctx, Request{
 		Method:      "POST",
 		URL:         "/api/vod",
 		Body:        bytes.NewReader(body),
 		ContentType: "application/json",
-	}, nil)
-	glog.Infof("Catalyst upload VOD request: rawReq=%q err=%q reqObj=%+v", body, err, upload)
+	}, &res)
+	glog.Infof("Catalyst upload VOD request: req=%q err=%q res=%q", body, err, string(res))
 	return err
 }
 
