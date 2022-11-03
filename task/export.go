@@ -152,6 +152,16 @@ func nftMetadata(asset *api.Asset, videoCID string, template api.NFTMetadataTemp
 	switch template {
 	default:
 		fallthrough
+	case api.NFTMetadataTemplateFile:
+		return map[string]interface{}{
+			"name":          asset.Name,
+			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
+			"image":         livepeerLogoUrl,
+			"animation_url": videoUrl,
+			"properties": map[string]interface{}{
+				"video": videoUrl,
+			},
+		}
 	case api.NFTMetadataTemplatePlayer:
 		return map[string]interface{}{
 			"name":          asset.Name,
@@ -163,16 +173,6 @@ func nftMetadata(asset *api.Asset, videoCID string, template api.NFTMetadataTemp
 			"properties": map[string]interface{}{
 				"video":                   videoUrl,
 				"com.livepeer.playbackId": asset.PlaybackID,
-			},
-		}
-	case api.NFTMetadataTemplateFile:
-		return map[string]interface{}{
-			"name":          asset.Name,
-			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
-			"image":         livepeerLogoUrl,
-			"animation_url": videoUrl,
-			"properties": map[string]interface{}{
-				"video": videoUrl,
 			},
 		}
 	}
