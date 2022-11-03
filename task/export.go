@@ -126,10 +126,7 @@ func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS,
 		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
 	}
 	if template == "" {
-		template = api.NFTMetadataTemplatePlayer
-		if asset.PlaybackRecordingID == "" {
-			template = api.NFTMetadataTemplateFile
-		}
+		template = api.NFTMetadataTemplateFile
 	}
 	nftMetadata := nftMetadata(asset, videoCID, template, config)
 	mergeJson(nftMetadata, overrides)
