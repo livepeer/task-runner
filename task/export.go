@@ -124,10 +124,7 @@ func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS,
 		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
 	}
 	if template == "" {
-		template = api.NFTMetadataTemplatePlayer
-		if asset.PlaybackRecordingID == "" {
-			template = api.NFTMetadataTemplateFile
-		}
+		template = api.NFTMetadataTemplateFile
 	}
 	nftMetadata := nftMetadata(asset, videoCID, template, config)
 	mergeJson(nftMetadata, overrides)
@@ -150,27 +147,24 @@ func nftMetadata(asset *api.Asset, videoCID string, template api.NFTMetadataTemp
 	switch template {
 	default:
 		fallthrough
-	case api.NFTMetadataTemplatePlayer:
-		return map[string]interface{}{
-			"name":          asset.Name,
-			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
-			"image":         livepeerLogoUrl,
-			"animation_url": buildPlayerUrl(config.PlayerImmutableURL, asset.PlaybackID, true),
-			"external_url":  buildPlayerUrl(config.PlayerExternalURL, asset.PlaybackID, false),
-			// TODO: Consider migrating these to `attributes` instead.
-			"properties": map[string]interface{}{
-				"video":                   videoUrl,
-				"com.livepeer.playbackId": asset.PlaybackID,
-			},
-		}
 	case api.NFTMetadataTemplateFile:
 		return map[string]interface{}{
 			"name":          asset.Name,
 			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
 			"image":         livepeerLogoUrl,
 			"animation_url": videoUrl,
+		}
+	case api.NFTMetadataTemplatePlayer:
+		return map[string]interface{}{
+			"name":          asset.Name,
+			"description":   fmt.Sprintf("Livepeer video from asset %q", asset.Name),
+			"image":         livepeerLogoUrl,
+			"animation_url": buildPlayerUrl(config.PlayerImmutableURL, videoCID, true),
+			"external_url":  buildPlayerUrl(config.PlayerExternalURL, videoCID, false),
+			// TODO: Consider migrating these to `attributes` instead. ref: https://github.com/livepeer/task-runner/pull/82#discussion_r1013538456
 			"properties": map[string]interface{}{
-				"video": videoUrl,
+				"video":                   videoUrl,
+				"com.livepeer.playbackId": asset.PlaybackID,
 			},
 		}
 	}
