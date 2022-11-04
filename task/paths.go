@@ -33,7 +33,7 @@ func extractOSUriFilePath(osUri, playbackID string) (string, error) {
 	if len(parts) != 2 {
 		return "", errors.New("no playback ID in URL path")
 	}
-	return "/" + parts[1], nil
+	return parts[1], nil
 }
 
 func toAssetRelativePath(playbackID string, path string) string {
