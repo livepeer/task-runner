@@ -219,9 +219,6 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 	if err != nil {
 		return nil, err
 	}
-	if videoFilePath != "" {
-		output.VideoFilePath = videoFilePath
-	}
 
 	assetSpecJson, _ = json.Marshal(output.AssetSpec)
 	glog.Infof("Complemented spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, output.AssetSpec, assetSpecJson)
@@ -257,14 +254,13 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		return tctx.Progress.TrackReader(rawSourceFile, size, endProgress), nil
 	}
 
-	var videoFilePath string
 	if !FlagCatalystCopiesSourceFile {
 		input, err := readLocalFile(0.95)
 		if err != nil {
 			return nil, err
 		}
 		fullPath := videoFileName(playbackID)
-		videoFilePath, err = osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
+		fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 		}
@@ -272,7 +268,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 			Type: "source_file",
 			Path: toAssetRelativePath(playbackID, fullPath),
 		})
-		glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
+		glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
 	}
 
 	if tctx.OutputAsset.Storage.IPFS != nil {
@@ -319,7 +315,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
 	}
 	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, callback
-	metadataFileUrl, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
+	_, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("error saving metadata file: %w", err)
 	}
@@ -328,11 +324,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		Path: toAssetRelativePath(playbackID, metadataPath),
 	})
 
-	return &data.UploadTaskOutput{
-		VideoFilePath:    videoFilePath,
-		MetadataFilePath: metadataFileUrl,
-		AssetSpec:        assetSpec,
-	}, nil
+	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
