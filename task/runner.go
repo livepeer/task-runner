@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -40,6 +41,7 @@ type TaskContext struct {
 	*runner
 	data.TaskInfo
 	*api.Task
+	Progress                *ProgressReporter
 	InputAsset, OutputAsset *api.Asset
 	InputOSObj, OutputOSObj *api.ObjectStore
 	inputOS, outputOS       drivers.OSSession
@@ -186,6 +188,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 	if err != nil {
 		return nil, fmt.Errorf("error building task context: %w", err)
 	}
+	defer taskCtx.Progress.Stop()
 	taskType, taskID := taskCtx.Task.Type, taskCtx.Task.ID
 
 	handler, ok := r.TaskHandlers[strings.ToLower(taskType)]
@@ -193,13 +196,15 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
-	if taskCtx.Status.Phase == api.TaskPhaseRunning && taskCtx.Step == "" {
-		return nil, errors.New("task has already been started before")
-	}
-	err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
-	if err != nil {
-		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
-		// execute the task anyway
+	if isFirstStep := taskCtx.Step == ""; isFirstStep {
+		if taskCtx.Status.Phase == api.TaskPhaseRunning {
+			return nil, errors.New("task has already been started before")
+		}
+		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
+		if err != nil {
+			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
+			// execute the task anyway
+		}
 	}
 
 	glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
@@ -232,7 +237,8 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	if err != nil {
 		return nil, err
 	}
-	return &TaskContext{ctx, r, info, task, inputAsset, outputAsset, inputOSObj, outputOSObj, inputOS, outputOS}, nil
+	progress := NewProgressReporter(ctx, r.lapi, task.ID)
+	return &TaskContext{ctx, r, info, task, progress, inputAsset, outputAsset, inputOSObj, outputOSObj, inputOS, outputOS}, nil
 }
 
 func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, drivers.OSSession, error) {
@@ -265,17 +271,19 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	if task.Status.Phase != api.TaskPhaseRunning {
 		return fmt.Errorf("task %s is not running", taskId)
 	}
-	progress := 0.95 * callback.CompletionRatio
-	err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
-	if err != nil {
-		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
+	progress := 0.9 * callback.CompletionRatio
+	progress = math.Round(progress*1000) / 1000
+	// Catalyst currently sends non monotonic progress updates, so we only update
+	// the progress if it's higher than the current one
+	if progress > task.Status.Progress {
+		err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
+		if err != nil {
+			glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
+		}
 	}
 	if callback.Status == clients.CatalystStatusError {
-		err := fmt.Errorf("got catalyst error: %s", callback.Error)
-		if callback.Unretriable {
-			err = UnretriableError{err}
-		}
-		return r.publishTaskResult(ctx, taskInfo, nil, err)
+		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
+		return r.publishTaskResult(ctx, taskInfo, nil, catalystError(callback))
 	} else if callback.Status == clients.CatalystStatusSuccess {
 		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
 	}
@@ -407,6 +415,17 @@ func humanizeError(err error) error {
 		return errors.New("execution timeout")
 	}
 
+	return err
+}
+
+func catalystError(callback *clients.CatalystCallback) error {
+	// TODO: Let some errors passthrough here e.g. user input errors
+	err := fmt.Errorf("catalyst error: %s", callback.Error)
+	// TODO: Bring back the filtered error
+	// err := errors.New("internal error catalysing file")
+	if callback.Unretriable {
+		err = UnretriableError{err}
+	}
 	return err
 }
 

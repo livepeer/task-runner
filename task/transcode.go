@@ -188,9 +188,7 @@ func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	err = nil
 	accumulator := NewAccumulator()
-	progressCtx, cancelProgress := context.WithCancel(ctx)
-	defer cancelProgress()
-	go ReportProgress(progressCtx, lapi, tctx.Task.ID, uint64(sourceFileSize), accumulator.Size, 0, 0.5)
+	tctx.Progress.TrackCount(accumulator.Size, uint64(sourceFileSize), 0.5)
 out:
 	for seg := range segmentsIn {
 		if seg.Err == io.EOF {
@@ -250,16 +248,15 @@ out:
 	}
 	glog.Infof("Saved file with playbackID=%s to url=%s", outAsset.PlaybackID, videoFilePath)
 
-	metadata, err := Probe(ctx, outAsset.ID, outAsset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()))
+	metadata, err := Probe(ctx, outAsset.ID, outAsset.Name+"_"+tctx.Params.Transcode.Profile.Name, NewReadCounter(ws.Reader()), true)
 	if err != nil {
 		return nil, err
 	}
-	metadataFilePath, err := saveMetadataFile(ctx, tctx.outputOS, outAsset.PlaybackID, metadata)
+	metadataFilePath, _, err := saveMetadataFile(ctx, tctx.outputOS, outAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, err
 	}
-	cancelProgress()
-	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader(), 0.5)
+	playbackRecordingId, err := Prepare(tctx.WithContext(ctx), metadata.AssetSpec, ws.Reader())
 	if err != nil {
 		glog.Errorf("Error preparing file assetId=%s taskType=transcode err=%q", tctx.OutputAsset.ID, err)
 		return nil, fmt.Errorf("error preparing asset: %w", err)
