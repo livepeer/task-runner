@@ -420,8 +420,9 @@ func humanizeError(err error) error {
 
 func catalystError(callback *clients.CatalystCallback) error {
 	// TODO: Let some errors passthrough here e.g. user input errors
-	// err := fmt.Errorf("catalyst error: %s", callback.Error)
-	err := errors.New("internal error catalysing file")
+	err := fmt.Errorf("catalyst error: %s", callback.Error)
+	// TODO: Bring back the filtered error
+	// err := errors.New("internal error catalysing file")
 	if callback.Unretriable {
 		err = UnretriableError{err}
 	}
