@@ -273,9 +273,13 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	}
 	progress := 0.9 * callback.CompletionRatio
 	progress = math.Round(progress*1000) / 1000
-	err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
-	if err != nil {
-		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
+	// Catalyst currently sends non monotonic progress updates, so we only update
+	// the progress if it's higher than the current one
+	if progress > task.Status.Progress {
+		err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
+		if err != nil {
+			glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
+		}
 	}
 	if callback.Status == clients.CatalystStatusError {
 		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
