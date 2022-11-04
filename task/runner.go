@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -271,6 +272,7 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 		return fmt.Errorf("task %s is not running", taskId)
 	}
 	progress := 0.9 * callback.CompletionRatio
+	progress = math.Round(progress*1000) / 1000
 	err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
 	if err != nil {
 		glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
