@@ -252,7 +252,7 @@ out:
 	if err != nil {
 		return nil, err
 	}
-	metadataFilePath, err := saveMetadataFile(ctx, tctx.outputOS, outAsset.PlaybackID, metadata)
+	metadataFilePath, _, err := saveMetadataFile(ctx, tctx.outputOS, outAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, err
 	}

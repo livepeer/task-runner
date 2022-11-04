@@ -163,8 +163,11 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		return nil, fmt.Errorf("error getting asset output requests: %w", err)
 	}
 
-	var videoFilePath string
-	var isMockResult bool
+	var (
+		playbackID    = tctx.OutputAsset.PlaybackID
+		videoFilePath string
+		isMockResult  bool
+	)
 	for idx, output := range callback.Outputs {
 		// TODO: Remove this once catalyst returns real data
 		if output.Type == "google-s3" || output.Type == "google-s4" {
@@ -176,6 +179,10 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		if output.Type != outReq.Type {
 			return nil, fmt.Errorf("output type mismatch: %s != %s", output.Type, outReq.Type)
 		}
+		manifestPath, err := extractOSUriFilePath(output.Manifest, playbackID)
+		if err != nil {
+			return nil, fmt.Errorf("error extracting file path from output manifest: %w", err)
+		}
 		switch outName {
 		case OutputNameOSSourceMP4:
 			if len(output.Videos) != 1 {
@@ -186,9 +193,16 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 				return nil, fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
 			}
 			videoFilePath = video.Location
+			assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+				Type: "source_file",
+				Path: manifestPath,
+			})
 		case OutputNameOSPlaylistHLS:
-			// TODO: We don't really know how to handle this yet. Just log
 			glog.Infof("Received OS HLS playlist output! taskId=%s manifest=%q output=%+v", tctx.Task.ID, output.Manifest, output)
+			assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+				Type: "catalyst_hls_manifest",
+				Path: manifestPath,
+			})
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
 		default:
@@ -198,6 +212,8 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 	if FlagCatalystCopiesSourceFile && videoFilePath == "" {
 		return nil, fmt.Errorf("no video file path found in catalyst output")
 	}
+	assetSpecJson, _ := json.Marshal(assetSpec)
+	glog.Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, assetSpec, assetSpecJson)
 
 	output, err := complementCatalystPipeline(tctx, *assetSpec, callback)
 	if err != nil {
@@ -207,8 +223,8 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		output.VideoFilePath = videoFilePath
 	}
 
-	assetSpecJson, _ := json.Marshal(assetSpec)
-	glog.Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, assetSpec, assetSpecJson)
+	assetSpecJson, _ = json.Marshal(output.AssetSpec)
+	glog.Infof("Complemented spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, output.AssetSpec, assetSpecJson)
 	if isMockResult {
 		return nil, UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
 	}
@@ -252,6 +268,10 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		if err != nil {
 			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 		}
+		assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+			Type: "source_file",
+			Path: toAssetRelativePath(playbackID, fullPath),
+		})
 		glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
 	}
 
@@ -299,14 +319,18 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
 	}
 	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, callback
-	metadataFilePath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
+	metadataFileUrl, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("error saving metadata file: %w", err)
 	}
+	assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+		Type: "metadata",
+		Path: toAssetRelativePath(playbackID, metadataPath),
+	})
 
 	return &data.UploadTaskOutput{
 		VideoFilePath:    videoFilePath,
-		MetadataFilePath: metadataFilePath,
+		MetadataFilePath: metadataFileUrl,
 		AssetSpec:        assetSpec,
 	}, nil
 }

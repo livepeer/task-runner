@@ -54,7 +54,7 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	metadataFilePath, err := saveMetadataFile(ctx, osSess, playbackID, metadata)
+	metadataFilePath, _, err := saveMetadataFile(ctx, osSess, playbackID, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -183,15 +183,15 @@ func filename(req *http.Request, resp *http.Response) string {
 	return ""
 }
 
-func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata interface{}) (string, error) {
-	fullPath := metadataFileName(playbackID)
+func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata interface{}) (string, string, error) {
+	path := metadataFileName(playbackID)
 	raw, err := json.Marshal(metadata)
 	if err != nil {
-		return "", fmt.Errorf("error marshaling file metadat: %w", err)
+		return "", "", fmt.Errorf("error marshaling file metadat: %w", err)
 	}
-	path, err := osSess.SaveData(ctx, fullPath, bytes.NewReader(raw), nil, fileUploadTimeout)
+	fullPath, err := osSess.SaveData(ctx, path, bytes.NewReader(raw), nil, fileUploadTimeout)
 	if err != nil {
-		return "", fmt.Errorf("error saving metadata file: %w", err)
+		return "", "", fmt.Errorf("error saving metadata file: %w", err)
 	}
-	return path, nil
+	return fullPath, path, nil
 }
