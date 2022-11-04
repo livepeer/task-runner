@@ -108,8 +108,7 @@ func (p *ProgressReporter) reportOnce() {
 		glog.Errorf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", p.taskID, p.lastProgress, progress)
 		return
 	}
-	if time.Since(p.lastReport) < minProgressReportInterval &&
-		progressBucket(progress) == progressBucket(p.lastProgress) {
+	if !shouldReportProgress(progress, p.lastProgress, p.lastReport) {
 		return
 	}
 	if err := p.lapi.UpdateTaskStatus(p.taskID, "running", progress); err != nil {
@@ -117,6 +116,11 @@ func (p *ProgressReporter) reportOnce() {
 		return
 	}
 	p.lastReport, p.lastProgress = time.Now(), progress
+}
+
+func shouldReportProgress(new, old float64, lastReportedAt time.Time) bool {
+	return progressBucket(new) != progressBucket(old) ||
+		time.Since(lastReportedAt) >= minProgressReportInterval
 }
 
 func (p *ProgressReporter) calcProgress() float64 {

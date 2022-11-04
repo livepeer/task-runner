@@ -273,9 +273,10 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	}
 	progress := 0.9 * callback.CompletionRatio
 	progress = math.Round(progress*1000) / 1000
+	currProgress, taskUpdatedAt := task.Status.Progress, data.NewUnixMillisTime(task.Status.UpdatedAt)
 	// Catalyst currently sends non monotonic progress updates, so we only update
 	// the progress if it's higher than the current one
-	if progress > task.Status.Progress {
+	if progress > currProgress && shouldReportProgress(progress, currProgress, taskUpdatedAt.Time) {
 		err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
 		if err != nil {
 			glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
