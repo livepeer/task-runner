@@ -145,6 +145,10 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 	if err != nil {
 		return fmt.Errorf("error binding delayed queue: %w", err)
 	}
+	err = c.Qos(maxConcurrentTasks, 0, false)
+	if err != nil {
+		return fmt.Errorf("error setting QoS: %w", err)
+	}
 	return nil
 }
 
