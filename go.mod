@@ -9,7 +9,7 @@ require (
 	github.com/livepeer/go-api-client v0.3.2-0.20221103235537-f7f043e34b90
 	github.com/livepeer/go-tools v0.0.0-20220805063103-76df6beb6506
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
-	github.com/livepeer/livepeer-data v0.5.1-0.20221114214709-c6aa7ae5b78b
+	github.com/livepeer/livepeer-data v0.5.2
 	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
 	github.com/peterbourgon/ff v1.7.1
 	github.com/prometheus/client_golang v1.13.0
