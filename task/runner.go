@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	globalTaskTimeout     = 10 * time.Minute
-	minTaskProcessingTime = 5 * time.Second
-	maxConcurrentTasks    = 3
+	defaultGlobalTaskTimeout     = 10 * time.Minute
+	defaultMinTaskProcessingTime = 5 * time.Second
+	defaultMaxConcurrentTasks    = 3
 )
 
 var ErrYieldExecution = errors.New("yield execution")
@@ -63,8 +63,13 @@ type Runner interface {
 type RunnerOptions struct {
 	AMQPUri                 string
 	ExchangeName, QueueName string
-	LivepeerAPIOptions      api.ClientOptions
-	Catalyst                *clients.CatalystOptions
+
+	MinTaskProcessingTime time.Duration
+	MaxTaskProcessingTime time.Duration
+	MaxConcurrentTasks    int
+
+	LivepeerAPIOptions api.ClientOptions
+	Catalyst           *clients.CatalystOptions
 	ExportTaskConfig
 	ImportTaskConfig
 
@@ -74,6 +79,15 @@ type RunnerOptions struct {
 func NewRunner(opts RunnerOptions) Runner {
 	if opts.TaskHandlers == nil {
 		opts.TaskHandlers = defaultTasks
+	}
+	if opts.MinTaskProcessingTime == 0 {
+		opts.MinTaskProcessingTime = defaultMinTaskProcessingTime
+	}
+	if opts.MaxTaskProcessingTime == 0 {
+		opts.MaxTaskProcessingTime = defaultGlobalTaskTimeout
+	}
+	if opts.MaxConcurrentTasks == 0 {
+		opts.MaxConcurrentTasks = defaultMaxConcurrentTasks
 	}
 	return &runner{
 		RunnerOptions:   opts,
@@ -106,7 +120,7 @@ func (r *runner) Start() error {
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
-	err = amqp.Consume(r.QueueName, maxConcurrentTasks, r.handleAMQPMessage)
+	err = amqp.Consume(r.QueueName, r.MaxConcurrentTasks, r.handleAMQPMessage)
 	if err != nil {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
@@ -145,7 +159,7 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 	if err != nil {
 		return fmt.Errorf("error binding delayed queue: %w", err)
 	}
-	err = c.Qos(maxConcurrentTasks, 0, false)
+	err = c.Qos(r.MaxConcurrentTasks, 0, false)
 	if err != nil {
 		return fmt.Errorf("error setting QoS: %w", err)
 	}
@@ -154,7 +168,10 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 
 func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	// rate-limit message processing time to limit load
-	defer blockUntil(time.After(minTaskProcessingTime))
+	defer blockUntil(time.After(r.MinTaskProcessingTime))
+
+	ctx, cancel := context.WithTimeout(context.Background(), r.MaxTaskProcessingTime)
+	defer cancel()
 
 	task, err := parseTaskInfo(msg)
 	if err != nil {
@@ -162,8 +179,6 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
-	defer cancel()
 	output, err := r.handleTask(ctx, task)
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
