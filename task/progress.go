@@ -105,7 +105,9 @@ func (p *ProgressReporter) reportOnce() {
 
 	progress := p.calcProgress()
 	if progress <= p.lastProgress {
-		glog.Errorf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", p.taskID, p.lastProgress, progress)
+		if progress < p.lastProgress {
+			glog.Warningf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", p.taskID, p.lastProgress, progress)
+		}
 		return
 	}
 	if !shouldReportProgress(progress, p.lastProgress, p.lastReport) {
