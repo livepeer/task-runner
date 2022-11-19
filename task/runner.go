@@ -303,7 +303,8 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	}
 	if callback.Status == clients.CatalystStatusError {
 		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
-		return r.publishTaskResult(ctx, taskInfo, nil, catalystError(callback))
+		err := NewCatalystError(callback.Error, callback.Unretriable)
+		return r.publishTaskResult(ctx, taskInfo, nil, err)
 	} else if callback.Status == clients.CatalystStatusSuccess {
 		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
 	}
@@ -407,6 +408,11 @@ func humanizeError(err error) error {
 		return nil
 	}
 
+	var catErr CatalystError
+	if errors.As(err, &catErr) {
+		return errors.New("internal error processing file")
+	}
+
 	errMsg := strings.ToLower(err.Error())
 
 	if strings.Contains(errMsg, "unexpected eof") {
@@ -435,17 +441,6 @@ func humanizeError(err error) error {
 		return errors.New("execution timeout")
 	}
 
-	return err
-}
-
-func catalystError(callback *clients.CatalystCallback) error {
-	// TODO: Let some errors passthrough here e.g. user input errors
-	err := fmt.Errorf("catalyst error: %s", callback.Error)
-	// TODO: Bring back the filtered error
-	// err := errors.New("internal error catalysing file")
-	if callback.Unretriable {
-		err = UnretriableError{err}
-	}
 	return err
 }
 
