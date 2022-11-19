@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	defaultGlobalTaskTimeout     = 10 * time.Minute
-	defaultMinTaskProcessingTime = 5 * time.Second
-	defaultMaxConcurrentTasks    = 3
+	DefaultMaxTaskProcessingTime = 10 * time.Minute
+	DefaultMinTaskProcessingTime = 5 * time.Second
+	DefaultMaxConcurrentTasks    = 3
 )
 
 var ErrYieldExecution = errors.New("yield execution")
@@ -81,13 +81,13 @@ func NewRunner(opts RunnerOptions) Runner {
 		opts.TaskHandlers = defaultTasks
 	}
 	if opts.MinTaskProcessingTime == 0 {
-		opts.MinTaskProcessingTime = defaultMinTaskProcessingTime
+		opts.MinTaskProcessingTime = DefaultMinTaskProcessingTime
 	}
 	if opts.MaxTaskProcessingTime == 0 {
-		opts.MaxTaskProcessingTime = defaultGlobalTaskTimeout
+		opts.MaxTaskProcessingTime = DefaultMaxTaskProcessingTime
 	}
 	if opts.MaxConcurrentTasks == 0 {
-		opts.MaxConcurrentTasks = defaultMaxConcurrentTasks
+		opts.MaxConcurrentTasks = DefaultMaxConcurrentTasks
 	}
 	return &runner{
 		RunnerOptions:   opts,
