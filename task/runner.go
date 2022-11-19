@@ -67,6 +67,7 @@ type RunnerOptions struct {
 	MinTaskProcessingTime time.Duration
 	MaxTaskProcessingTime time.Duration
 	MaxConcurrentTasks    int
+	HumanizeErrors        bool
 
 	LivepeerAPIOptions api.ClientOptions
 	Catalyst           *clients.CatalystOptions
@@ -340,7 +341,9 @@ func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, inpu
 }
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, resultErr error) error {
-	resultErr = humanizeError(resultErr)
+	if r.HumanizeErrors {
+		resultErr = humanizeError(resultErr)
+	}
 	key, body := fmt.Sprintf("task.result.%s.%s", task.Type, task.ID), data.NewTaskResultEvent(task, errorInfo(resultErr), output)
 	if err := r.publishLogged(ctx, task, r.ExchangeName, key, body); err != nil {
 		return fmt.Errorf("error publishing task result event: %w", err)
