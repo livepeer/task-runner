@@ -413,6 +413,9 @@ func humanizeError(err error) error {
 
 	var catErr CatalystError
 	if errors.As(err, &catErr) {
+		if strings.Contains(catErr.Error(), "Unsupported input pixel format") {
+			return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
+		}
 		return errors.New("internal error processing file")
 	}
 
