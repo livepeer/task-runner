@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	globalTaskTimeout     = 10 * time.Minute
-	minTaskProcessingTime = 5 * time.Second
-	maxConcurrentTasks    = 3
+	DefaultMaxTaskProcessingTime = 10 * time.Minute
+	DefaultMinTaskProcessingTime = 5 * time.Second
+	DefaultMaxConcurrentTasks    = 3
 )
 
 var ErrYieldExecution = errors.New("yield execution")
@@ -63,8 +63,14 @@ type Runner interface {
 type RunnerOptions struct {
 	AMQPUri                 string
 	ExchangeName, QueueName string
-	LivepeerAPIOptions      api.ClientOptions
-	Catalyst                *clients.CatalystOptions
+
+	MinTaskProcessingTime time.Duration
+	MaxTaskProcessingTime time.Duration
+	MaxConcurrentTasks    uint
+	HumanizeErrors        bool
+
+	LivepeerAPIOptions api.ClientOptions
+	Catalyst           *clients.CatalystOptions
 	ExportTaskConfig
 	ImportTaskConfig
 
@@ -74,6 +80,15 @@ type RunnerOptions struct {
 func NewRunner(opts RunnerOptions) Runner {
 	if opts.TaskHandlers == nil {
 		opts.TaskHandlers = defaultTasks
+	}
+	if opts.MinTaskProcessingTime == 0 {
+		opts.MinTaskProcessingTime = DefaultMinTaskProcessingTime
+	}
+	if opts.MaxTaskProcessingTime == 0 {
+		opts.MaxTaskProcessingTime = DefaultMaxTaskProcessingTime
+	}
+	if opts.MaxConcurrentTasks == 0 {
+		opts.MaxConcurrentTasks = DefaultMaxConcurrentTasks
 	}
 	return &runner{
 		RunnerOptions:   opts,
@@ -106,7 +121,7 @@ func (r *runner) Start() error {
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
-	err = amqp.Consume(r.QueueName, maxConcurrentTasks, r.handleAMQPMessage)
+	err = amqp.Consume(r.QueueName, int(r.MaxConcurrentTasks), r.handleAMQPMessage)
 	if err != nil {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
@@ -145,7 +160,7 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 	if err != nil {
 		return fmt.Errorf("error binding delayed queue: %w", err)
 	}
-	err = c.Qos(maxConcurrentTasks, 0, false)
+	err = c.Qos(int(r.MaxConcurrentTasks), 0, false)
 	if err != nil {
 		return fmt.Errorf("error setting QoS: %w", err)
 	}
@@ -154,7 +169,10 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 
 func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	// rate-limit message processing time to limit load
-	defer blockUntil(time.After(minTaskProcessingTime))
+	defer blockUntil(time.After(r.MinTaskProcessingTime))
+
+	ctx, cancel := context.WithTimeout(context.Background(), r.MaxTaskProcessingTime)
+	defer cancel()
 
 	task, err := parseTaskInfo(msg)
 	if err != nil {
@@ -162,8 +180,6 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), globalTaskTimeout)
-	defer cancel()
 	output, err := r.handleTask(ctx, task)
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
@@ -288,7 +304,8 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, c
 	}
 	if callback.Status == clients.CatalystStatusError {
 		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
-		return r.publishTaskResult(ctx, taskInfo, nil, catalystError(callback))
+		err := NewCatalystError(callback.Error, callback.Unretriable)
+		return r.publishTaskResult(ctx, taskInfo, nil, err)
 	} else if callback.Status == clients.CatalystStatusSuccess {
 		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
 	}
@@ -324,7 +341,9 @@ func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, inpu
 }
 
 func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, resultErr error) error {
-	resultErr = humanizeError(resultErr)
+	if r.HumanizeErrors {
+		resultErr = humanizeError(resultErr)
+	}
 	key, body := fmt.Sprintf("task.result.%s.%s", task.Type, task.ID), data.NewTaskResultEvent(task, errorInfo(resultErr), output)
 	if err := r.publishLogged(ctx, task, r.ExchangeName, key, body); err != nil {
 		return fmt.Errorf("error publishing task result event: %w", err)
@@ -391,8 +410,15 @@ func humanizeError(err error) error {
 	if err == nil {
 		return nil
 	}
-
 	errMsg := strings.ToLower(err.Error())
+
+	var catErr CatalystError
+	if errors.As(err, &catErr) {
+		if strings.Contains(errMsg, "unsupported input pixel format") {
+			return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
+		}
+		return errors.New("internal error processing file")
+	}
 
 	if strings.Contains(errMsg, "unexpected eof") {
 		return errors.New("file download failed")
@@ -420,17 +446,6 @@ func humanizeError(err error) error {
 		return errors.New("execution timeout")
 	}
 
-	return err
-}
-
-func catalystError(callback *clients.CatalystCallback) error {
-	// TODO: Let some errors passthrough here e.g. user input errors
-	err := fmt.Errorf("catalyst error: %s", callback.Error)
-	// TODO: Bring back the filtered error
-	// err := errors.New("internal error catalysing file")
-	if callback.Unretriable {
-		err = UnretriableError{err}
-	}
 	return err
 }
 
