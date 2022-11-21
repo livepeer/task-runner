@@ -66,7 +66,7 @@ type RunnerOptions struct {
 
 	MinTaskProcessingTime time.Duration
 	MaxTaskProcessingTime time.Duration
-	MaxConcurrentTasks    int
+	MaxConcurrentTasks    uint
 	HumanizeErrors        bool
 
 	LivepeerAPIOptions api.ClientOptions
@@ -121,7 +121,7 @@ func (r *runner) Start() error {
 	if err != nil {
 		return fmt.Errorf("error creating AMQP consumer: %w", err)
 	}
-	err = amqp.Consume(r.QueueName, r.MaxConcurrentTasks, r.handleAMQPMessage)
+	err = amqp.Consume(r.QueueName, int(r.MaxConcurrentTasks), r.handleAMQPMessage)
 	if err != nil {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
@@ -160,7 +160,7 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 	if err != nil {
 		return fmt.Errorf("error binding delayed queue: %w", err)
 	}
-	err = c.Qos(r.MaxConcurrentTasks, 0, false)
+	err = c.Qos(int(r.MaxConcurrentTasks), 0, false)
 	if err != nil {
 		return fmt.Errorf("error setting QoS: %w", err)
 	}

@@ -90,7 +90,7 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange")
 	fs.DurationVar(&cli.runnerOpts.MinTaskProcessingTime, "min-task-processing-time", task.DefaultMinTaskProcessingTime, "Minimum time that a task processing must take as rate-limiting strategy. If the task finishes earlier, the runner will wait for the remaining time before starting another task")
 	fs.DurationVar(&cli.runnerOpts.MaxTaskProcessingTime, "max-task-processing-time", task.DefaultMaxTaskProcessingTime, "Timeout for task processing. If the task is not completed within this time it will be marked as failed")
-	fs.IntVar(&cli.runnerOpts.MaxConcurrentTasks, "max-concurrent-tasks", task.DefaultMaxConcurrentTasks, "Maximum number of tasks to run simultaneously")
+	fs.UintVar(&cli.runnerOpts.MaxConcurrentTasks, "max-concurrent-tasks", task.DefaultMaxConcurrentTasks, "Maximum number of tasks to run simultaneously")
 	fs.BoolVar(&cli.runnerOpts.HumanizeErrors, "humanize-errors", true, "Whether to process task error messages into human-friendlier ones")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
