@@ -410,16 +410,15 @@ func humanizeError(err error) error {
 	if err == nil {
 		return nil
 	}
+	errMsg := strings.ToLower(err.Error())
 
 	var catErr CatalystError
 	if errors.As(err, &catErr) {
-		if strings.Contains(catErr.Error(), "Unsupported input pixel format") {
+		if strings.Contains(errMsg, "unsupported input pixel format") {
 			return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
 		}
 		return errors.New("internal error processing file")
 	}
-
-	errMsg := strings.ToLower(err.Error())
 
 	if strings.Contains(errMsg, "unexpected eof") {
 		return errors.New("file download failed")
