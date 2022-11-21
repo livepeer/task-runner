@@ -120,7 +120,7 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS,
 	asset *api.Asset, videoCID string, template api.NFTMetadataTemplate,
 	overrides map[string]interface{}, config ExportTaskConfig) (string, error) {
-	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackRecordingID == "" {
+	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackURL == "" {
 		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
 	}
 	if template == "" {
