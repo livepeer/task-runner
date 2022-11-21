@@ -7,7 +7,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/livepeer/catalyst-api v0.0.12
 	github.com/livepeer/go-api-client v0.3.2-0.20221103235537-f7f043e34b90
-	github.com/livepeer/go-tools v0.0.0-20221115155924-5c5eee72e093
+	github.com/livepeer/go-tools v0.1.0
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
 	github.com/livepeer/livepeer-data v0.5.2
 	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
