@@ -56,7 +56,7 @@ func (t *TaskContext) WithContext(ctx context.Context) *TaskContext {
 
 type Runner interface {
 	Start() error
-	HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error
+	HandleCatalysis(ctx context.Context, taskId, nextStep string, retries *int, callback *clients.CatalystCallback) error
 	Shutdown(ctx context.Context) error
 }
 
@@ -281,15 +281,19 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, dr
 	return asset, objectStore, osSession, nil
 }
 
-func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error {
+func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, retries *int, callback *clients.CatalystCallback) error {
 	taskInfo, task, err := r.getTaskInfo(taskId, "catalysis", nil)
 	if err != nil {
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
 	}
 	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q rawCallback=%+v",
 		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error, *callback)
-	if task.Status.Phase != api.TaskPhaseRunning {
+	if task.Status.Phase != api.TaskPhaseRunning &&
+		task.Status.Phase != api.TaskPhaseWaiting {
 		return fmt.Errorf("task %s is not running", taskId)
+	} else if retries != nil && *retries != task.Status.Retries {
+		return fmt.Errorf("outdated catalyst job callback, "+
+			"task has already been retried (callback: %d current: %d)", *retries, task.Status.Retries)
 	}
 	progress := 0.9 * callback.CompletionRatio
 	progress = math.Round(progress*1000) / 1000
