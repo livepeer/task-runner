@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/livepeer/catalyst-api/clients"
@@ -48,7 +49,7 @@ type CatalystCallback = clients.TranscodeStatusCompletedMessage
 
 type Catalyst interface {
 	UploadVOD(ctx context.Context, upload UploadVODRequest) error
-	CatalystHookURL(taskId, nextStep string) string
+	CatalystHookURL(taskId, nextStep string, attemptID int) string
 }
 
 func NewCatalyst(opts CatalystOptions) Catalyst {
@@ -83,11 +84,12 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 
 // Catalyst hook helpers
 
-func (c *catalyst) CatalystHookURL(taskId, nextStep string) string {
+func (c *catalyst) CatalystHookURL(taskId, nextStep string, attemptID int) string {
 	// Own base URL already includes root path, so no need to add it
 	hookURL := c.OwnBaseURL.JoinPath(CatalystHookPath("", taskId))
 	query := hookURL.Query()
 	query.Set("nextStep", nextStep)
+	query.Set("attemptId", strconv.Itoa(attemptID))
 	hookURL.RawQuery = query.Encode()
 	return hookURL.String()
 }

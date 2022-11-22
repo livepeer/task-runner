@@ -51,7 +51,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		uploadReq := clients.UploadVODRequest{
 			Url:             inUrl,
-			CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize"),
+			CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", tctx.Status.Retries),
 			OutputLocations: outputLocations,
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
