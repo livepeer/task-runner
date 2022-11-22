@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -64,19 +63,12 @@ func (h *apiHandler) healthcheck(rw http.ResponseWriter, r *http.Request) {
 func (h *apiHandler) catalystHook(rw http.ResponseWriter, r *http.Request) {
 	taskId := httprouter.ParamsFromContext(r.Context()).ByName("id")
 	nextStep := r.URL.Query().Get("nextStep")
-	attemptIDStr := r.URL.Query().Get("attemptId")
+	attemptID := r.URL.Query().Get("attemptId")
 
 	var payload *clients.CatalystCallback
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		respondError(r, rw, http.StatusBadRequest, err)
 		return
-	}
-	var attemptID *int
-	if attemptIDStr != "" {
-		id, err := strconv.Atoi(attemptIDStr)
-		if err == nil {
-			attemptID = &id
-		}
 	}
 
 	err := h.runner.HandleCatalysis(r.Context(), taskId, nextStep, attemptID, payload)
