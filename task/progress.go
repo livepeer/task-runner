@@ -110,7 +110,7 @@ func (p *ProgressReporter) reportOnce() {
 		}
 		return
 	}
-	if !shouldReportProgress(progress, p.lastProgress, p.lastReport) {
+	if !shouldReportProgress(progress, p.lastProgress, p.taskID, p.lastReport) {
 		return
 	}
 	if err := p.lapi.UpdateTaskStatus(p.taskID, "running", progress); err != nil {
@@ -120,10 +120,13 @@ func (p *ProgressReporter) reportOnce() {
 	p.lastReport, p.lastProgress = time.Now(), progress
 }
 
-func shouldReportProgress(new, old float64, lastReportedAt time.Time) bool {
+func shouldReportProgress(new, old float64, taskID string, lastReportedAt time.Time) bool {
 	// Catalyst currently sends non monotonic progress updates, so we only update
-	// the progress if it's equal or higher than the current one.
-	if old >= new {
+	// the progress if it's higher than the current one.
+	if new <= old {
+		if new < old {
+			glog.Warningf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", taskID, old, new)
+		}
 		return false
 	}
 	return progressBucket(new) != progressBucket(old) ||
