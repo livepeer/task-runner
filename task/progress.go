@@ -122,11 +122,9 @@ func (p *ProgressReporter) reportOnce() {
 
 func shouldReportProgress(new, old float64, taskID string, lastReportedAt time.Time) bool {
 	// Catalyst currently sends non monotonic progress updates, so we only update
-	// the progress if it's higher than the current one.
-	if new <= old {
-		if new < old {
-			glog.Warningf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", taskID, old, new)
-		}
+	// the progress if the new value is not less than the old one.
+	if new < old {
+		glog.Warningf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", taskID, old, new)
 		return false
 	}
 	return progressBucket(new) != progressBucket(old) ||
