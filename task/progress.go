@@ -121,6 +121,11 @@ func (p *ProgressReporter) reportOnce() {
 }
 
 func shouldReportProgress(new, old float64, lastReportedAt time.Time) bool {
+	// Catalyst currently sends non monotonic progress updates, so we only update
+	// the progress if it's equal or higher than the current one.
+	if old >= new {
+		return false
+	}
 	return progressBucket(new) != progressBucket(old) ||
 		time.Since(lastReportedAt) >= minProgressReportInterval
 }
