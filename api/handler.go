@@ -63,6 +63,7 @@ func (h *apiHandler) healthcheck(rw http.ResponseWriter, r *http.Request) {
 func (h *apiHandler) catalystHook(rw http.ResponseWriter, r *http.Request) {
 	taskId := httprouter.ParamsFromContext(r.Context()).ByName("id")
 	nextStep := r.URL.Query().Get("nextStep")
+	attemptID := r.URL.Query().Get("attemptId")
 
 	var payload *clients.CatalystCallback
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -70,7 +71,7 @@ func (h *apiHandler) catalystHook(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.runner.HandleCatalysis(r.Context(), taskId, nextStep, payload)
+	err := h.runner.HandleCatalysis(r.Context(), taskId, nextStep, attemptID, payload)
 	if err != nil {
 		respondError(r, rw, http.StatusInternalServerError, err)
 		return

@@ -48,7 +48,7 @@ type CatalystCallback = clients.TranscodeStatusCompletedMessage
 
 type Catalyst interface {
 	UploadVOD(ctx context.Context, upload UploadVODRequest) error
-	CatalystHookURL(taskId, nextStep string) string
+	CatalystHookURL(taskId, nextStep, attemptID string) string
 }
 
 func NewCatalyst(opts CatalystOptions) Catalyst {
@@ -83,11 +83,12 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 
 // Catalyst hook helpers
 
-func (c *catalyst) CatalystHookURL(taskId, nextStep string) string {
+func (c *catalyst) CatalystHookURL(taskId, nextStep, attemptID string) string {
 	// Own base URL already includes root path, so no need to add it
 	hookURL := c.OwnBaseURL.JoinPath(CatalystHookPath("", taskId))
 	query := hookURL.Query()
 	query.Set("nextStep", nextStep)
+	query.Set("attemptId", attemptID)
 	hookURL.RawQuery = query.Encode()
 	return hookURL.String()
 }

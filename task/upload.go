@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,7 +52,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		}
 		uploadReq := clients.UploadVODRequest{
 			Url:             inUrl,
-			CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize"),
+			CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 			OutputLocations: outputLocations,
 		}
 		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
@@ -374,4 +375,10 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 			})
 	}
 	return names, locations, nil
+}
+
+func catalystTaskAttemptID(task *api.Task) string {
+	// Simplest way to identify unique runs of a given task. We should think of
+	// something more sophisticated in the future.
+	return strconv.Itoa(task.Status.Retries)
 }

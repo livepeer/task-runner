@@ -56,7 +56,7 @@ func (t *TaskContext) WithContext(ctx context.Context) *TaskContext {
 
 type Runner interface {
 	Start() error
-	HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error
+	HandleCatalysis(ctx context.Context, taskId, nextStep, attemptID string, callback *clients.CatalystCallback) error
 	Shutdown(ctx context.Context) error
 }
 
@@ -281,22 +281,24 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, dr
 	return asset, objectStore, osSession, nil
 }
 
-func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep string, callback *clients.CatalystCallback) error {
+func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptID string, callback *clients.CatalystCallback) error {
 	taskInfo, task, err := r.getTaskInfo(taskId, "catalysis", nil)
 	if err != nil {
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
 	}
 	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q rawCallback=%+v",
 		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error, *callback)
-	if task.Status.Phase != api.TaskPhaseRunning {
+	if task.Status.Phase != api.TaskPhaseRunning &&
+		task.Status.Phase != api.TaskPhaseWaiting {
 		return fmt.Errorf("task %s is not running", taskId)
+	} else if curr := catalystTaskAttemptID(task); attemptID != "" && attemptID != curr {
+		return fmt.Errorf("outdated catalyst job callback, "+
+			"task has already been retried (callback: %s current: %s)", attemptID, curr)
 	}
 	progress := 0.9 * callback.CompletionRatio
 	progress = math.Round(progress*1000) / 1000
 	currProgress, taskUpdatedAt := task.Status.Progress, data.NewUnixMillisTime(task.Status.UpdatedAt)
-	// Catalyst currently sends non monotonic progress updates, so we only update
-	// the progress if it's higher than the current one
-	if progress > currProgress && shouldReportProgress(progress, currProgress, taskUpdatedAt.Time) {
+	if shouldReportProgress(progress, currProgress, task.ID, taskUpdatedAt.Time) {
 		err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
 		if err != nil {
 			glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
