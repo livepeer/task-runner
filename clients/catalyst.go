@@ -16,12 +16,15 @@ import (
 )
 
 var (
-	ErrYieldExecution     = errors.New("yield execution")
+	ErrRateLimited        = errors.New("rate limited")
 	CatalystStatusSuccess = clients.TranscodeStatusCompleted.String()
 	CatalystStatusError   = clients.TranscodeStatusError.String()
 )
 
-const rateLimitRetryAfter := 15*time.Second
+const (
+	rateLimitRetryAfter = 15 * time.Second
+	maxAttempts         = 4
+)
 
 type UploadVODRequest struct {
 	Url             string           `json:"url"`
@@ -74,7 +77,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 	if err != nil {
 		return err
 	}
-	for ctx.Err() == nil {
+	for attempt := 1; ; attempt++ {
 		var res json.RawMessage
 		err = c.DoRequest(ctx, Request{
 			Method:      "POST",
@@ -83,18 +86,21 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 			ContentType: "application/json",
 		}, &res)
 		glog.Infof("Catalyst upload VOD request: req=%q err=%q res=%q", body, err, string(res))
-		var statusErr *HTTPStatusError
-		if errors.As(err, &statusErr) && statusErr.Status == http.StatusTooManyRequests {
-			select {
-			case <-time.After(rateLimitRetryAfter):
-				continue
-			case <-ctx.Done():
-				return ctx.Err()
-			}
+
+		if !isTooManyRequestsErr(err) {
+			return err
 		}
-		return err
+
+		if attempt >= maxAttempts {
+			return ErrRateLimited
+		}
+		select {
+		case <-time.After(rateLimitRetryAfter):
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-	return ctx.Err()
 }
 
 // Catalyst hook helpers
@@ -111,4 +117,9 @@ func (c *catalyst) CatalystHookURL(taskId, nextStep, attemptID string) string {
 
 func CatalystHookPath(apiRoot, taskId string) string {
 	return path.Join(apiRoot, fmt.Sprintf("/webhook/catalyst/task/%s", taskId))
+}
+
+func isTooManyRequestsErr(err error) bool {
+	var statusErr *HTTPStatusError
+	return errors.As(err, &statusErr) && statusErr.Status == http.StatusTooManyRequests
 }
