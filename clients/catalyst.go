@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/livepeer/catalyst-api/clients"
@@ -18,6 +20,8 @@ var (
 	CatalystStatusSuccess = clients.TranscodeStatusCompleted.String()
 	CatalystStatusError   = clients.TranscodeStatusError.String()
 )
+
+const rateLimitRetryAfter := 15*time.Second
 
 type UploadVODRequest struct {
 	Url             string           `json:"url"`
@@ -70,15 +74,27 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 	if err != nil {
 		return err
 	}
-	var res json.RawMessage
-	err = c.DoRequest(ctx, Request{
-		Method:      "POST",
-		URL:         "/api/vod",
-		Body:        bytes.NewReader(body),
-		ContentType: "application/json",
-	}, &res)
-	glog.Infof("Catalyst upload VOD request: req=%q err=%q res=%q", body, err, string(res))
-	return err
+	for ctx.Err() == nil {
+		var res json.RawMessage
+		err = c.DoRequest(ctx, Request{
+			Method:      "POST",
+			URL:         "/api/vod",
+			Body:        bytes.NewReader(body),
+			ContentType: "application/json",
+		}, &res)
+		glog.Infof("Catalyst upload VOD request: req=%q err=%q res=%q", body, err, string(res))
+		var statusErr *HTTPStatusError
+		if errors.As(err, &statusErr) && statusErr.Status == http.StatusTooManyRequests {
+			select {
+			case <-time.After(rateLimitRetryAfter):
+				continue
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		return err
+	}
+	return ctx.Err()
 }
 
 // Catalyst hook helpers
