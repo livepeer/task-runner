@@ -26,7 +26,7 @@ type ImportTaskConfig struct {
 	ImportIPFSGatewayURLs []*url.URL
 }
 
-func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
+func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	var (
 		ctx        = tctx.Context
 		playbackID = tctx.OutputAsset.PlaybackID
@@ -82,11 +82,12 @@ func TaskImport(tctx *TaskContext) (*data.TaskOutput, error) {
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingID
-	return &data.TaskOutput{Import: &data.UploadTaskOutput{
-		VideoFilePath:    videoFilePath,
-		MetadataFilePath: metadataFilePath,
-		AssetSpec:        assetSpec,
-	}}, nil
+	return &TaskHandlerOutput{
+		TaskOutput: &data.TaskOutput{Import: &data.UploadTaskOutput{
+			VideoFilePath:    videoFilePath,
+			MetadataFilePath: metadataFilePath,
+			AssetSpec:        assetSpec,
+		}}}, nil
 }
 
 func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {

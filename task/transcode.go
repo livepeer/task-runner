@@ -132,7 +132,7 @@ func (a *Accumulator) Accumulate(size uint64) {
 	atomic.AddUint64(&a.size, size)
 }
 
-func TaskTranscode(tctx *TaskContext) (*data.TaskOutput, error) {
+func TaskTranscode(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	var (
 		ctx             = tctx.Context
 		outAsset        = tctx.OutputAsset
@@ -263,15 +263,16 @@ out:
 	}
 	assetSpec := *metadata.AssetSpec
 	assetSpec.PlaybackRecordingID = playbackRecordingId
-	return &data.TaskOutput{
-		Transcode: &data.TranscodeTaskOutput{
-			Asset: data.UploadTaskOutput{
-				VideoFilePath:    videoFilePath,
-				MetadataFilePath: metadataFilePath,
-				AssetSpec:        assetSpec,
+	return &TaskHandlerOutput{
+		TaskOutput: &data.TaskOutput{
+			Transcode: &data.TranscodeTaskOutput{
+				Asset: data.UploadTaskOutput{
+					VideoFilePath:    videoFilePath,
+					MetadataFilePath: metadataFilePath,
+					AssetSpec:        assetSpec,
+				},
 			},
-		},
-	}, nil
+		}}, nil
 }
 
 // memWriteSeeker is an in-memory io.WriteSeeker implementation

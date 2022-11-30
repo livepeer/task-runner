@@ -26,7 +26,7 @@ type ExportTaskConfig struct {
 	PlayerExternalURL  *url.URL
 }
 
-func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
+func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	var (
 		ctx    = tctx.Context
 		asset  = tctx.InputAsset
@@ -50,7 +50,9 @@ func TaskExport(tctx *TaskContext) (*data.TaskOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &data.TaskOutput{Export: output}, nil
+	return &TaskHandlerOutput{
+		TaskOutput: &data.TaskOutput{Export: output},
+	}, nil
 }
 
 type internalMetadata struct {

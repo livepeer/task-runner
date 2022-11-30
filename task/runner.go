@@ -25,8 +25,6 @@ const (
 	DefaultMaxConcurrentTasks    = 3
 )
 
-var ErrYieldExecution = errors.New("yield execution")
-
 var defaultTasks = map[string]TaskHandler{
 	"import":    TaskImport,
 	"upload":    TaskUpload,
@@ -34,7 +32,17 @@ var defaultTasks = map[string]TaskHandler{
 	"transcode": TaskTranscode,
 }
 
-type TaskHandler func(tctx *TaskContext) (*data.TaskOutput, error)
+type TaskHandlerOutput struct {
+	*data.TaskOutput
+	Continue bool
+}
+
+// If this special output is returned it means the task is yielding execution
+// until another async event is received about it. Likely triggered by an
+// external callback (e.g. catalyst's VOD upload callback) or delayed event.
+var ContinueAsync = &TaskHandlerOutput{Continue: true}
+
+type TaskHandler func(tctx *TaskContext) (*TaskHandlerOutput, error)
 
 type TaskContext struct {
 	context.Context
@@ -181,22 +189,20 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	}
 
 	output, err := r.handleTask(ctx, task)
-	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
-
-	if errors.Is(err, ErrYieldExecution) {
-		// If this special error is returned it means the task is yielding execution
-		// until another event is received about it. Likely from a different step
-		// triggered by an external callback (e.g. catalyst's VOD upload callback).
+	if err == nil && output != nil && output.Continue {
+		glog.Infof("Task handler will continue task async type=%q id=%s output=%+v", task.Type, task.ID, output)
 		return nil
 	}
+
+	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
 	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 	// return the error directly so that if publishing the result fails we nack the message to try again
-	return r.publishTaskResult(ctx, task, output, err)
+	return r.publishTaskResult(ctx, task, output.TaskOutput, err)
 }
 
-func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output *data.TaskOutput, err error) {
+func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output *TaskHandlerOutput, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic handling task: value=%q stack:\n%s", r, string(debug.Stack()))

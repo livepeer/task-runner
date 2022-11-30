@@ -34,7 +34,7 @@ var (
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
 )
 
-func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
+func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	var (
 		ctx    = tctx.Context
 		step   = tctx.Step
@@ -62,11 +62,11 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %w", err)
 		}
-		return nil, ErrYieldExecution
+		return ContinueAsync, nil
 	case "checkCatalyst":
 		task := tctx.Task
 		if task.Status.Phase != api.TaskPhaseRunning {
-			return nil, ErrYieldExecution
+			return ContinueAsync, nil
 		}
 		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
 		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
@@ -76,7 +76,7 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to schedule next check: %w", err)
 		}
-		return nil, ErrYieldExecution
+		return ContinueAsync, nil
 	case "finalize":
 		var callback *clients.CatalystCallback
 		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
@@ -93,7 +93,9 @@ func TaskUpload(tctx *TaskContext) (*data.TaskOutput, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error processing catalyst callback: %w", err)
 		}
-		return &data.TaskOutput{Upload: taskOutput}, nil
+		return &TaskHandlerOutput{
+			TaskOutput: &data.TaskOutput{Upload: taskOutput},
+		}, nil
 	}
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }
