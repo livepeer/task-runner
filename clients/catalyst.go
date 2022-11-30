@@ -19,6 +19,8 @@ var (
 	ErrRateLimited        = errors.New("rate limited")
 	CatalystStatusSuccess = clients.TranscodeStatusCompleted.String()
 	CatalystStatusError   = clients.TranscodeStatusError.String()
+
+	baseTransport = *http.DefaultTransport.(*http.Transport)
 )
 
 const (
@@ -59,10 +61,15 @@ type Catalyst interface {
 }
 
 func NewCatalyst(opts CatalystOptions) Catalyst {
+	transport := baseTransport
+	transport.DisableKeepAlives = true
 	return &catalyst{opts, BaseClient{
 		BaseUrl: opts.BaseURL,
 		BaseHeaders: map[string]string{
 			"Authorization": "Bearer " + opts.Secret,
+		},
+		Client: &http.Client{
+			Transport: &transport,
 		},
 	}}
 }
