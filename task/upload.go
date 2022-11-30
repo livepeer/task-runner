@@ -45,20 +45,26 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
 	switch step {
-	case "":
+	case "", "rateLimitBackoff":
 		_, outputLocations, err := assetOutputLocations(tctx)
 		if err != nil {
 			return nil, err
 		}
-		uploadReq := clients.UploadVODRequest{
-			Url:             inUrl,
-			CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
-			OutputLocations: outputLocations,
-		}
-		if err := tctx.catalyst.UploadVOD(ctx, uploadReq); err != nil {
+		var (
+			req = clients.UploadVODRequest{
+				Url:             inUrl,
+				CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
+				OutputLocations: outputLocations,
+			}
+			nextStep = "checkCatalyst"
+		)
+		err = tctx.catalyst.UploadVOD(ctx, req)
+		if errors.Is(err, clients.ErrRateLimited) {
+			nextStep = "rateLimitBackoff"
+		} else if err != nil {
 			return nil, fmt.Errorf("failed to call catalyst: %w", err)
 		}
-		err = tctx.delayTaskStep(ctx, tctx.Task.ID, "checkCatalyst", nil)
+		err = tctx.delayTaskStep(ctx, tctx.Task.ID, nextStep, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %w", err)
 		}
