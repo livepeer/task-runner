@@ -22,8 +22,8 @@ var (
 )
 
 const (
-	rateLimitRetryAfter = 15 * time.Second
-	maxAttempts         = 4
+	rateLimitRetryInitialDelay = 2 * time.Second
+	maxAttempts                = 4
 )
 
 type UploadVODRequest struct {
@@ -77,6 +77,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 	if err != nil {
 		return err
 	}
+	retryDelay := rateLimitRetryInitialDelay
 	for attempt := 1; ; attempt++ {
 		var res json.RawMessage
 		err = c.DoRequest(ctx, Request{
@@ -95,7 +96,8 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 			return ErrRateLimited
 		}
 		select {
-		case <-time.After(rateLimitRetryAfter):
+		case <-time.After(retryDelay):
+			retryDelay = 2 * retryDelay
 			continue
 		case <-ctx.Done():
 			return ctx.Err()
