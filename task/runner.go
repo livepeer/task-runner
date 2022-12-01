@@ -199,7 +199,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 	// return the error directly so that if publishing the result fails we nack the message to try again
-	return r.publishTaskResult(ctx, task, output.TaskOutput, err)
+	return r.publishTaskResult(ctx, task, output, err)
 }
 
 func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output *TaskHandlerOutput, err error) {
@@ -348,11 +348,19 @@ func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, inpu
 	return nil
 }
 
-func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *data.TaskOutput, resultErr error) error {
+func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *TaskHandlerOutput, resultErr error) error {
 	if r.HumanizeErrors {
 		resultErr = humanizeError(resultErr)
 	}
-	key, body := fmt.Sprintf("task.result.%s.%s", task.Type, task.ID), data.NewTaskResultEvent(task, errorInfo(resultErr), output)
+	var body *data.TaskResultEvent
+	if resultErr != nil {
+		body = data.NewTaskResultEvent(task, errorInfo(resultErr), nil)
+	} else if output != nil {
+		body = data.NewTaskResultEvent(task, errorInfo(resultErr), output.TaskOutput)
+	} else {
+		return errors.New("output or resultErr must be non-nil")
+	}
+	key := fmt.Sprintf("task.result.%s.%s", task.Type, task.ID)
 	if err := r.publishLogged(ctx, task, r.ExchangeName, key, body); err != nil {
 		return fmt.Errorf("error publishing task result event: %w", err)
 	}
