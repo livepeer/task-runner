@@ -202,7 +202,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	return r.publishTaskResult(ctx, task, output, err)
 }
 
-func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output *TaskHandlerOutput, err error) {
+func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (*TaskHandlerOutput, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic handling task: value=%q stack:\n%s", r, string(debug.Stack()))
@@ -222,20 +222,24 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (output
 		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
-	if isFirstStep := taskCtx.Step == ""; isFirstStep {
+	isFirstStep := taskCtx.Step == ""
+	if !isFirstStep {
+		glog.Infof(`Continuing task type=%q id=%s step=%s inputAssetId=%s outputAssetId=%s params="%+v" stepInput=%q`, taskType, taskID, taskCtx.Step, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params, taskCtx.StepInput)
+	} else {
 		if taskCtx.Status.Phase == api.TaskPhaseRunning {
 			return nil, errors.New("task has already been started before")
 		}
+
 		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
 		if err != nil {
 			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 			// execute the task anyway
 		}
+
+		glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
 	}
 
-	glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
-	output, err = handler(taskCtx)
-	return output, err
+	return handler(taskCtx)
 }
 
 func parseTaskInfo(msg amqp.Delivery) (data.TaskInfo, error) {
