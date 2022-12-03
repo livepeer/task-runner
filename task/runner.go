@@ -202,7 +202,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	return r.publishTaskResult(ctx, task, output, err)
 }
 
-func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (*TaskHandlerOutput, error) {
+func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *TaskHandlerOutput, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			glog.Errorf("Panic handling task: value=%q stack:\n%s", r, string(debug.Stack()))
