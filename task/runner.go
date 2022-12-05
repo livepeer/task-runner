@@ -255,7 +255,7 @@ func parseTaskInfo(msg amqp.Delivery) (data.TaskInfo, error) {
 }
 
 func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*TaskContext, error) {
-	task, err := r.lapi.GetTask(info.ID)
+	task, err := r.lapi.GetTask(info.ID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, dr
 	if assetID == "" {
 		return nil, nil, nil, nil
 	}
-	asset, err := r.lapi.GetAsset(assetID)
+	asset, err := r.lapi.GetAsset(assetID, true)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -372,7 +372,7 @@ func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, outp
 }
 
 func (r *runner) getTaskInfo(id, step string, input interface{}) (data.TaskInfo, *api.Task, error) {
-	task, err := r.lapi.GetTask(id)
+	task, err := r.lapi.GetTask(id, true)
 	if err != nil {
 		return data.TaskInfo{}, nil, fmt.Errorf("error getting task %q: %w", id, err)
 	}

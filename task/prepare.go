@@ -71,7 +71,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 	if err != nil {
 		return "", err
 	}
-	stream, err := lapi.CreateStreamR(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
+	stream, err := lapi.CreateStream(api.CreateStreamReq{Name: streamName, Record: true, Profiles: profiles})
 	if err != nil {
 		return "", err
 	}
@@ -110,7 +110,7 @@ func Prepare(tctx *TaskContext, assetSpec *api.AssetSpec, file io.ReadSeekCloser
 		glog.V(model.VERBOSE).Infof("Got segment seqNo=%d pts=%s dur=%s data len bytes=%d\n", seg.SeqNo, seg.Pts, seg.Duration, len(seg.Data))
 		accumulator.Accumulate(uint64(len(seg.Data)))
 		started := time.Now()
-		_, err = lapi.PushSegmentR(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
+		_, err = lapi.PushSegment(stream.ID, seg.SeqNo, seg.Duration, seg.Data, contentResolution)
 		if err != nil {
 			glog.Errorf("Error while segment push for prepare err=%v\n", err)
 			break
