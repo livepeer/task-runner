@@ -5,7 +5,7 @@ tags ?= latest $(version)
 allCmds := $(shell ls ./cmd/)
 dockerimg := livepeer/task-runner
 
-.PHONY: all $(allCmds) docker docker_run docker_push
+.PHONY: all $(allCmds) run test docker docker_run docker_push docker_ci
 
 all: $(allCmds)
 
@@ -14,6 +14,9 @@ $(allCmds):
 
 run:
 	$(MAKE) -C ./cmd/$(cmd) run
+
+test:
+	go test -race ./...
 
 docker:
 	docker build $(foreach tag,$(tags),-t $(dockerimg):$(tag)) --build-arg version=$(version) .

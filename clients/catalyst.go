@@ -24,8 +24,8 @@ var (
 )
 
 const (
-	rateLimitRetryInitialDelay = 2 * time.Second
-	maxAttempts                = 4
+	defaultRateLimitInitialBackoff = 2 * time.Second
+	maxAttempts                    = 4
 )
 
 type UploadVODRequest struct {
@@ -48,9 +48,10 @@ type OutputsRequest struct {
 }
 
 type CatalystOptions struct {
-	BaseURL    string
-	Secret     string
-	OwnBaseURL *url.URL
+	BaseURL                 string
+	Secret                  string
+	OwnBaseURL              *url.URL
+	RateLimitInitialBackoff time.Duration
 }
 
 type CatalystCallback = clients.TranscodeStatusCompletedMessage
@@ -63,6 +64,9 @@ type Catalyst interface {
 func NewCatalyst(opts CatalystOptions) Catalyst {
 	transport := baseTransport
 	transport.DisableKeepAlives = true
+	if opts.RateLimitInitialBackoff == 0 {
+		opts.RateLimitInitialBackoff = defaultRateLimitInitialBackoff
+	}
 	return &catalyst{opts, BaseClient{
 		BaseUrl: opts.BaseURL,
 		BaseHeaders: map[string]string{
@@ -79,12 +83,12 @@ type catalyst struct {
 	BaseClient
 }
 
-func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error {
+func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err error) {
 	body, err := json.Marshal(upload)
 	if err != nil {
 		return err
 	}
-	retryDelay := rateLimitRetryInitialDelay
+	rateLimitBackoff := c.RateLimitInitialBackoff
 	for attempt := 1; ; attempt++ {
 		var res json.RawMessage
 		err = c.DoRequest(ctx, Request{
@@ -96,18 +100,19 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) error
 		glog.Infof("Catalyst upload VOD request: req=%q err=%q res=%q", body, err, string(res))
 
 		if !isTooManyRequestsErr(err) {
-			return err
+			return
 		}
+		err = ErrRateLimited
 
 		if attempt >= maxAttempts {
-			return ErrRateLimited
+			return
 		}
 		select {
-		case <-time.After(retryDelay):
-			retryDelay = 2 * retryDelay
+		case <-time.After(rateLimitBackoff):
+			rateLimitBackoff = 2 * rateLimitBackoff
 			continue
 		case <-ctx.Done():
-			return ctx.Err()
+			return
 		}
 	}
 }
