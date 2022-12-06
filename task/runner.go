@@ -25,12 +25,16 @@ const (
 	DefaultMaxConcurrentTasks    = 3
 )
 
-var defaultTasks = map[string]TaskHandler{
-	"import":    TaskImport,
-	"upload":    TaskUpload,
-	"export":    TaskExport,
-	"transcode": TaskTranscode,
-}
+var (
+	defaultTasks = map[string]TaskHandler{
+		"import":    TaskImport,
+		"upload":    TaskUpload,
+		"export":    TaskExport,
+		"transcode": TaskTranscode,
+	}
+	errInternalProcessingError = errors.New("internal error processing file")
+	taskFatalErrorInfo         = &data.ErrorInfo{Message: errInternalProcessingError.Error(), Unretriable: true}
+)
 
 type TaskHandlerOutput struct {
 	*data.TaskOutput
@@ -175,7 +179,7 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 	return nil
 }
 
-func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
+func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 	// rate-limit message processing time to limit load
 	defer blockUntil(time.After(r.MinTaskProcessingTime))
 
@@ -185,8 +189,14 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 	task, err := parseTaskInfo(msg)
 	if err != nil {
 		glog.Errorf("Error parsing AMQP message err=%q msg=%q", err, msg.Body)
-		return nil
+		return event.UnprocessableIfErr(err)
 	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			glog.Errorf("Panic handling task type=%s id=%s step=%q panic=%v stack=%q", task.Type, task.ID, task.Step, rec, debug.Stack())
+			err = simplePublishTaskFatalError(ctx, r.amqp, r.ExchangeName, task)
+		}
+	}()
 
 	output, err := r.handleTask(ctx, task)
 	if err == nil && output != nil && output.Continue {
@@ -203,13 +213,6 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) error {
 }
 
 func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *TaskHandlerOutput, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			glog.Errorf("Panic handling task: value=%q stack:\n%s", r, string(debug.Stack()))
-			err = UnretriableError{fmt.Errorf("panic handling task: %v", r)}
-		}
-	}()
-
 	taskCtx, err := r.buildTaskContext(ctx, taskInfo)
 	if err != nil {
 		return nil, fmt.Errorf("error building task context: %w", err)
@@ -400,19 +403,7 @@ func (r *runner) getTaskInfo(id, step string, input interface{}) (data.TaskInfo,
 }
 
 func (r *runner) publishLogged(ctx context.Context, task data.TaskInfo, exchange, key string, body interface{}) error {
-	msg := event.AMQPMessage{
-		Exchange:   exchange,
-		Key:        key,
-		Body:       body,
-		Persistent: true,
-		WaitResult: true,
-	}
-	glog.Infof("Publishing AMQP message. taskType=%q id=%s step=%q exchange=%q key=%q body=%+v", task.Type, task.ID, task.Step, exchange, key, body)
-	if err := r.amqp.Publish(ctx, msg); err != nil {
-		glog.Errorf("Error publishing AMQP message. taskType=%q id=%s step=%q exchange=%q key=%q err=%q body=%+v", task.Type, task.ID, task.Step, exchange, key, err, body)
-		return err
-	}
-	return nil
+	return publishLoggedRaw(ctx, r.amqp, task, exchange, key, body)
 }
 
 func (r *runner) Shutdown(ctx context.Context) error {
@@ -440,13 +431,13 @@ func humanizeError(err error) error {
 		if strings.Contains(errMsg, "unsupported input pixel format") {
 			return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
 		}
-		return errors.New("internal error processing file")
+		return errInternalProcessingError
 	}
 
 	if strings.Contains(errMsg, "unexpected eof") {
 		return errors.New("file download failed")
 	} else if strings.Contains(errMsg, "multipartupload: upload multipart failed") {
-		return errors.New("internal error saving file to storage")
+		return errors.New("error saving file to storage")
 	} else if strings.Contains(errMsg, "mp4io: parse error") {
 		return UnretriableError{errors.New("file format unsupported, must be a valid MP4")}
 	}
@@ -459,7 +450,7 @@ func humanizeError(err error) error {
 		(strings.Contains(errMsg, "eof") && strings.Contains(errMsg, "error processing file"))
 
 	if isProcessing {
-		return errors.New("internal error processing file")
+		return errInternalProcessingError
 	}
 
 	isTimeout := strings.Contains(errMsg, "context deadline exceeded") ||
@@ -474,3 +465,33 @@ func humanizeError(err error) error {
 }
 
 func blockUntil(t <-chan time.Time) { <-t }
+
+// This is a code path to send a task failure event the simplest way possible,
+// to be used when handling panics in the task processing code path. It is
+// purposedly meant to be a separate flow as much as possible to avoid any
+// chance of hitting the same panic again.
+func simplePublishTaskFatalError(ctx context.Context, producer event.AMQPProducer, exchange string, task data.TaskInfo) error {
+	body := data.NewTaskResultEvent(task, taskFatalErrorInfo, nil)
+	key := taskResultMessageKey(task.Type, task.ID)
+	return publishLoggedRaw(ctx, producer, task, exchange, key, body)
+}
+
+func publishLoggedRaw(ctx context.Context, producer event.AMQPProducer, task data.TaskInfo, exchange, key string, body interface{}) error {
+	msg := event.AMQPMessage{
+		Exchange:   exchange,
+		Key:        key,
+		Body:       body,
+		Persistent: true,
+		WaitResult: true,
+	}
+	glog.Infof("Publishing AMQP message. taskType=%q id=%s step=%q exchange=%q key=%q body=%+v", task.Type, task.ID, task.Step, exchange, key, body)
+	if err := producer.Publish(ctx, msg); err != nil {
+		glog.Errorf("Error publishing AMQP message. taskType=%q id=%s step=%q exchange=%q key=%q err=%q body=%+v", task.Type, task.ID, task.Step, exchange, key, err, body)
+		return err
+	}
+	return nil
+}
+
+func taskResultMessageKey(ttype, id string) string {
+	return fmt.Sprintf("task.result.%s.%s", ttype, id)
+}
