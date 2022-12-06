@@ -231,7 +231,10 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *T
 		}
 
 		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
-		if err != nil {
+		if err == api.ErrRateLimited {
+			glog.Warning("Task execution rate limited type=%q id=%s userID=%s", taskType, taskID, taskCtx.UserID)
+			return nil, r.delayTaskStep(ctx, taskID, taskCtx.Step, taskCtx.StepInput)
+		} else if err != nil {
 			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 			// execute the task anyway
 		}
