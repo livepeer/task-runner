@@ -455,6 +455,7 @@ func humanizeError(err error) error {
 		strings.Contains(errMsg, "could not create stream id") ||
 		strings.Contains(errMsg, "502 bad gateway") ||
 		strings.Contains(errMsg, "task has already been started before") ||
+		strings.Contains(errMsg, "catalyst task lost") ||
 		(strings.Contains(errMsg, "eof") && strings.Contains(errMsg, "error processing file"))
 
 	if isProcessing {
