@@ -23,6 +23,7 @@ const (
 	DefaultMaxTaskProcessingTime = 10 * time.Minute
 	DefaultMinTaskProcessingTime = 5 * time.Second
 	DefaultMaxConcurrentTasks    = 3
+	taskPublishTimeout           = 1 * time.Minute
 )
 
 var (
@@ -194,7 +195,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			glog.Errorf("Panic handling task type=%s id=%s step=%q panic=%v stack=%q", task.Type, task.ID, task.Step, rec, debug.Stack())
-			err = simplePublishTaskFatalError(ctx, r.amqp, r.ExchangeName, task)
+			err = simplePublishTaskFatalError(r.amqp, r.ExchangeName, task)
 		}
 	}()
 
@@ -206,8 +207,6 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
-	ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
 	// return the error directly so that if publishing the result fails we nack the message to try again
 	return r.publishTaskResult(ctx, task, output, err)
 }
@@ -338,7 +337,7 @@ func (r *runner) delayTaskStep(ctx context.Context, taskID, step string, input i
 	if err != nil {
 		return err
 	}
-	return r.publishLogged(ctx, task, r.DelayedExchange,
+	return r.publishLogged(task, r.DelayedExchange,
 		fmt.Sprintf("task.trigger.%s", task.Type),
 		data.NewTaskTriggerEvent(task))
 }
@@ -352,7 +351,7 @@ func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, inpu
 		return err
 	}
 	key, body := fmt.Sprintf("task.trigger.%s", task.Type), data.NewTaskTriggerEvent(task)
-	if err := r.publishLogged(ctx, task, r.ExchangeName, key, body); err != nil {
+	if err := r.publishLogged(task, r.ExchangeName, key, body); err != nil {
 		return fmt.Errorf("error publishing task result event: %w", err)
 	}
 	return nil
@@ -371,7 +370,7 @@ func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, outp
 		return errors.New("output or resultErr must be non-nil")
 	}
 	key := fmt.Sprintf("task.result.%s.%s", task.Type, task.ID)
-	if err := r.publishLogged(ctx, task, r.ExchangeName, key, body); err != nil {
+	if err := r.publishLogged(task, r.ExchangeName, key, body); err != nil {
 		return fmt.Errorf("error publishing task result event: %w", err)
 	}
 	return nil
@@ -402,8 +401,8 @@ func (r *runner) getTaskInfo(id, step string, input interface{}) (data.TaskInfo,
 	}, task, nil
 }
 
-func (r *runner) publishLogged(ctx context.Context, task data.TaskInfo, exchange, key string, body interface{}) error {
-	return publishLoggedRaw(ctx, r.amqp, task, exchange, key, body)
+func (r *runner) publishLogged(task data.TaskInfo, exchange, key string, body interface{}) error {
+	return publishLoggedRaw(r.amqp, task, exchange, key, body)
 }
 
 func (r *runner) Shutdown(ctx context.Context) error {
@@ -470,13 +469,15 @@ func blockUntil(t <-chan time.Time) { <-t }
 // to be used when handling panics in the task processing code path. It is
 // purposedly meant to be a separate flow as much as possible to avoid any
 // chance of hitting the same panic again.
-func simplePublishTaskFatalError(ctx context.Context, producer event.AMQPProducer, exchange string, task data.TaskInfo) error {
+func simplePublishTaskFatalError(producer event.AMQPProducer, exchange string, task data.TaskInfo) error {
 	body := data.NewTaskResultEvent(task, taskFatalErrorInfo, nil)
 	key := taskResultMessageKey(task.Type, task.ID)
-	return publishLoggedRaw(ctx, producer, task, exchange, key, body)
+	return publishLoggedRaw(producer, task, exchange, key, body)
 }
 
-func publishLoggedRaw(ctx context.Context, producer event.AMQPProducer, task data.TaskInfo, exchange, key string, body interface{}) error {
+func publishLoggedRaw(producer event.AMQPProducer, task data.TaskInfo, exchange, key string, body interface{}) error {
+	ctx, cancel := context.WithTimeout(context.Background(), taskPublishTimeout)
+	defer cancel()
 	msg := event.AMQPMessage{
 		Exchange:   exchange,
 		Key:        key,
