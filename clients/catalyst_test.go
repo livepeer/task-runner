@@ -33,6 +33,14 @@ func TestCatalystHookPath(t *testing.T) {
 	require.Equal("https://call.me/maybe/webhook/catalyst/task/1234?attemptId=first+try&nextStep=nothing", url)
 }
 
+func TestDefaultRateLimitBackoff(t *testing.T) {
+	require := require.New(t)
+	c := NewCatalyst(CatalystOptions{})
+	actualBackoff := c.(*catalyst).CatalystOptions.RateLimitInitialBackoff
+	require.NotEqual(0, actualBackoff)
+	require.Equal(defaultRateLimitInitialBackoff, actualBackoff)
+}
+
 func TestCatalystRateLimiting(t *testing.T) {
 	require := require.New(t)
 	payload := baseUploadReq
