@@ -535,6 +535,7 @@ func publishLoggedRaw(producer event.AMQPProducer, task data.TaskInfo, exchange,
 		Key:        key,
 		Body:       body,
 		Persistent: true,
+		// TODO: Actually handle returns from the AMQP server. Needs further support in pkg/event.
 		Mandatory:  true,
 		WaitResult: true,
 	}
