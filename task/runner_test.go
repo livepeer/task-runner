@@ -27,7 +27,7 @@ func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
 	}
 	var err error
 	require.NotPanics(func() {
-		err = simplePublishTaskFatalError(context.Background(), producerFunc(producer), exchange, taskInfo)
+		err = simplePublishTaskFatalError(producerFunc(producer), exchange, taskInfo)
 	})
 	require.NoError(err)
 	require.NotNil(publishedMsg)
