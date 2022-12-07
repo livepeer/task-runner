@@ -89,7 +89,7 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.ExchangeName, "exchange-name", "lp_tasks", "Name of exchange where the task events will be published to")
 	fs.StringVar(&cli.runnerOpts.QueueName, "queue-name", "lp_runner_task_queue", "Name of task queue to consume from. If it doesn't exist a new queue will be created and bound to the API exchange")
 	fs.StringVar(&cli.runnerOpts.OldQueueName, "old-queue-name", "", "Name of the old task queue that should be unbound and attempted a clean-up")
-	fs.StringVar(&cli.runnerOpts.DeadLetter.ExchangeName, "dead-letter-exchange-name", "lp_dead_tasks", "Name of the dead letter exchange to create for tasks that are unprocessable")
+	fs.StringVar(&cli.runnerOpts.DeadLetter.ExchangeName, "dead-letter-exchange-name", "", "Name of the dead letter exchange to create for tasks that are unprocessable")
 	fs.StringVar(&cli.runnerOpts.DeadLetter.QueueName, "dead-letter-queue-name", "", "Name of the queue where the dead-lettered tasks should be routed to. This queue is not consumed automatically. If empty, the name will be the same as the dead-letter exchange")
 	fs.DurationVar(&cli.runnerOpts.MinTaskProcessingTime, "min-task-processing-time", task.DefaultMinTaskProcessingTime, "Minimum time that a task processing must take as rate-limiting strategy. If the task finishes earlier, the runner will wait for the remaining time before starting another task")
 	fs.DurationVar(&cli.runnerOpts.MaxTaskProcessingTime, "max-task-processing-time", task.DefaultMaxTaskProcessingTime, "Timeout for task processing. If the task is not completed within this time it will be marked as failed")
