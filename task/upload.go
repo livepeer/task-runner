@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/catalyst-api/pipeline"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
@@ -52,9 +53,10 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		}
 		var (
 			req = clients.UploadVODRequest{
-				Url:             inUrl,
-				CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
-				OutputLocations: outputLocations,
+				Url:              inUrl,
+				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
+				OutputLocations:  outputLocations,
+				PipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 			}
 			nextStep = "checkCatalyst"
 		)
@@ -157,8 +159,8 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			DurationSec: track.DurationSec,
 			Bitrate:     float64(track.Bitrate),
 
-			Width:       track.VideoTrack.Width,
-			Height:      track.VideoTrack.Height,
+			Width:       int(track.VideoTrack.Width),
+			Height:      int(track.VideoTrack.Height),
 			PixelFormat: track.VideoTrack.PixelFormat,
 			FPS:         float64(track.VideoTrack.FPS) / 1000,
 
