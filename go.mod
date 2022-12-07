@@ -9,11 +9,12 @@ require (
 	github.com/livepeer/go-api-client v0.3.2-0.20221121220903-caabac493c45
 	github.com/livepeer/go-tools v0.1.0
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
-	github.com/livepeer/livepeer-data v0.5.2
+	github.com/livepeer/livepeer-data v0.6.0
 	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
 	github.com/peterbourgon/ff v1.7.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/rabbitmq/amqp091-go v1.5.0
+	github.com/stretchr/testify v1.8.0
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	gopkg.in/vansante/go-ffprobe.v2 v2.1.1
 )
@@ -63,7 +64,6 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.0.1-rc.2 // indirect
 	github.com/stretchr/objx v0.4.0 // indirect
-	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3 // indirect
