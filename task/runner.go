@@ -316,8 +316,10 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 	if err != nil {
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
 	}
+
 	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q rawCallback=%+v",
 		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error, *callback)
+
 	if task.Status.Phase != api.TaskPhaseRunning &&
 		task.Status.Phase != api.TaskPhaseWaiting {
 		return fmt.Errorf("task %s is not running", taskId)
@@ -325,6 +327,7 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 		return fmt.Errorf("outdated catalyst job callback, "+
 			"task has already been retried (callback: %s current: %s)", attemptID, curr)
 	}
+
 	progress := 0.9 * callback.CompletionRatio
 	progress = math.Round(progress*1000) / 1000
 	currProgress, taskUpdatedAt := task.Status.Progress, data.NewUnixMillisTime(task.Status.UpdatedAt)
@@ -334,6 +337,7 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 			glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
 		}
 	}
+
 	if callback.Status == clients.CatalystStatusError {
 		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
 		err := NewCatalystError(callback.Error, callback.Unretriable)
@@ -341,6 +345,7 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 	} else if callback.Status == clients.CatalystStatusSuccess {
 		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
 	}
+
 	return nil
 }
 
