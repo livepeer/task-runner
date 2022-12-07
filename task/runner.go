@@ -161,7 +161,7 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 
 	err := declareQueueAndExchange(c, r.ExchangeName, r.QueueName, "task.trigger.#", queueArgs)
 	if err != nil {
-		return fmt.Errorf("error declaring main exchange: %w", err)
+		return err
 	}
 
 	queueArgs = amqp.Table{
