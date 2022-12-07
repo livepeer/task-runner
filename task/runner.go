@@ -205,7 +205,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 	task, err := parseTaskInfo(msg)
 	if err != nil {
 		glog.Errorf("Error parsing AMQP message err=%q msg=%q", err, msg.Body)
-		return event.UnprocessableIfErr(err)
+		return event.UnprocessableMsgErr(err)
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
