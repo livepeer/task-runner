@@ -76,6 +76,9 @@ type Runner interface {
 type RunnerOptions struct {
 	AMQPUri                 string
 	ExchangeName, QueueName string
+	DeadLetter              struct {
+		ExchangeName, QueueName string
+	}
 
 	MinTaskProcessingTime time.Duration
 	MaxTaskProcessingTime time.Duration
@@ -102,6 +105,9 @@ func NewRunner(opts RunnerOptions) Runner {
 	}
 	if opts.MaxConcurrentTasks == 0 {
 		opts.MaxConcurrentTasks = DefaultMaxConcurrentTasks
+	}
+	if opts.DeadLetter.ExchangeName != "" && opts.DeadLetter.QueueName == "" {
+		opts.DeadLetter.QueueName = opts.DeadLetter.ExchangeName
 	}
 	return &runner{
 		RunnerOptions:   opts,
@@ -144,38 +150,47 @@ func (r *runner) Start() error {
 }
 
 func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
-	err := c.ExchangeDeclare(r.ExchangeName, "topic", true, false, false, false, nil)
-	if err != nil {
-		return fmt.Errorf("error ensuring API exchange exists: %w", err)
-	}
-	_, err = c.QueueDeclare(r.QueueName, true, false, false, false, amqp.Table{"x-queue-type": "quorum"})
-	if err != nil {
-		return fmt.Errorf("error declaring task queue: %w", err)
-	}
-	err = c.QueueBind(r.QueueName, "task.trigger.#", r.ExchangeName, false, nil)
-	if err != nil {
-		return fmt.Errorf("error binding task queue: %w", err)
+	queueArgs := amqp.Table{"x-queue-type": "quorum"}
+	if dlx := r.DeadLetter; dlx.ExchangeName != "" {
+		err := declareQueueAndExchange(c, dlx.ExchangeName, dlx.QueueName, "#", queueArgs)
+		if err != nil {
+			return err
+		}
+		queueArgs["x-dead-letter-exchange"] = r.DeadLetter.ExchangeName
 	}
 
-	err = c.ExchangeDeclare(r.DelayedExchange, "topic", true, false, false, false, nil)
+	err := declareQueueAndExchange(c, r.ExchangeName, r.QueueName, "task.trigger.#", queueArgs)
 	if err != nil {
-		return fmt.Errorf("error declaring delayed exchange: %w", err)
+		return fmt.Errorf("error declaring main exchange: %w", err)
 	}
-	delayedArgs := amqp.Table{
+
+	queueArgs = amqp.Table{
 		"x-message-ttl":          int32(time.Minute / time.Millisecond),
 		"x-dead-letter-exchange": r.ExchangeName,
 	}
-	_, err = c.QueueDeclare(r.DelayedExchange, true, false, false, false, delayedArgs)
+	err = declareQueueAndExchange(c, r.DelayedExchange, r.DelayedExchange, "#", queueArgs)
 	if err != nil {
-		return fmt.Errorf("error declaring delayed queue: %w", err)
+		return err
 	}
-	err = c.QueueBind(r.DelayedExchange, "#", r.DelayedExchange, false, nil)
-	if err != nil {
-		return fmt.Errorf("error binding delayed queue: %w", err)
-	}
-	err = c.Qos(int(r.MaxConcurrentTasks), 0, false)
-	if err != nil {
+
+	if err := c.Qos(int(r.MaxConcurrentTasks), 0, false); err != nil {
 		return fmt.Errorf("error setting QoS: %w", err)
+	}
+	return nil
+}
+
+func declareQueueAndExchange(c event.AMQPChanSetup, exchange, queue, binding string, queueArgs amqp.Table) error {
+	err := c.ExchangeDeclare(exchange, "topic", true, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("error declaring exchange %q: %w", exchange, err)
+	}
+	_, err = c.QueueDeclare(queue, true, false, false, false, queueArgs)
+	if err != nil {
+		return fmt.Errorf("error declaring queue %q: %w", queue, err)
+	}
+	err = c.QueueBind(queue, binding, exchange, false, nil)
+	if err != nil {
+		return fmt.Errorf("error binding queue %q on %q to exchange %q: %w", queue, binding, exchange, err)
 	}
 	return nil
 }
