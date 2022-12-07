@@ -157,8 +157,8 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			DurationSec: track.DurationSec,
 			Bitrate:     float64(track.Bitrate),
 
-			Width:       track.VideoTrack.Width,
-			Height:      track.VideoTrack.Height,
+			Width:       int(track.VideoTrack.Width),
+			Height:      int(track.VideoTrack.Height),
 			PixelFormat: track.VideoTrack.PixelFormat,
 			FPS:         float64(track.VideoTrack.FPS) / 1000,
 

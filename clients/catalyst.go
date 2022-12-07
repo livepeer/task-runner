@@ -13,6 +13,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/livepeer/catalyst-api/clients"
+	"github.com/livepeer/catalyst-api/pipeline"
 )
 
 var (
@@ -29,9 +30,10 @@ const (
 )
 
 type UploadVODRequest struct {
-	Url             string           `json:"url"`
-	CallbackUrl     string           `json:"callback_url"`
-	OutputLocations []OutputLocation `json:"output_locations,omitempty"`
+	Url              string            `json:"url"`
+	CallbackUrl      string            `json:"callback_url"`
+	OutputLocations  []OutputLocation  `json:"output_locations,omitempty"`
+	PipelineStrategy pipeline.Strategy `json:"pipeline_strategy,omitempty"`
 }
 
 type OutputLocation struct {
@@ -54,7 +56,7 @@ type CatalystOptions struct {
 	RateLimitInitialBackoff time.Duration
 }
 
-type CatalystCallback = clients.TranscodeStatusCompletedMessage
+type CatalystCallback = clients.TranscodeStatusMessage
 
 type Catalyst interface {
 	UploadVOD(ctx context.Context, upload UploadVODRequest) error
