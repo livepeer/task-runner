@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/livepeer/catalyst-api/pipeline"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
@@ -52,9 +53,10 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		}
 		var (
 			req = clients.UploadVODRequest{
-				Url:             inUrl,
-				CallbackUrl:     tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
-				OutputLocations: outputLocations,
+				Url:              inUrl,
+				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
+				OutputLocations:  outputLocations,
+				PipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 			}
 			nextStep = "checkCatalyst"
 		)
