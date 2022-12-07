@@ -76,6 +76,7 @@ type Runner interface {
 type RunnerOptions struct {
 	AMQPUri                 string
 	ExchangeName, QueueName string
+	OldQueueName            string
 	DeadLetter              struct {
 		ExchangeName, QueueName string
 	}
@@ -150,6 +151,17 @@ func (r *runner) Start() error {
 }
 
 func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
+	// TODO: Remove this logic after migration to dead leterred queue
+	if r.OldQueueName != "" {
+		err := c.QueueUnbind(r.OldQueueName, "task.trigger.#", r.ExchangeName, nil)
+		if err == nil {
+			_, err = c.QueueDelete(r.OldQueueName, true, true, false)
+		}
+		if err != nil {
+			glog.Errorf("Error cleaning up old queue err=%q", err)
+		}
+	}
+
 	queueArgs := amqp.Table{"x-queue-type": "quorum"}
 	if dlx := r.DeadLetter; dlx.ExchangeName != "" {
 		err := declareQueueAndExchange(c, dlx.ExchangeName, dlx.QueueName, "#", queueArgs)
