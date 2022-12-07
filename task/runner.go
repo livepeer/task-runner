@@ -146,22 +146,16 @@ func (r *runner) Start() error {
 		return fmt.Errorf("error consuming queue: %w", err)
 	}
 
+	// TODO: Remove this logic after migration to dead leterred queue
+	if r.OldQueueName != "" {
+		go cleanUpOldQueue(r.AMQPUri, r.OldQueueName, r.ExchangeName)
+	}
+
 	r.amqp = amqp
 	return nil
 }
 
 func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
-	// TODO: Remove this logic after migration to dead leterred queue
-	if r.OldQueueName != "" {
-		err := c.QueueUnbind(r.OldQueueName, "task.trigger.#", r.ExchangeName, nil)
-		if err == nil {
-			_, err = c.QueueDelete(r.OldQueueName, true, true, false)
-		}
-		if err != nil {
-			glog.Errorf("Error cleaning up old queue err=%q", err)
-		}
-	}
-
 	queueArgs := amqp.Table{"x-queue-type": "quorum"}
 	if dlx := r.DeadLetter; dlx.ExchangeName != "" {
 		err := declareQueueAndExchange(c, dlx.ExchangeName, dlx.QueueName, "#", queueArgs)
@@ -189,6 +183,32 @@ func (r *runner) setupAmqpConnection(c event.AMQPChanSetup) error {
 		return fmt.Errorf("error setting QoS: %w", err)
 	}
 	return nil
+}
+
+func cleanUpOldQueue(amqpURI, oldQueue, exchange string) {
+	defer func() {
+		if r := recover(); r != nil {
+			glog.Errorf("Recovered from panic in cleanUpOldQueue: %v", r)
+		}
+	}()
+
+	cleanUp := event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
+		err := c.QueueUnbind(oldQueue, "task.trigger.#", oldQueue, nil)
+		if err != nil {
+			glog.Errorf("Error unbinding old queue from exchange queue=%q exchange=%q err=%q", oldQueue, exchange, err)
+		}
+
+		_, err = c.QueueDelete(oldQueue, false, true, false)
+		if err != nil {
+			glog.Errorf("Error deleting old queue=%q err=%q", oldQueue, err)
+		}
+
+		return nil
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cleanUp(ctx, amqpURI, nil, nil)
 }
 
 func declareQueueAndExchange(c event.AMQPChanSetup, exchange, queue, binding string, queueArgs amqp.Table) error {
