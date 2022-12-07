@@ -255,7 +255,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
 	// return the error directly so that if publishing the result fails we nack the message to try again
-	return r.publishTaskResult(ctx, task, output, err)
+	return r.publishTaskResult(task, output, err)
 }
 
 func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *TaskHandlerOutput, err error) {
@@ -373,9 +373,9 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 	if callback.Status == clients.CatalystStatusError {
 		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
 		err := NewCatalystError(callback.Error, callback.Unretriable)
-		return r.publishTaskResult(ctx, taskInfo, nil, err)
+		return r.publishTaskResult(taskInfo, nil, err)
 	} else if callback.Status == clients.CatalystStatusSuccess {
-		return r.scheduleTaskStep(ctx, task.ID, nextStep, callback)
+		return r.scheduleTaskStep(task.ID, nextStep, callback)
 	}
 
 	return nil
@@ -394,7 +394,7 @@ func (r *runner) delayTaskStep(ctx context.Context, taskID, step string, input i
 		data.NewTaskTriggerEvent(task))
 }
 
-func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, input interface{}) error {
+func (r *runner) scheduleTaskStep(taskID, step string, input interface{}) error {
 	if step == "" {
 		return errors.New("can only schedule sub-steps of tasks")
 	}
@@ -409,7 +409,7 @@ func (r *runner) scheduleTaskStep(ctx context.Context, taskID, step string, inpu
 	return nil
 }
 
-func (r *runner) publishTaskResult(ctx context.Context, task data.TaskInfo, output *TaskHandlerOutput, resultErr error) error {
+func (r *runner) publishTaskResult(task data.TaskInfo, output *TaskHandlerOutput, resultErr error) error {
 	if r.HumanizeErrors {
 		resultErr = humanizeError(resultErr)
 	}
