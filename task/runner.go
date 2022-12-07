@@ -539,8 +539,8 @@ func publishLoggedRaw(producer event.AMQPProducer, task data.TaskInfo, exchange,
 		Key:        key,
 		Body:       body,
 		Persistent: true,
-		// TODO: Actually handle returns from the AMQP server. Needs further support in pkg/event.
-		Mandatory:  true,
+		// TODO: Actually handle returns from the AMQP server so we can toggle mandatory here. Needs further support in pkg/event.
+		// Mandatory:  true,
 		WaitResult: true,
 	}
 	glog.Infof("Publishing AMQP message. taskType=%q id=%s step=%q exchange=%q key=%q body=%+v", task.Type, task.ID, task.Step, exchange, key, body)

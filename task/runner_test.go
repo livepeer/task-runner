@@ -43,7 +43,7 @@ func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
 		Exchange:   "uniswap",
 		Key:        "task.result.ICO.LPT",
 		Persistent: true,
-		Mandatory:  true,
+		Mandatory:  false,
 		WaitResult: true,
 		Body: &data.TaskResultEvent{
 			Base: base,
