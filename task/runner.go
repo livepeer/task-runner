@@ -481,6 +481,10 @@ func humanizeError(err error) error {
 	if errors.As(err, &catErr) {
 		if strings.Contains(errMsg, "unsupported input pixel format") {
 			return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
+		} else if strings.Contains(errMsg, "Unsupported video input") {
+			return errors.New("unsupported file format")
+		} else if strings.Contains(errMsg, "ReadPacketData File read failed - end of file hit") {
+			return errors.New("invalid video file, possibly truncated")
 		}
 		return errInternalProcessingError
 	}
