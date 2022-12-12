@@ -39,10 +39,11 @@ var (
 
 var (
 	defaultTasks = map[string]TaskHandler{
-		"import":    TaskImport,
-		"upload":    TaskUpload,
-		"export":    TaskExport,
-		"transcode": TaskTranscode,
+		"import":         TaskImport,
+		"upload":         TaskUpload,
+		"export":         TaskExport,
+		"transcode":      TaskTranscode,
+		"transcode-file": TaskTranscodeFile,
 	}
 	errInternalProcessingError = errors.New("internal error processing file")
 	taskFatalErrorInfo         = &data.ErrorInfo{Message: errInternalProcessingError.Error(), Unretriable: true}
