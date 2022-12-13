@@ -471,6 +471,22 @@ func errorInfo(err error) *data.ErrorInfo {
 	return &data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)}
 }
 
+// Caller should check if err is a CatalystError first
+func humanizeCatalystError(err error) error {
+	errMsg := strings.ToLower(err.Error())
+
+	// Livepeer pipeline errors
+	if strings.Contains(errMsg, "unsupported input pixel format") {
+		return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
+	} else if strings.Contains(errMsg, "Unsupported video input") {
+		return errors.New("unsupported file format")
+	} else if strings.Contains(errMsg, "ReadPacketData File read failed - end of file hit") {
+		return errors.New("invalid video file, possibly truncated")
+	}
+
+	return errInternalProcessingError
+}
+
 func humanizeError(err error) error {
 	if err == nil {
 		return nil
@@ -479,14 +495,7 @@ func humanizeError(err error) error {
 
 	var catErr CatalystError
 	if errors.As(err, &catErr) {
-		if strings.Contains(errMsg, "unsupported input pixel format") {
-			return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
-		} else if strings.Contains(errMsg, "Unsupported video input") {
-			return errors.New("unsupported file format")
-		} else if strings.Contains(errMsg, "ReadPacketData File read failed - end of file hit") {
-			return errors.New("invalid video file, possibly truncated")
-		}
-		return errInternalProcessingError
+		return humanizeCatalystError(err)
 	}
 
 	if strings.Contains(errMsg, "unexpected eof") {
