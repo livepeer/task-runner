@@ -475,6 +475,11 @@ func errorInfo(err error) *data.ErrorInfo {
 func humanizeCatalystError(err error) error {
 	errMsg := strings.ToLower(err.Error())
 
+	// General errors
+	if strings.Contains(errMsg, "import request") && strings.Contains(errMsg, "504 Gateway Timeout") {
+		return errors.New("file could not be imported from URL because it was not accessible")
+	}
+
 	// Livepeer pipeline errors
 	if strings.Contains(errMsg, "unsupported input pixel format") {
 		return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
