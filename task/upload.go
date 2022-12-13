@@ -114,6 +114,10 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		step   = tctx.Step
 		params = *tctx.Task.Params.TranscodeFile
 	)
+	task, err := parseTaskSnapshot(tctx.Snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing task from message snapshot: %w", err)
+	}
 	// TODO: Unify getFileUrlString and getFileUrl
 	// TODO: Support private input storage
 	inUrl, err := getFileUrlString(tctx.OutputOSObj, tctx.ImportTaskConfig, params.Input.URL)
@@ -122,7 +126,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	}
 	switch step {
 	case "", "rateLimitBackoff":
-		_, outputLocations, err := assetOutputLocationsTranscodeFile(params)
+		_, outputLocations, err := assetOutputLocationsTranscodeFile(*task.Params.TranscodeFile)
 		if err != nil {
 			return nil, err
 		}
@@ -181,6 +185,14 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown task step: %s", step)
+}
+
+func parseTaskSnapshot(snapshot json.RawMessage) (api.Task, error) {
+	var task api.Task
+	if err := json.Unmarshal(snapshot, &task); err != nil {
+		return task, err
+	}
+	return task, nil
 }
 
 func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
@@ -484,9 +496,9 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 }
 
 func assetOutputLocationsTranscodeFile(params api.TranscodeFileTaskParams) ([]OutputName, []clients.OutputLocation, error) {
-	outURL, err := url.Parse(fmt.Sprintf("s3+https://%s:%s@%s/%s/output.m3u8",
-		params.Storage.Credentals.AccessKeyId,
-		params.Storage.Credentals.SecretAccessKey,
+	outURL, err := url.Parse(fmt.Sprintf("s3+https://%s:%s@%s/%s/samplevideo/hls/output.m3u8",
+		params.Storage.Credentials.AccessKeyId,
+		params.Storage.Credentials.SecretAccessKey,
 		// TODO: Parse endpoint
 		//params.Storage.Endpoint,
 		"gateway.storjshare.io",
