@@ -471,6 +471,36 @@ func errorInfo(err error) *data.ErrorInfo {
 	return &data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)}
 }
 
+// Caller should check if err is a CatalystError first
+func humanizeCatalystError(err error) error {
+	errMsg := strings.ToLower(err.Error())
+
+	// General errors
+	if strings.Contains(errMsg, "import request") && strings.Contains(errMsg, "504 Gateway Timeout") {
+		return errors.New("file could not be imported from URL because it was not accessible")
+	}
+
+	// MediaConvert pipeline errors
+	if strings.Contains(errMsg, "doesn't have video that the transcoder can consume") {
+		// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
+		return errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")
+	} else if strings.Contains(errMsg, "Failed probe/open") {
+		// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
+		return errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")
+	}
+
+	// Livepeer pipeline errors
+	if strings.Contains(errMsg, "unsupported input pixel format") {
+		return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
+	} else if strings.Contains(errMsg, "Unsupported video input") {
+		return errors.New("unsupported file format")
+	} else if strings.Contains(errMsg, "ReadPacketData File read failed - end of file hit") {
+		return errors.New("invalid video file, possibly truncated")
+	}
+
+	return errInternalProcessingError
+}
+
 func humanizeError(err error) error {
 	if err == nil {
 		return nil
@@ -479,14 +509,7 @@ func humanizeError(err error) error {
 
 	var catErr CatalystError
 	if errors.As(err, &catErr) {
-		if strings.Contains(errMsg, "unsupported input pixel format") {
-			return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
-		} else if strings.Contains(errMsg, "Unsupported video input") {
-			return errors.New("unsupported file format")
-		} else if strings.Contains(errMsg, "ReadPacketData File read failed - end of file hit") {
-			return errors.New("invalid video file, possibly truncated")
-		}
-		return errInternalProcessingError
+		return humanizeCatalystError(err)
 	}
 
 	if strings.Contains(errMsg, "unexpected eof") {
