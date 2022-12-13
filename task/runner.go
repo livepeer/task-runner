@@ -480,6 +480,15 @@ func humanizeCatalystError(err error) error {
 		return errors.New("file could not be imported from URL because it was not accessible")
 	}
 
+	// MediaConvert pipeline errors
+	if strings.Contains(errMsg, "doesn't have video that the transcoder can consume") {
+		// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
+		return errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")
+	} else if strings.Contains(errMsg, "Failed probe/open") {
+		// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
+		return errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")
+	}
+
 	// Livepeer pipeline errors
 	if strings.Contains(errMsg, "unsupported input pixel format") {
 		return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
