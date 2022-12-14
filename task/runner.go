@@ -476,7 +476,11 @@ func humanizeCatalystError(err error) error {
 	errMsg := strings.ToLower(err.Error())
 
 	fileNotAccessibleErrs := []string{
+		// This should trigger retry logic so probably can be removed
 		"504 Gateway Timeout",
+		// This will not trigger retry logic so needs to be handled on its own
+		"404 Not Found",
+		// Checks for hitting max retries for a HTTP client
 		"giving up after",
 	}
 	// General errors
