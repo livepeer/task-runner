@@ -475,9 +475,17 @@ func errorInfo(err error) *data.ErrorInfo {
 func humanizeCatalystError(err error) error {
 	errMsg := strings.ToLower(err.Error())
 
+	fileNotAccessibleErrs := []string{
+		"504 Gateway Timeout",
+		"giving up after",
+	}
 	// General errors
-	if strings.Contains(errMsg, "import request") && strings.Contains(errMsg, "504 Gateway Timeout") {
-		return errors.New("file could not be imported from URL because it was not accessible")
+	if strings.Contains(errMsg, "import request") {
+		for _, e := range fileNotAccessibleErrs {
+			if strings.Contains(errMsg, e) {
+				return errors.New("file could not be imported from URL because it was not accessible")
+			}
+		}
 	}
 
 	// MediaConvert pipeline errors
