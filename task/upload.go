@@ -35,44 +35,47 @@ var (
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
 )
 
-func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
+type handleUploadVODParams struct {
+	tctx                     *TaskContext
+	inUrl                    string
+	getOutputLocations       func() ([]clients.OutputLocation, error)
+	finalize                 func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error)
+	catalystPipelineStrategy pipeline.Strategy
+}
+
+func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 	var (
-		ctx    = tctx.Context
-		step   = tctx.Step
-		params = *tctx.Task.Params.Upload
+		ctx  = p.tctx.Context
+		step = p.tctx.Step
 	)
-	inUrl, err := getFileUrl(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
-	if err != nil {
-		return nil, fmt.Errorf("error building file URL: %w", err)
-	}
 	switch step {
 	case "", "rateLimitBackoff":
-		_, outputLocations, err := assetOutputLocations(tctx)
+		outputLocations, err := p.getOutputLocations()
 		if err != nil {
 			return nil, err
 		}
 		var (
 			req = clients.UploadVODRequest{
-				Url:              inUrl,
-				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
+				Url:              p.inUrl,
+				CallbackUrl:      p.tctx.catalyst.CatalystHookURL(p.tctx.Task.ID, "finalize", catalystTaskAttemptID(p.tctx.Task)),
 				OutputLocations:  outputLocations,
-				PipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+				PipelineStrategy: p.catalystPipelineStrategy,
 			}
 			nextStep = "checkCatalyst"
 		)
-		err = tctx.catalyst.UploadVOD(ctx, req)
+		err = p.tctx.catalyst.UploadVOD(ctx, req)
 		if errors.Is(err, clients.ErrRateLimited) {
 			nextStep = "rateLimitBackoff"
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to call catalyst: %w", err)
 		}
-		err = tctx.delayTaskStep(ctx, tctx.Task.ID, nextStep, nil)
+		err = p.tctx.delayTaskStep(ctx, p.tctx.Task.ID, nextStep, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %w", err)
 		}
 		return ContinueAsync, nil
 	case "checkCatalyst":
-		task := tctx.Task
+		task := p.tctx.Task
 		if task.Status.Phase != api.TaskPhaseRunning {
 			return ContinueAsync, nil
 		}
@@ -80,106 +83,78 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
 			return nil, fmt.Errorf("catalyst task lost (last update %s ago)", updateAge)
 		}
-		err := tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
+		err := p.tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to schedule next check: %w", err)
 		}
 		return ContinueAsync, nil
 	case "finalize":
 		var callback *clients.CatalystCallback
-		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
+		if err := json.Unmarshal(p.tctx.StepInput, &callback); err != nil {
 			return nil, fmt.Errorf("error parsing step input: %w", err)
 		}
 		glog.Infof("Processing upload task catalyst callback. taskId=%s status=%q rawCallback=%+v",
-			tctx.Task.ID, callback.Status, *callback)
+			p.tctx.Task.ID, callback.Status, *callback)
 		if callback.Status != "success" {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
 
-		tctx.Progress.Set(0.9)
-		taskOutput, err := processCatalystCallback(tctx, callback)
-		if err != nil {
-			return nil, fmt.Errorf("error processing catalyst callback: %w", err)
-		}
-		return &TaskHandlerOutput{
-			TaskOutput: &data.TaskOutput{Upload: taskOutput},
-		}, nil
+		return p.finalize(callback)
 	}
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }
 
+func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
+	params := *tctx.Task.Params.Upload
+	inUrl, err := getFileUrl(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
+	if err != nil {
+		return nil, fmt.Errorf("error building file URL: %w", err)
+	}
+
+	return handleUploadVOD(handleUploadVODParams{
+		tctx:  tctx,
+		inUrl: inUrl,
+		getOutputLocations: func() ([]clients.OutputLocation, error) {
+			_, outputLocations, err := assetOutputLocations(tctx)
+			return outputLocations, err
+		},
+		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
+			tctx.Progress.Set(0.9)
+			taskOutput, err := processCatalystCallback(tctx, callback)
+			if err != nil {
+				return nil, fmt.Errorf("error processing catalyst callback: %w", err)
+			}
+			return &TaskHandlerOutput{
+				TaskOutput: &data.TaskOutput{Upload: taskOutput},
+			}, nil
+		},
+		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+	})
+}
+
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
-	var (
-		ctx    = tctx.Context
-		step   = tctx.Step
-		params = *tctx.Task.Params.TranscodeFile
-	)
 	// TODO: Unify getFileUrlString and getFileUrl
 	// TODO: Support private input storage
+	params := *tctx.Task.Params.TranscodeFile
 	inUrl, err := getFileUrlString(tctx.OutputOSObj, tctx.ImportTaskConfig, params.Input.URL)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
-	switch step {
-	case "", "rateLimitBackoff":
-		_, outputLocations, err := assetOutputLocationsTranscodeFile(params)
-		if err != nil {
-			return nil, err
-		}
-		var (
-			req = clients.UploadVODRequest{
-				Url:              inUrl,
-				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
-				OutputLocations:  outputLocations,
-				PipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
-			}
-			nextStep = "checkCatalyst"
-		)
-		err = tctx.catalyst.UploadVOD(ctx, req)
-		if errors.Is(err, clients.ErrRateLimited) {
-			nextStep = "rateLimitBackoff"
-		} else if err != nil {
-			return nil, fmt.Errorf("failed to call catalyst: %w", err)
-		}
-		err = tctx.delayTaskStep(ctx, tctx.Task.ID, nextStep, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %w", err)
-		}
-		return ContinueAsync, nil
-	case "checkCatalyst":
-		task := tctx.Task
-		if task.Status.Phase != api.TaskPhaseRunning {
-			return ContinueAsync, nil
-		}
-		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
-		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
-			return nil, fmt.Errorf("catalyst task lost (last update %s ago)", updateAge)
-		}
-		err := tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to schedule next check: %w", err)
-		}
-		return ContinueAsync, nil
-	case "finalize":
-		var callback *clients.CatalystCallback
-		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
-			return nil, fmt.Errorf("error parsing step input: %w", err)
-		}
-		glog.Infof("Processing upload task catalyst callback. taskId=%s status=%q rawCallback=%+v",
-			tctx.Task.ID, callback.Status, *callback)
-		if callback.Status != "success" {
-			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
-		}
 
-		tctx.Progress.Set(1)
-		// TODO: Check if nothing of this is needed
-		//taskOutput, err := processCatalystCallbackTranscodeFile(tctx, callback)
-		//if err != nil {
-		//	return nil, fmt.Errorf("error processing catalyst callback: %w", err)
-		//}
-		return &TaskHandlerOutput{}, nil
-	}
-	return nil, fmt.Errorf("unknown task step: %s", step)
+	return handleUploadVOD(handleUploadVODParams{
+		tctx:  tctx,
+		inUrl: inUrl,
+		getOutputLocations: func() ([]clients.OutputLocation, error) {
+			_, outputLocations, err := assetOutputLocationsTranscodeFile(params)
+			return outputLocations, err
+		},
+		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
+			tctx.Progress.Set(1)
+			// TODO: Check if this logic from TaskUpload is not needed here
+			return &TaskHandlerOutput{}, nil
+		},
+		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+	})
 }
 
 func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
@@ -443,12 +418,15 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
+	relativePath := asset.PlaybackID
+	// TODO: Refactor this part to reuse by both TaskUpload and Task TranscodeFile
+
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
-				URL:  outURL.JoinPath(hlsRootPlaylistFileName(asset.PlaybackID)).String(),
+				URL:  outURL.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceSegments:     true,
 					TranscodedSegments: true,
@@ -460,13 +438,13 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 			append(names, OutputNameOSSourceMP4),
 			append(locations, clients.OutputLocation{
 				Type: "object_store",
-				URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
+				URL:  outURL.JoinPath(videoFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceMp4: true,
 				},
 			})
 	}
-	if FlagCatalystSupportsIPFS && asset.Storage.IPFS != nil {
+	if FlagCatalystSupportsIPFS && pinataAccessToken != "" {
 		// TODO: This interface is likely going to change so that pinata is just a
 		// `object_store` output
 		names, locations =
