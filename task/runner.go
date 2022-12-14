@@ -480,7 +480,9 @@ func humanizeCatalystError(err error) error {
 		"giving up after",
 	}
 	// General errors
-	if strings.Contains(errMsg, "import request") {
+	// TODO(yondonfu): This string matching is ugly and we should come up with a better less error-prone way to
+	// do this
+	if strings.Contains(errMsg, "download error") && strings.Contains(errMsg, "import request") {
 		for _, e := range fileNotAccessibleErrs {
 			if strings.Contains(errMsg, e) {
 				return errors.New("file could not be imported from URL because it was not accessible")
