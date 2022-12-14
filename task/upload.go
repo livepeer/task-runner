@@ -485,8 +485,8 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 
 func assetOutputLocationsTranscodeFile(params api.TranscodeFileTaskParams) ([]OutputName, []clients.OutputLocation, error) {
 	outURL, err := url.Parse(fmt.Sprintf("s3+https://%s:%s@%s/%s/output.m3u8",
-		params.Storage.Credentals.AccessKeyId,
-		params.Storage.Credentals.SecretAccessKey,
+		params.Storage.Credentials.AccessKeyId,
+		params.Storage.Credentials.SecretAccessKey,
 		// TODO: Parse endpoint
 		//params.Storage.Endpoint,
 		"gateway.storjshare.io",
