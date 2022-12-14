@@ -171,14 +171,13 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
 
-		tctx.Progress.Set(0.9)
-		taskOutput, err := processCatalystCallback(tctx, callback)
-		if err != nil {
-			return nil, fmt.Errorf("error processing catalyst callback: %w", err)
-		}
-		return &TaskHandlerOutput{
-			TaskOutput: &data.TaskOutput{Upload: taskOutput},
-		}, nil
+		tctx.Progress.Set(1)
+		// TODO: Check if nothing of this is needed
+		//taskOutput, err := processCatalystCallbackTranscodeFile(tctx, callback)
+		//if err != nil {
+		//	return nil, fmt.Errorf("error processing catalyst callback: %w", err)
+		//}
+		return &TaskHandlerOutput{}, nil
 	}
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }
