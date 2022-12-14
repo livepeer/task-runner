@@ -476,7 +476,11 @@ func humanizeCatalystError(err error) error {
 	errMsg := strings.ToLower(err.Error())
 
 	fileNotAccessibleErrs := []string{
+		// This should trigger retry logic so probably can be removed
 		"504 Gateway Timeout",
+		// This will not trigger retry logic so needs to be handled on its own
+		"404 Not Found",
+		// Checks for hitting max retries for a HTTP client
 		"giving up after",
 	}
 	// General errors
@@ -490,11 +494,22 @@ func humanizeCatalystError(err error) error {
 		}
 	}
 
+	invalidVideoErrs := []string{
+		"doesn't have video that the transcoder can consume",
+		"is not a supported input video codec",
+		"is not a supported input audio codec",
+	}
+
 	// MediaConvert pipeline errors
-	if strings.Contains(errMsg, "doesn't have video that the transcoder can consume") {
-		// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
-		return errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")
-	} else if strings.Contains(errMsg, "Failed probe/open") {
+	for _, e := range invalidVideoErrs {
+		if strings.Contains(errMsg, e) {
+			// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
+			// TODO(yondonfu): See if we can passthrough the MediaConvert error message with the exact problematic input codec
+			// without including extraneous error information from Catalyst
+			return errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")
+		}
+	}
+	if strings.Contains(errMsg, "Failed probe/open") {
 		// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
 		return errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")
 	}
