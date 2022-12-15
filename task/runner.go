@@ -26,6 +26,17 @@ const (
 	taskPublishTimeout           = 1 * time.Minute
 )
 
+// Humanized errors
+var (
+	errFileInaccessible = errors.New("file could not be imported from URL because it was not accessible")
+	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
+	// TODO(yondonfu): See if we can passthrough the MediaConvert error message with the exact problematic input codec
+	// without including extraneous error information from Catalyst
+	errInvalidVideo = errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")
+	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
+	errProbe = errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")
+)
+
 var (
 	defaultTasks = map[string]TaskHandler{
 		"import":    TaskImport,
@@ -477,9 +488,9 @@ func humanizeCatalystError(err error) error {
 
 	fileNotAccessibleErrs := []string{
 		// This should trigger retry logic so probably can be removed
-		"504 Gateway Timeout",
+		"504 gateway timeout",
 		// This will not trigger retry logic so needs to be handled on its own
-		"404 Not Found",
+		"404 not found",
 		// Checks for hitting max retries for a HTTP client
 		"giving up after",
 	}
@@ -489,7 +500,7 @@ func humanizeCatalystError(err error) error {
 	if strings.Contains(errMsg, "download error") && strings.Contains(errMsg, "import request") {
 		for _, e := range fileNotAccessibleErrs {
 			if strings.Contains(errMsg, e) {
-				return errors.New("file could not be imported from URL because it was not accessible")
+				return errFileInaccessible
 			}
 		}
 	}
@@ -503,23 +514,21 @@ func humanizeCatalystError(err error) error {
 	// MediaConvert pipeline errors
 	for _, e := range invalidVideoErrs {
 		if strings.Contains(errMsg, e) {
-			// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
-			// TODO(yondonfu): See if we can passthrough the MediaConvert error message with the exact problematic input codec
-			// without including extraneous error information from Catalyst
-			return errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")
+			return errInvalidVideo
 		}
 	}
-	if strings.Contains(errMsg, "Failed probe/open") {
-		// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
-		return errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")
+	if strings.Contains(errMsg, "failed probe/open") {
+		return errProbe
 	}
 
 	// Livepeer pipeline errors
 	if strings.Contains(errMsg, "unsupported input pixel format") {
 		return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
 	} else if strings.Contains(errMsg, "Unsupported video input") {
+		// TODO(yondonfu): This check probably does not work because the error message will be lowercased
 		return errors.New("unsupported file format")
 	} else if strings.Contains(errMsg, "ReadPacketData File read failed - end of file hit") {
+		// TODO(yondonfu): This check probably does not work because the error message will be lowercased
 		return errors.New("invalid video file, possibly truncated")
 	}
 

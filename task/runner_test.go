@@ -7,8 +7,35 @@ import (
 
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHumanizeError(t *testing.T) {
+	assert := assert.New(t)
+
+	// Catalyst errors
+	err := NewCatalystError("download error import request 504 Gateway Timeout", false)
+	assert.Error(humanizeError(err), errFileInaccessible)
+
+	err = NewCatalystError("download error import request 404 Not Found", false)
+	assert.Error(humanizeError(err), errFileInaccessible)
+
+	err = NewCatalystError("download error import request giving up after", false)
+	assert.Error(humanizeError(err), errFileInaccessible)
+
+	err = NewCatalystError("foobar doesn't have video that the transcoder can consume foobar", false)
+	assert.Error(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("foobar is not a supported input video codec foobar", false)
+	assert.Error(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("foobar is not a supported input audio codec foobar", false)
+	assert.Error(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("foobar Failed probe/open: foobar", false)
+	assert.Error(humanizeError(err), errProbe)
+}
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
 	require := require.New(t)
