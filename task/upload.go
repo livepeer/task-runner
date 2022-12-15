@@ -134,7 +134,7 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.TranscodeFile
-	inUrl, err := getFileUrlForTranscodeTask(tctx.ImportTaskConfig, params)
+	inUrl, err := getFileUrl(tctx.ImportTaskConfig, params.Input.URL)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -143,7 +143,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: inUrl,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := assetOutputLocationsForTranscodeFile(tctx)
+			_, outputLocation, err := assetOutputLocations(params.Storage.URL, params.Outputs.HLS.Path)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -164,22 +164,6 @@ func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params a
 		return u.String(), nil
 	}
 	return getFileUrl(cfg, params.URL)
-}
-
-func getFileUrlForTranscodeTask(cfg ImportTaskConfig, params api.TranscodeFileTaskParams) (string, error) {
-	in := params.Input
-
-	// Use the direct URL if specified
-	if in.URL != "" {
-		return getFileUrl(cfg, params.Input.URL)
-	}
-
-	// If URL not specified, resolve the s3 private storage
-	URL, err := resolveStorageURL(in.Type, in.Endpoint, in.Bucket, in.Credentials.AccessKeyId, in.Credentials.SecretAccessKey)
-	if err != nil {
-		return "", fmt.Errorf("error parsing object store URL: %w", err)
-	}
-	return URL.JoinPath(in.Path).String(), nil
 }
 
 func getFileUrl(cfg ImportTaskConfig, URL string) (string, error) {
@@ -405,11 +389,10 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 }
 
 func assetOutputLocationsForUploadTask(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
-	outURL, err := url.Parse(tctx.OutputOSObj.URL)
+	outputNames, outputLocations, err := assetOutputLocations(tctx.OutputOSObj.URL, tctx.OutputAsset.PlaybackID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
+		return nil, nil, err
 	}
-	outputNames, outputLocations := assetOutputLocations(outURL, tctx.OutputAsset.PlaybackID)
 
 	// Add Pinata output location
 	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
@@ -429,36 +412,17 @@ func assetOutputLocationsForUploadTask(tctx *TaskContext) ([]OutputName, []clien
 	return outputNames, outputLocations, nil
 }
 
-func assetOutputLocationsForTranscodeFile(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
-	params := *tctx.Task.Params.TranscodeFile
-	s := params.Storage
-	outURL, err := resolveStorageURL(s.Type, s.Endpoint, s.Bucket, s.Credentials.AccessKeyId, s.Credentials.SecretAccessKey)
+func assetOutputLocations(outURL string, relativePath string) ([]OutputName, []clients.OutputLocation, error) {
+	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	outputNames, outputLocations := assetOutputLocations(outURL, params.Outputs.HLS.Path)
-	return outputNames, outputLocations, nil
-}
-
-func resolveStorageURL(sType, endpoint, bucket, accessKeyId, secretAccessKey string) (*url.URL, error) {
-	if sType != "s3" {
-		return nil, fmt.Errorf("only s3 type is supported, but received %s", sType)
-	}
-	endpointURL, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing endpoint url: %w", err)
-	}
-	return url.Parse(
-		fmt.Sprintf("s3+%s://%s:%s@%s/%s", endpointURL.Scheme, accessKeyId, secretAccessKey, endpointURL.Host, bucket))
-}
-
-func assetOutputLocations(outURL *url.URL, relativePath string) ([]OutputName, []clients.OutputLocation) {
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
-				URL:  outURL.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
+				URL:  url.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceSegments:     true,
 					TranscodedSegments: true,
@@ -470,13 +434,13 @@ func assetOutputLocations(outURL *url.URL, relativePath string) ([]OutputName, [
 			append(names, OutputNameOSSourceMP4),
 			append(locations, clients.OutputLocation{
 				Type: "object_store",
-				URL:  outURL.JoinPath(videoFileName(relativePath)).String(),
+				URL:  url.JoinPath(videoFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceMp4: true,
 				},
 			})
 	}
-	return names, locations
+	return names, locations, nil
 }
 
 func catalystTaskAttemptID(task *api.Task) string {
