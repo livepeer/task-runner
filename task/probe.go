@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -214,6 +215,18 @@ func parseFps(framerate string) (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("error parsing framerate denominator: %w", err)
 	}
+
+	if den == 0 {
+		// If numerator and denominator are 0 return 0.0 for the FPS
+		// 0/0 can be valid for a video track i.e. mjpeg
+		if num == 0 {
+			return 0, nil
+		}
+
+		// If only denominator is 0 then the framerate is invalid
+		return 0, errors.New("invalid framerate denominator 0")
+	}
+
 	return float64(num) / float64(den), nil
 }
 
