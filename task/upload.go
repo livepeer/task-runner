@@ -115,7 +115,7 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: inUrl,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocations, err := assetOutputLocationsForUploadTask(tctx)
+			_, outputLocations, err := assetOutputLocations(tctx)
 			return outputLocations, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -143,7 +143,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: inUrl,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := assetOutputLocations(params.Storage.URL, params.Outputs.HLS.Path)
+			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -219,7 +219,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		}
 	}
 
-	outputNames, outputReqs, err := assetOutputLocationsForUploadTask(tctx)
+	outputNames, outputReqs, err := assetOutputLocations(tctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting asset output requests: %w", err)
 	}
@@ -388,8 +388,8 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 }
 
-func assetOutputLocationsForUploadTask(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
-	outputNames, outputLocations, err := assetOutputLocations(tctx.OutputOSObj.URL, tctx.OutputAsset.PlaybackID)
+func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
+	outputNames, outputLocations, err := outputLocations(tctx.OutputOSObj.URL, tctx.OutputAsset.PlaybackID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -412,7 +412,7 @@ func assetOutputLocationsForUploadTask(tctx *TaskContext) ([]OutputName, []clien
 	return outputNames, outputLocations, nil
 }
 
-func assetOutputLocations(outURL string, relativePath string) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL string, relativePath string) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
