@@ -18,10 +18,6 @@ Returned when Catalyst cannot handle the file because the codec or container is 
 
 Returned when Catalyst cannot probe or open the file likely because the codec or container is not supported.
 
-**error processing catalyst callback: error saving metadata file: error marshaling file metadat: json: unsupported value: NaN**
-
-This error will be removed once https://github.com/livepeer/task-runner/issues/106 is resolved. For now, this error is known to be returned when an image file is provided instead of a video file.
-
 **internal error processing file**
 
 This error is the default used when no other error can be generated for the internal error within task-runner.
