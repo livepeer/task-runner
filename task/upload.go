@@ -106,7 +106,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 
 func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.Upload
-	inUrl, err := getFileUrl(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
+	inUrl, err := getFileUrlForUploadTask(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -115,7 +115,7 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: inUrl,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocations, err := assetOutputLocations(tctx)
+			_, outputLocations, err := assetOutputLocationsForUploadTask(tctx)
 			return outputLocations, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -133,10 +133,8 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 }
 
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
-	// TODO: Unify getFileUrlString and getFileUrl
-	// TODO: Support private input storage
 	params := *tctx.Task.Params.TranscodeFile
-	inUrl, err := getFileUrlString(tctx.OutputOSObj, tctx.ImportTaskConfig, params.Input.URL)
+	inUrl, err := getFileUrlForTranscodeTask(tctx.ImportTaskConfig, params)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -145,8 +143,8 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: inUrl,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocations, err := assetOutputLocationsTranscodeFile(params)
-			return outputLocations, err
+			_, outputLocation, err := assetOutputLocationsForTranscodeFile(tctx)
+			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
@@ -157,7 +155,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	})
 }
 
-func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
+func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
 	if params.UploadedObjectKey != "" {
 		u, err := url.Parse(os.PublicURL)
 		if err != nil {
@@ -166,27 +164,15 @@ func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTask
 		u.Path = path.Join(u.Path, params.UploadedObjectKey)
 		return u.String(), nil
 	}
-	if params.URL == "" {
-		return "", fmt.Errorf("no URL or uploaded object key specified")
-	}
-
-	if strings.HasPrefix(params.URL, IPFS_PREFIX) {
-		cid := strings.TrimPrefix(params.URL, IPFS_PREFIX)
-		if len(cfg.ImportIPFSGatewayURLs) == 0 {
-			return "", fmt.Errorf("no IPFS gateways configured")
-		}
-		return cfg.ImportIPFSGatewayURLs[0].JoinPath(cid).String(), nil
-	}
-	if strings.HasPrefix(params.URL, ARWEAVE_PREFIX) {
-		txID := strings.TrimPrefix(params.URL, ARWEAVE_PREFIX)
-		// arweave.net is the main gateway for Arweave right now
-		// In the future, given more gateways, we can receive a config gateway URL similar to what we do for IPFS
-		return "https://arweave.net/" + txID, nil
-	}
-	return params.URL, nil
+	return getFileUrl(cfg, params.URL)
 }
 
-func getFileUrlString(os *api.ObjectStore, cfg ImportTaskConfig, URL string) (string, error) {
+func getFileUrlForTranscodeTask(cfg ImportTaskConfig, params api.TranscodeFileTaskParams) (string, error) {
+	// TODO: Resolve private S3 buckets
+	return getFileUrl(cfg, params.Input.URL)
+}
+
+func getFileUrl(cfg ImportTaskConfig, URL string) (string, error) {
 	if URL == "" {
 		return "", fmt.Errorf("no URL or uploaded object key specified")
 	}
@@ -239,7 +225,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		}
 	}
 
-	outputNames, outputReqs, err := assetOutputLocations(tctx)
+	outputNames, outputReqs, err := assetOutputLocationsForUploadTask(tctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting asset output requests: %w", err)
 	}
@@ -408,19 +394,38 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 }
 
-func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
-	var (
-		asset             = tctx.OutputAsset
-		outOS             = tctx.OutputOSObj
-		pinataAccessToken = tctx.PinataAccessToken
-	)
-	outURL, err := url.Parse(outOS.URL)
+func assetOutputLocationsForUploadTask(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
+	outURL, err := url.Parse(tctx.OutputOSObj.URL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	relativePath := asset.PlaybackID
-	// TODO: Refactor this part to reuse by both TaskUpload and Task TranscodeFile
+	return assetOutputLocations(outURL, tctx.OutputAsset.PlaybackID, tctx.PinataAccessToken)
+}
 
+func assetOutputLocationsForTranscodeFile(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
+	var params = *tctx.Task.Params.TranscodeFile
+	if params.Storage.Type != "s3" {
+		return nil, nil, fmt.Errorf("only s3 type is supported, but received %s", params.Storage.Type)
+	}
+	endpointURL, err := url.Parse(params.Storage.Endpoint)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error parsing endpoint url: %w", err)
+	}
+	outURL, err := url.Parse(
+		fmt.Sprintf("s3+%s://%s:%s@%s/%s",
+			endpointURL.Scheme,
+			params.Storage.Credentials.AccessKeyId,
+			params.Storage.Credentials.SecretAccessKey,
+			endpointURL.Host,
+			params.Storage.Bucket))
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
+	}
+	return assetOutputLocations(outURL, params.Outputs.HLS.Path, tctx.PinataAccessToken)
+}
+
+func assetOutputLocations(outURL *url.URL, relativePath, pinataAccessToken string) ([]OutputName, []clients.OutputLocation, error) {
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
@@ -457,61 +462,6 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 				},
 			})
 	}
-	return names, locations, nil
-}
-
-func assetOutputLocationsTranscodeFile(params api.TranscodeFileTaskParams) ([]OutputName, []clients.OutputLocation, error) {
-	outURL, err := url.Parse(fmt.Sprintf("s3+https://%s:%s@%s/%s/output.m3u8",
-		params.Storage.Credentials.AccessKeyId,
-		params.Storage.Credentials.SecretAccessKey,
-		// TODO: Parse endpoint
-		//params.Storage.Endpoint,
-		"gateway.storjshare.io",
-		params.Storage.Bucket,
-	))
-	urlString := outURL.String()
-	fmt.Println(urlString)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
-	}
-	names, locations :=
-		[]OutputName{OutputNameOSPlaylistHLS},
-		[]clients.OutputLocation{
-			{
-				Type: "object_store",
-				URL:  outURL.String(),
-				Outputs: &clients.OutputsRequest{
-					SourceSegments:     true,
-					TranscodedSegments: true,
-				},
-			},
-		}
-	// TODO: Check if we should support this part
-	//if FlagCatalystCopiesSourceFile {
-	//	names, locations =
-	//		append(names, OutputNameOSSourceMP4),
-	//		append(locations, clients.OutputLocation{
-	//			Type: "object_store",
-	//			URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
-	//			Outputs: &clients.OutputsRequest{
-	//				SourceMp4: true,
-	//			},
-	//		})
-	//}
-	// TODO: Check if we should support Pinata
-	//if FlagCatalystSupportsIPFS && asset.Storage.IPFS != nil {
-	//	// TODO: This interface is likely going to change so that pinata is just a
-	//	// `object_store` output
-	//	names, locations =
-	//		append(names, OutputNameIPFSSourceMP4),
-	//		append(locations, clients.OutputLocation{
-	//			Type:            "ipfs_pinata",
-	//			PinataAccessKey: pinataAccessToken,
-	//			Outputs: &clients.OutputsRequest{
-	//				SourceMp4: true,
-	//			},
-	//		})
-	//}
 	return names, locations, nil
 }
 
