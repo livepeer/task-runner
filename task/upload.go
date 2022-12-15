@@ -409,7 +409,24 @@ func assetOutputLocationsForUploadTask(tctx *TaskContext) ([]OutputName, []clien
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	return assetOutputLocations(outURL, tctx.OutputAsset.PlaybackID, tctx.PinataAccessToken)
+	outputNames, outputLocations := assetOutputLocations(outURL, tctx.OutputAsset.PlaybackID)
+
+	// Add Pinata output location
+	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
+		// TODO: This interface is likely going to change so that pinata is just a
+		// `object_store` output
+		outputNames, outputLocations =
+			append(outputNames, OutputNameIPFSSourceMP4),
+			append(outputLocations, clients.OutputLocation{
+				Type:            "ipfs_pinata",
+				PinataAccessKey: tctx.PinataAccessToken,
+				Outputs: &clients.OutputsRequest{
+					SourceMp4: true,
+				},
+			})
+	}
+
+	return outputNames, outputLocations, nil
 }
 
 func assetOutputLocationsForTranscodeFile(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
@@ -419,7 +436,8 @@ func assetOutputLocationsForTranscodeFile(tctx *TaskContext) ([]OutputName, []cl
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	return assetOutputLocations(outURL, params.Outputs.HLS.Path, tctx.PinataAccessToken)
+	outputNames, outputLocations := assetOutputLocations(outURL, params.Outputs.HLS.Path)
+	return outputNames, outputLocations, nil
 }
 
 func resolveStorageURL(sType, endpoint, bucket, accessKeyId, secretAccessKey string) (*url.URL, error) {
@@ -434,7 +452,7 @@ func resolveStorageURL(sType, endpoint, bucket, accessKeyId, secretAccessKey str
 		fmt.Sprintf("s3+%s://%s:%s@%s/%s", endpointURL.Scheme, accessKeyId, secretAccessKey, endpointURL.Host, bucket))
 }
 
-func assetOutputLocations(outURL *url.URL, relativePath, pinataAccessToken string) ([]OutputName, []clients.OutputLocation, error) {
+func assetOutputLocations(outURL *url.URL, relativePath string) ([]OutputName, []clients.OutputLocation) {
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
@@ -458,20 +476,7 @@ func assetOutputLocations(outURL *url.URL, relativePath, pinataAccessToken strin
 				},
 			})
 	}
-	if FlagCatalystSupportsIPFS && pinataAccessToken != "" {
-		// TODO: This interface is likely going to change so that pinata is just a
-		// `object_store` output
-		names, locations =
-			append(names, OutputNameIPFSSourceMP4),
-			append(locations, clients.OutputLocation{
-				Type:            "ipfs_pinata",
-				PinataAccessKey: pinataAccessToken,
-				Outputs: &clients.OutputsRequest{
-					SourceMp4: true,
-				},
-			})
-	}
-	return names, locations, nil
+	return names, locations
 }
 
 func catalystTaskAttemptID(task *api.Task) string {
