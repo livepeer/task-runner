@@ -121,13 +121,6 @@ func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTask
 		return "", fmt.Errorf("no URL or uploaded object key specified")
 	}
 
-	if strings.HasPrefix(params.URL, IPFS_PREFIX) {
-		cid := strings.TrimPrefix(params.URL, IPFS_PREFIX)
-		if len(cfg.ImportIPFSGatewayURLs) == 0 {
-			return "", fmt.Errorf("no IPFS gateways configured")
-		}
-		return cfg.ImportIPFSGatewayURLs[0].JoinPath(cid).String(), nil
-	}
 	if strings.HasPrefix(params.URL, ARWEAVE_PREFIX) {
 		txID := strings.TrimPrefix(params.URL, ARWEAVE_PREFIX)
 		// arweave.net is the main gateway for Arweave right now
