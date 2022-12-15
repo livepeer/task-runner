@@ -148,7 +148,6 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
-			// TODO: Check if this logic from TaskUpload is not needed here
 			return &TaskHandlerOutput{}, nil
 		},
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
@@ -168,8 +167,19 @@ func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params a
 }
 
 func getFileUrlForTranscodeTask(cfg ImportTaskConfig, params api.TranscodeFileTaskParams) (string, error) {
-	// TODO: Resolve private S3 buckets
-	return getFileUrl(cfg, params.Input.URL)
+	in := params.Input
+
+	// Use the direct URL if specified
+	if in.URL != "" {
+		return getFileUrl(cfg, params.Input.URL)
+	}
+
+	// If URL not specified, resolve the s3 private storage
+	URL, err := resolveStorageURL(in.Type, in.Endpoint, in.Bucket, in.Credentials.AccessKeyId, in.Credentials.SecretAccessKey)
+	if err != nil {
+		return "", fmt.Errorf("error parsing object store URL: %w", err)
+	}
+	return URL.JoinPath(in.Path).String(), nil
 }
 
 func getFileUrl(cfg ImportTaskConfig, URL string) (string, error) {
@@ -403,26 +413,25 @@ func assetOutputLocationsForUploadTask(tctx *TaskContext) ([]OutputName, []clien
 }
 
 func assetOutputLocationsForTranscodeFile(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
-	var params = *tctx.Task.Params.TranscodeFile
-	if params.Storage.Type != "s3" {
-		return nil, nil, fmt.Errorf("only s3 type is supported, but received %s", params.Storage.Type)
-	}
-	endpointURL, err := url.Parse(params.Storage.Endpoint)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing endpoint url: %w", err)
-	}
-	outURL, err := url.Parse(
-		fmt.Sprintf("s3+%s://%s:%s@%s/%s",
-			endpointURL.Scheme,
-			params.Storage.Credentials.AccessKeyId,
-			params.Storage.Credentials.SecretAccessKey,
-			endpointURL.Host,
-			params.Storage.Bucket))
-
+	params := *tctx.Task.Params.TranscodeFile
+	s := params.Storage
+	outURL, err := resolveStorageURL(s.Type, s.Endpoint, s.Bucket, s.Credentials.AccessKeyId, s.Credentials.SecretAccessKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
 	return assetOutputLocations(outURL, params.Outputs.HLS.Path, tctx.PinataAccessToken)
+}
+
+func resolveStorageURL(sType, endpoint, bucket, accessKeyId, secretAccessKey string) (*url.URL, error) {
+	if sType != "s3" {
+		return nil, fmt.Errorf("only s3 type is supported, but received %s", sType)
+	}
+	endpointURL, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing endpoint url: %w", err)
+	}
+	return url.Parse(
+		fmt.Sprintf("s3+%s://%s:%s@%s/%s", endpointURL.Scheme, accessKeyId, secretAccessKey, endpointURL.Host, bucket))
 }
 
 func assetOutputLocations(outURL *url.URL, relativePath, pinataAccessToken string) ([]OutputName, []clients.OutputLocation, error) {
