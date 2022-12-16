@@ -24,6 +24,9 @@ func TestHumanizeError(t *testing.T) {
 	err = NewCatalystError("download error import request giving up after", false)
 	assert.Error(humanizeError(err), errFileInaccessible)
 
+	err = NewCatalystError("upload error: failed to write file foobar to foobar: unexpected EOF", false)
+	assert.Error(humanizeError(err), errFileInaccessible)
+
 	err = NewCatalystError("foobar doesn't have video that the transcoder can consume foobar", false)
 	assert.Error(humanizeError(err), errInvalidVideo)
 
