@@ -33,6 +33,9 @@ func TestHumanizeError(t *testing.T) {
 	err = NewCatalystError("foobar is not a supported input audio codec foobar", false)
 	assert.Error(humanizeError(err), errInvalidVideo)
 
+	err = NewCatalystError("Demuxer: [ReadPacketData File read failed - end of file hit at length [5242880]. Is file truncated?]", false)
+	assert.Error(humanizeError(err), errInvalidVideo)
+
 	err = NewCatalystError("foobar Failed probe/open: foobar", false)
 	assert.Error(humanizeError(err), errProbe)
 }
