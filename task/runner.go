@@ -505,6 +505,13 @@ func humanizeCatalystError(err error) error {
 		}
 	}
 
+	if strings.Contains(errMsg, "upload error") && strings.Contains(errMsg, "failed to write file") {
+		// Handle error reading source when copying
+		if strings.Contains(errMsg, "unexpected EOF") {
+			return errFileInaccessible
+		}
+	}
+
 	invalidVideoErrs := []string{
 		"doesn't have video that the transcoder can consume",
 		"is not a supported input video codec",
