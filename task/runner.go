@@ -509,6 +509,9 @@ func humanizeCatalystError(err error) error {
 		"doesn't have video that the transcoder can consume",
 		"is not a supported input video codec",
 		"is not a supported input audio codec",
+		// Keeping it simple for now and returning errInvalidVideo for this
+		// But, should there be a separate humanized error for this?
+		"readpacketdata file read failed - end of file hit",
 	}
 
 	// MediaConvert pipeline errors
@@ -527,9 +530,6 @@ func humanizeCatalystError(err error) error {
 	} else if strings.Contains(errMsg, "Unsupported video input") {
 		// TODO(yondonfu): This check probably does not work because the error message will be lowercased
 		return errors.New("unsupported file format")
-	} else if strings.Contains(errMsg, "ReadPacketData File read failed - end of file hit") {
-		// TODO(yondonfu): This check probably does not work because the error message will be lowercased
-		return errors.New("invalid video file, possibly truncated")
 	}
 
 	return errInternalProcessingError
