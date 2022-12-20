@@ -45,8 +45,9 @@ type handleUploadVODParams struct {
 
 func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 	var (
-		ctx  = p.tctx.Context
-		step = p.tctx.Step
+		tctx = p.tctx
+		ctx  = tctx.Context
+		step = tctx.Step
 	)
 	switch step {
 	case "", "rateLimitBackoff":
@@ -57,25 +58,25 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		var (
 			req = clients.UploadVODRequest{
 				Url:              p.inUrl,
-				CallbackUrl:      p.tctx.catalyst.CatalystHookURL(p.tctx.Task.ID, "finalize", catalystTaskAttemptID(p.tctx.Task)),
+				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 				OutputLocations:  outputLocations,
 				PipelineStrategy: p.catalystPipelineStrategy,
 			}
 			nextStep = "checkCatalyst"
 		)
-		err = p.tctx.catalyst.UploadVOD(ctx, req)
+		err = tctx.catalyst.UploadVOD(ctx, req)
 		if errors.Is(err, clients.ErrRateLimited) {
 			nextStep = "rateLimitBackoff"
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to call catalyst: %w", err)
 		}
-		err = p.tctx.delayTaskStep(ctx, p.tctx.Task.ID, nextStep, nil)
+		err = tctx.delayTaskStep(ctx, tctx.Task.ID, nextStep, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed scheduling catalyst healthcheck: %w", err)
 		}
 		return ContinueAsync, nil
 	case "checkCatalyst":
-		task := p.tctx.Task
+		task := tctx.Task
 		if task.Status.Phase != api.TaskPhaseRunning {
 			return ContinueAsync, nil
 		}
@@ -83,18 +84,18 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		if updateAge := time.Since(updatedAt.Time); updateAge > time.Minute {
 			return nil, fmt.Errorf("catalyst task lost (last update %s ago)", updateAge)
 		}
-		err := p.tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
+		err := tctx.delayTaskStep(ctx, task.ID, "checkCatalyst", nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to schedule next check: %w", err)
 		}
 		return ContinueAsync, nil
 	case "finalize":
 		var callback *clients.CatalystCallback
-		if err := json.Unmarshal(p.tctx.StepInput, &callback); err != nil {
+		if err := json.Unmarshal(tctx.StepInput, &callback); err != nil {
 			return nil, fmt.Errorf("error parsing step input: %w", err)
 		}
 		glog.Infof("Processing upload task catalyst callback. taskId=%s status=%q rawCallback=%+v",
-			p.tctx.Task.ID, callback.Status, *callback)
+			tctx.Task.ID, callback.Status, *callback)
 		if callback.Status != "success" {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
@@ -166,25 +167,25 @@ func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params a
 	return getFileUrl(cfg, params.URL)
 }
 
-func getFileUrl(cfg ImportTaskConfig, URL string) (string, error) {
-	if URL == "" {
+func getFileUrl(cfg ImportTaskConfig, url string) (string, error) {
+	if url == "" {
 		return "", fmt.Errorf("no URL or uploaded object key specified")
 	}
 
-	if strings.HasPrefix(URL, IPFS_PREFIX) {
-		cid := strings.TrimPrefix(URL, IPFS_PREFIX)
+	if strings.HasPrefix(url, IPFS_PREFIX) {
+		cid := strings.TrimPrefix(url, IPFS_PREFIX)
 		if len(cfg.ImportIPFSGatewayURLs) == 0 {
 			return "", fmt.Errorf("no IPFS gateways configured")
 		}
 		return cfg.ImportIPFSGatewayURLs[0].JoinPath(cid).String(), nil
 	}
-	if strings.HasPrefix(URL, ARWEAVE_PREFIX) {
-		txID := strings.TrimPrefix(URL, ARWEAVE_PREFIX)
+	if strings.HasPrefix(url, ARWEAVE_PREFIX) {
+		txID := strings.TrimPrefix(url, ARWEAVE_PREFIX)
 		// arweave.net is the main gateway for Arweave right now
 		// In the future, given more gateways, we can receive a config gateway URL similar to what we do for IPFS
 		return "https://arweave.net/" + txID, nil
 	}
-	return URL, nil
+	return url, nil
 }
 
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
