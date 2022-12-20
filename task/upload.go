@@ -35,28 +35,32 @@ var (
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
 )
 
-func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
+type handleUploadVODParams struct {
+	tctx                     *TaskContext
+	inUrl                    string
+	getOutputLocations       func() ([]clients.OutputLocation, error)
+	finalize                 func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error)
+	catalystPipelineStrategy pipeline.Strategy
+}
+
+func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 	var (
-		ctx    = tctx.Context
-		step   = tctx.Step
-		params = *tctx.Task.Params.Upload
+		tctx = p.tctx
+		ctx  = tctx.Context
+		step = tctx.Step
 	)
-	inUrl, err := getFileUrl(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
-	if err != nil {
-		return nil, fmt.Errorf("error building file URL: %w", err)
-	}
 	switch step {
 	case "", "rateLimitBackoff":
-		_, outputLocations, err := assetOutputLocations(tctx)
+		outputLocations, err := p.getOutputLocations()
 		if err != nil {
 			return nil, err
 		}
 		var (
 			req = clients.UploadVODRequest{
-				Url:              inUrl,
+				Url:              p.inUrl,
 				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 				OutputLocations:  outputLocations,
-				PipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+				PipelineStrategy: p.catalystPipelineStrategy,
 			}
 			nextStep = "checkCatalyst"
 		)
@@ -96,19 +100,62 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
 
-		tctx.Progress.Set(0.9)
-		taskOutput, err := processCatalystCallback(tctx, callback)
-		if err != nil {
-			return nil, fmt.Errorf("error processing catalyst callback: %w", err)
-		}
-		return &TaskHandlerOutput{
-			TaskOutput: &data.TaskOutput{Upload: taskOutput},
-		}, nil
+		return p.finalize(callback)
 	}
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }
 
-func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
+func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
+	params := *tctx.Task.Params.Upload
+	inUrl, err := getFileUrlForUploadTask(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
+	if err != nil {
+		return nil, fmt.Errorf("error building file URL: %w", err)
+	}
+
+	return handleUploadVOD(handleUploadVODParams{
+		tctx:  tctx,
+		inUrl: inUrl,
+		getOutputLocations: func() ([]clients.OutputLocation, error) {
+			_, outputLocations, err := assetOutputLocations(tctx)
+			return outputLocations, err
+		},
+		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
+			tctx.Progress.Set(0.9)
+			taskOutput, err := processCatalystCallback(tctx, callback)
+			if err != nil {
+				return nil, fmt.Errorf("error processing catalyst callback: %w", err)
+			}
+			return &TaskHandlerOutput{
+				TaskOutput: &data.TaskOutput{Upload: taskOutput},
+			}, nil
+		},
+		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+	})
+}
+
+func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
+	params := *tctx.Task.Params.TranscodeFile
+	inUrl, err := getFileUrl(tctx.ImportTaskConfig, params.Input.URL)
+	if err != nil {
+		return nil, fmt.Errorf("error building file URL: %w", err)
+	}
+
+	return handleUploadVOD(handleUploadVODParams{
+		tctx:  tctx,
+		inUrl: inUrl,
+		getOutputLocations: func() ([]clients.OutputLocation, error) {
+			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path)
+			return outputLocation, err
+		},
+		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
+			tctx.Progress.Set(1)
+			return &TaskHandlerOutput{}, nil
+		},
+		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+	})
+}
+
+func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
 	if params.UploadedObjectKey != "" {
 		u, err := url.Parse(os.PublicURL)
 		if err != nil {
@@ -117,24 +164,28 @@ func getFileUrl(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTask
 		u.Path = path.Join(u.Path, params.UploadedObjectKey)
 		return u.String(), nil
 	}
-	if params.URL == "" {
+	return getFileUrl(cfg, params.URL)
+}
+
+func getFileUrl(cfg ImportTaskConfig, url string) (string, error) {
+	if url == "" {
 		return "", fmt.Errorf("no URL or uploaded object key specified")
 	}
 
-	if strings.HasPrefix(params.URL, IPFS_PREFIX) {
-		cid := strings.TrimPrefix(params.URL, IPFS_PREFIX)
+	if strings.HasPrefix(url, IPFS_PREFIX) {
+		cid := strings.TrimPrefix(url, IPFS_PREFIX)
 		if len(cfg.ImportIPFSGatewayURLs) == 0 {
 			return "", fmt.Errorf("no IPFS gateways configured")
 		}
 		return cfg.ImportIPFSGatewayURLs[0].JoinPath(cid).String(), nil
 	}
-	if strings.HasPrefix(params.URL, ARWEAVE_PREFIX) {
-		txID := strings.TrimPrefix(params.URL, ARWEAVE_PREFIX)
+	if strings.HasPrefix(url, ARWEAVE_PREFIX) {
+		txID := strings.TrimPrefix(url, ARWEAVE_PREFIX)
 		// arweave.net is the main gateway for Arweave right now
 		// In the future, given more gateways, we can receive a config gateway URL similar to what we do for IPFS
 		return "https://arweave.net/" + txID, nil
 	}
-	return params.URL, nil
+	return url, nil
 }
 
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
@@ -339,12 +390,31 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
-	var (
-		asset             = tctx.OutputAsset
-		outOS             = tctx.OutputOSObj
-		pinataAccessToken = tctx.PinataAccessToken
-	)
-	outURL, err := url.Parse(outOS.URL)
+	outputNames, outputLocations, err := outputLocations(tctx.OutputOSObj.URL, tctx.OutputAsset.PlaybackID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Add Pinata output location
+	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
+		// TODO: This interface is likely going to change so that pinata is just a
+		// `object_store` output
+		outputNames, outputLocations =
+			append(outputNames, OutputNameIPFSSourceMP4),
+			append(outputLocations, clients.OutputLocation{
+				Type:            "ipfs_pinata",
+				PinataAccessKey: tctx.PinataAccessToken,
+				Outputs: &clients.OutputsRequest{
+					SourceMp4: true,
+				},
+			})
+	}
+
+	return outputNames, outputLocations, nil
+}
+
+func outputLocations(outURL string, relativePath string) ([]OutputName, []clients.OutputLocation, error) {
+	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
@@ -353,7 +423,7 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
-				URL:  outURL.JoinPath(hlsRootPlaylistFileName(asset.PlaybackID)).String(),
+				URL:  url.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceSegments:     true,
 					TranscodedSegments: true,
@@ -365,20 +435,7 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 			append(names, OutputNameOSSourceMP4),
 			append(locations, clients.OutputLocation{
 				Type: "object_store",
-				URL:  outURL.JoinPath(videoFileName(asset.PlaybackID)).String(),
-				Outputs: &clients.OutputsRequest{
-					SourceMp4: true,
-				},
-			})
-	}
-	if FlagCatalystSupportsIPFS && asset.Storage.IPFS != nil {
-		// TODO: This interface is likely going to change so that pinata is just a
-		// `object_store` output
-		names, locations =
-			append(names, OutputNameIPFSSourceMP4),
-			append(locations, clients.OutputLocation{
-				Type:            "ipfs_pinata",
-				PinataAccessKey: pinataAccessToken,
+				URL:  url.JoinPath(videoFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceMp4: true,
 				},
