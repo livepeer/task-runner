@@ -285,7 +285,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *T
 
 	isFirstStep := taskCtx.Step == ""
 	if !isFirstStep {
-		glog.Infof(`Continuing task type=%q id=%s step=%s inputAssetId=%s outputAssetId=%s params="%+v" stepInput=%q`, taskType, taskID, taskCtx.Step, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params, taskCtx.StepInput)
+		glog.Infof("Continuing task type=%q id=%s step=%s inputAssetId=%s outputAssetId=%s", taskType, taskID, taskCtx.Step, taskCtx.InputAssetID, taskCtx.OutputAssetID)
 	} else {
 		if taskCtx.Status.Phase == api.TaskPhaseRunning {
 			return nil, errors.New("task has already been started before")
@@ -361,8 +361,8 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 		return fmt.Errorf("failed to get task %s: %w", taskId, err)
 	}
 
-	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q rawCallback=%+v",
-		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error, *callback)
+	glog.Infof("Received catalyst callback taskType=%q id=%s taskPhase=%s status=%q completionRatio=%v error=%q",
+		task.Type, task.ID, task.Status.Phase, callback.Status, callback.CompletionRatio, callback.Error)
 
 	if task.Status.Phase != api.TaskPhaseRunning &&
 		task.Status.Phase != api.TaskPhaseWaiting {

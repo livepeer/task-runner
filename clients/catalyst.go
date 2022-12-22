@@ -99,7 +99,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 			Body:        bytes.NewReader(body),
 			ContentType: "application/json",
 		}, &res)
-		glog.Infof("Catalyst upload VOD request: req=%q err=%q res=%q", body, err, string(res))
+		glog.Infof("Catalyst upload VOD request: req=%v err=%s res=%s", withoutCredentials(upload), err, string(res))
 
 		if !isTooManyRequestsErr(err) {
 			return
@@ -117,6 +117,26 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 			return
 		}
 	}
+}
+
+func withoutCredentials(upload UploadVODRequest) UploadVODRequest {
+	res := upload
+	res.Url = redactURL(upload.Url)
+	res.OutputLocations = []OutputLocation{}
+	for _, ol := range upload.OutputLocations {
+		nol := ol
+		nol.URL = redactURL(ol.URL)
+		res.OutputLocations = append(res.OutputLocations, nol)
+	}
+	return res
+}
+
+func redactURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "REDACTED"
+	}
+	return u.Redacted()
 }
 
 // Catalyst hook helpers
