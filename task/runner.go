@@ -508,9 +508,14 @@ func humanizeCatalystError(err error) error {
 
 	if strings.Contains(errMsg, "upload error") && strings.Contains(errMsg, "failed to write file") {
 		// Handle error reading source when copying
-		if strings.Contains(errMsg, "unexpected EOF") {
+		if strings.Contains(errMsg, "unexpected eof") {
 			return errFileInaccessible
 		}
+	}
+
+	// MediaConvert inaccessible error
+	if strings.Contains(errMsg, "3450") && strings.Contains(errMsg, "error encountered when accessing") {
+		return errFileInaccessible
 	}
 
 	invalidVideoErrs := []string{
