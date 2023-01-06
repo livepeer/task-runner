@@ -16,34 +16,34 @@ func TestHumanizeError(t *testing.T) {
 
 	// Catalyst errors
 	err := NewCatalystError("download error import request 504 Gateway Timeout", false)
-	assert.EqualError(humanizeError(err), errFileInaccessible.Error())
+	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 
 	err = NewCatalystError("download error import request 404 Not Found", false)
-	assert.EqualError(humanizeError(err), errFileInaccessible.Error())
+	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 
 	err = NewCatalystError("download error import request giving up after", false)
-	assert.EqualError(humanizeError(err), errFileInaccessible.Error())
+	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 
 	err = NewCatalystError("upload error: failed to write file foobar to foobar: unexpected EOF", false)
-	assert.EqualError(humanizeError(err), errFileInaccessible.Error())
+	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 
 	err = NewCatalystError("external transcoder error: job failed: 3450: Error encountered when accessing: foo", false)
-	assert.EqualError(humanizeError(err), errFileInaccessible.Error())
+	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 
 	err = NewCatalystError("foobar doesn't have video that the transcoder can consume foobar", false)
-	assert.EqualError(humanizeError(err), errInvalidVideo.Error())
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 
 	err = NewCatalystError("foobar is not a supported input video codec foobar", false)
-	assert.EqualError(humanizeError(err), errInvalidVideo.Error())
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 
 	err = NewCatalystError("foobar is not a supported input audio codec foobar", false)
-	assert.EqualError(humanizeError(err), errInvalidVideo.Error())
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 
 	err = NewCatalystError("Demuxer: [ReadPacketData File read failed - end of file hit at length [5242880]. Is file truncated?]", false)
-	assert.EqualError(humanizeError(err), errInvalidVideo.Error())
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 
 	err = NewCatalystError("foobar Failed probe/open: foobar", false)
-	assert.EqualError(humanizeError(err), errProbe.Error())
+	assert.ErrorIs(humanizeError(err), errProbe)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
