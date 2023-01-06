@@ -508,7 +508,7 @@ func humanizeCatalystError(err error) error {
 
 	if strings.Contains(errMsg, "upload error") && strings.Contains(errMsg, "failed to write file") {
 		// Handle error reading source when copying
-		if strings.Contains(errMsg, "unexpected EOF") {
+		if strings.Contains(errMsg, "unexpected eof") {
 			return errFileInaccessible
 		}
 	}
@@ -520,6 +520,7 @@ func humanizeCatalystError(err error) error {
 		// Keeping it simple for now and returning errInvalidVideo for this
 		// But, should there be a separate humanized error for this?
 		"readpacketdata file read failed - end of file hit",
+		"no video track found in file",
 	}
 
 	// MediaConvert pipeline errors
