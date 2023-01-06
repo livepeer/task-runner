@@ -44,6 +44,9 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("foobar Failed probe/open: foobar", false)
 	assert.ErrorIs(humanizeError(err), errProbe)
+
+	err = NewCatalystError("no video track found in file", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
