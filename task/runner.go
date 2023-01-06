@@ -513,6 +513,11 @@ func humanizeCatalystError(err error) error {
 		}
 	}
 
+	// MediaConvert inaccessible error
+	if strings.Contains(errMsg, "3450") && strings.Contains(errMsg, "error encountered when accessing") {
+		return errFileInaccessible
+	}
+
 	invalidVideoErrs := []string{
 		"doesn't have video that the transcoder can consume",
 		"is not a supported input video codec",
