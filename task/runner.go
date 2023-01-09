@@ -205,7 +205,7 @@ func cleanUpOldQueue(amqpURI, oldQueue, exchange string) {
 	}()
 
 	cleanUp := event.NewAMQPConnectFunc(func(c event.AMQPChanSetup) error {
-		err := c.QueueUnbind(oldQueue, "task.trigger.#", oldQueue, nil)
+		err := c.QueueUnbind(oldQueue, "task.trigger.#", exchange, nil)
 		if err != nil {
 			glog.Errorf("Error unbinding old queue from exchange queue=%q exchange=%q err=%q", oldQueue, exchange, err)
 		}
