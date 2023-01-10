@@ -17,6 +17,7 @@ import (
 	"github.com/livepeer/stream-tester/m3u8"
 	"github.com/livepeer/task-runner/api"
 	"github.com/livepeer/task-runner/clients"
+	"github.com/livepeer/task-runner/metrics"
 	"github.com/livepeer/task-runner/task"
 	"github.com/peterbourgon/ff"
 	"golang.org/x/sync/errgroup"
@@ -142,6 +143,9 @@ func parseFlags(build BuildFlags) cliFlags {
 func Run(build BuildFlags) {
 	cli := parseFlags(build)
 	glog.Infof("Task runner starting... version=%q", build.Version)
+
+	// Fire a metric to track which version of task-runner we're running
+	metrics.Version.WithLabelValues("task-runner", build.Version).Inc()
 
 	clients.UserAgent = "livepeer-task-runner/" + build.Version
 	cli.runnerOpts.LivepeerAPIOptions.UserAgent = clients.UserAgent
