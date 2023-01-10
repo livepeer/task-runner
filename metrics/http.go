@@ -29,6 +29,13 @@ var (
 		},
 		[]string{"api"},
 	)
+	Version = Factory.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: FQName("version"),
+			Help: "Current Git SHA / Tag that's running. Incremented once on app startup.",
+		},
+		[]string{"app", "version"},
+	)
 )
 
 func ObservedHandlerFunc(apiName string, handler http.HandlerFunc) http.Handler {
