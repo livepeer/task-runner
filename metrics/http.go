@@ -29,8 +29,8 @@ var (
 		},
 		[]string{"api"},
 	)
-	Version = Factory.NewCounterVec(
-		prometheus.CounterOpts{
+	Version = Factory.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: FQName("version"),
 			Help: "Current Git SHA / Tag that's running. Incremented once on app startup.",
 		},
