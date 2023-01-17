@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -135,7 +134,7 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.TranscodeFile
-	inUrl, err := getFileUrl(tctx.ImportTaskConfig, params.Input.URL)
+	inUrl, err := getFileUrl(params.Input.URL)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -164,27 +163,14 @@ func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params a
 		u.Path = path.Join(u.Path, params.UploadedObjectKey)
 		return u.String(), nil
 	}
-	return getFileUrl(cfg, params.URL)
+	return getFileUrl(params.URL)
 }
 
-func getFileUrl(cfg ImportTaskConfig, url string) (string, error) {
+func getFileUrl(url string) (string, error) {
 	if url == "" {
 		return "", fmt.Errorf("no URL or uploaded object key specified")
 	}
 
-	if strings.HasPrefix(url, IPFS_PREFIX) {
-		cid := strings.TrimPrefix(url, IPFS_PREFIX)
-		if len(cfg.ImportIPFSGatewayURLs) == 0 {
-			return "", fmt.Errorf("no IPFS gateways configured")
-		}
-		return cfg.ImportIPFSGatewayURLs[0].JoinPath(cid).String(), nil
-	}
-	if strings.HasPrefix(url, ARWEAVE_PREFIX) {
-		txID := strings.TrimPrefix(url, ARWEAVE_PREFIX)
-		// arweave.net is the main gateway for Arweave right now
-		// In the future, given more gateways, we can receive a config gateway URL similar to what we do for IPFS
-		return "https://arweave.net/" + txID, nil
-	}
 	return url, nil
 }
 
