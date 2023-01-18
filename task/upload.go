@@ -106,7 +106,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 
 func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.Upload
-	inUrl, err := getFileUrlForUploadTask(tctx.OutputOSObj, tctx.ImportTaskConfig, params)
+	inUrl, err := getFileUrlForUploadTask(tctx.OutputOSObj, params)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -134,14 +134,10 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.TranscodeFile
-	inUrl, err := getFileUrl(params.Input.URL)
-	if err != nil {
-		return nil, fmt.Errorf("error building file URL: %w", err)
-	}
 
 	return handleUploadVOD(handleUploadVODParams{
 		tctx:  tctx,
-		inUrl: inUrl,
+		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
 			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path)
 			return outputLocation, err
@@ -154,7 +150,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	})
 }
 
-func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams) (string, error) {
+func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
 	if params.UploadedObjectKey != "" {
 		u, err := url.Parse(os.PublicURL)
 		if err != nil {
@@ -163,15 +159,7 @@ func getFileUrlForUploadTask(os *api.ObjectStore, cfg ImportTaskConfig, params a
 		u.Path = path.Join(u.Path, params.UploadedObjectKey)
 		return u.String(), nil
 	}
-	return getFileUrl(params.URL)
-}
-
-func getFileUrl(url string) (string, error) {
-	if url == "" {
-		return "", fmt.Errorf("no URL or uploaded object key specified")
-	}
-
-	return url, nil
+	return params.URL, nil
 }
 
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
