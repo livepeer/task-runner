@@ -14,6 +14,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/livepeer/catalyst-api/clients"
 	"github.com/livepeer/catalyst-api/pipeline"
+	"github.com/livepeer/go-api-client"
 )
 
 var (
@@ -33,6 +34,7 @@ type UploadVODRequest struct {
 	Url              string            `json:"url"`
 	CallbackUrl      string            `json:"callback_url"`
 	OutputLocations  []OutputLocation  `json:"output_locations,omitempty"`
+	Profiles         []api.Profile     `json:"profiles,omitempty"`
 	PipelineStrategy pipeline.Strategy `json:"pipeline_strategy,omitempty"`
 }
 
