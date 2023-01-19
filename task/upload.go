@@ -40,6 +40,7 @@ type handleUploadVODParams struct {
 	inUrl                    string
 	getOutputLocations       func() ([]clients.OutputLocation, error)
 	finalize                 func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error)
+	profiles                 []api.Profile
 	catalystPipelineStrategy pipeline.Strategy
 }
 
@@ -61,6 +62,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 				OutputLocations:  outputLocations,
 				PipelineStrategy: p.catalystPipelineStrategy,
+				Profiles:         p.profiles,
 			}
 			nextStep = "checkCatalyst"
 		)
@@ -151,6 +153,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
 			return &TaskHandlerOutput{}, nil
 		},
+		profiles:                 params.Profiles,
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 	})
 }
