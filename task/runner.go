@@ -28,7 +28,7 @@ const (
 
 // Humanized errors
 var (
-	errFileInaccessible = UnretriableError{errors.New("file could not be imported from URL because it was not accessible")}
+	errFileInaccessible = errors.New("file could not be imported from URL because it was not accessible")
 	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
 	// TODO(yondonfu): See if we can passthrough the MediaConvert error message with the exact problematic input codec
 	// without including extraneous error information from Catalyst
