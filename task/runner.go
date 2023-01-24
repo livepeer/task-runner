@@ -32,9 +32,9 @@ var (
 	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
 	// TODO(yondonfu): See if we can passthrough the MediaConvert error message with the exact problematic input codec
 	// without including extraneous error information from Catalyst
-	errInvalidVideo = errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")
+	errInvalidVideo = UnretriableError{errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")}
 	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
-	errProbe = errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")
+	errProbe = UnretriableError{errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")}
 )
 
 var (
