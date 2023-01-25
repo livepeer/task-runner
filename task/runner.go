@@ -526,6 +526,7 @@ func humanizeCatalystError(err error) error {
 		// But, should there be a separate humanized error for this?
 		"readpacketdata file read failed - end of file hit",
 		"no video track found in file",
+		"no pictures decoded",
 	}
 
 	// MediaConvert pipeline errors

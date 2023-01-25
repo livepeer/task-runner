@@ -47,6 +47,9 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("no video track found in file", false)
 	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("job failed: Decoder closed. No pictures decoded", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
