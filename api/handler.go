@@ -37,7 +37,7 @@ func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.R
 
 	hookHandler := metrics.ObservedHandlerFunc("catalyst_hook", router.catalystHook)
 	hookHandler = authorized(opts.Catalyst.Secret, hookHandler)
-	hookHandler = logger(router)
+	hookHandler = logger(hookHandler)
 	router.Handler("POST", clients.CatalystHookPath(opts.APIRoot, ":id"), hookHandler)
 	return router
 }
