@@ -34,6 +34,7 @@ var (
 	OutputNameOSSourceMP4   = OutputName("source_mp4")
 	OutputNameOSPlaylistHLS = OutputName("playlist_hls")
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
+	OutputNameAssetMP4      = OutputName("asset_mp4")
 )
 
 type handleUploadVODParams struct {
@@ -253,6 +254,19 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			})
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
+		case OutputNameAssetMP4:
+			if len(output.Videos) != 1 {
+				return nil, fmt.Errorf("unexpected number of videos in source MP4 output: %d", len(output.Videos))
+			}
+			video := output.Videos[0]
+			if video.Type != "mp4" {
+				return nil, fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
+			}
+			videoFilePath = video.Location
+			assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+				Type: "asset_file",
+				Path: videoFilePath,
+			})
 		default:
 			return nil, fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
@@ -434,6 +448,15 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 				},
 			},
 		}
+	names, locations =
+		append(names, OutputNameAssetMP4),
+		append(locations, clients.OutputLocation{
+			Type: "object_store",
+			URL:  url.JoinPath(mp4FileName(relativePath)).String(),
+			Outputs: &clients.OutputsRequest{
+				AutoMP4s: true,
+			},
+		})
 	if FlagCatalystCopiesSourceFile {
 		names, locations =
 			append(names, OutputNameOSSourceMP4),
