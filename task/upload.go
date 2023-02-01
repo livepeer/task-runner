@@ -258,15 +258,17 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			if len(output.Videos) != 1 {
 				return nil, fmt.Errorf("unexpected number of videos in source MP4 output: %d", len(output.Videos))
 			}
-			video := output.Videos[0]
-			if video.Type != "mp4" {
-				return nil, fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
+			for _, video := range output.Videos {
+				if video.Type != "mp4" {
+					return nil, fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
+				}
+				videoFilePath = video.Location
+				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+					Type: "asset_file",
+					Path: videoFilePath,
+				})
 			}
-			videoFilePath = video.Location
-			assetSpec.Files = append(assetSpec.Files, api.AssetFile{
-				Type: "asset_file",
-				Path: videoFilePath,
-			})
+
 		default:
 			return nil, fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
