@@ -409,16 +409,17 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
-	outputNames, outputLocations, err := outputLocations(tctx.OutputOSObj.URL, playbackId)
+	outURL := tctx.OutputOSObj.URL
+	outputNames, outputLocations, err := outputLocations(outURL, playbackId)
 	if err != nil {
 		return nil, nil, err
 	}
-	mp4Url, _ := url.JoinPath(mp4FileName(playbackId))
+	url, _ := url.Parse(outURL)
 	outputNames, outputLocations =
 		append(outputNames, OutputNameAssetMP4),
 		append(outputLocations, clients.OutputLocation{
 			Type: "object_store",
-			URL:  mp4Url,
+			URL:  url.JoinPath(mp4FileName(playbackId)).String(),
 			Outputs: &clients.OutputsRequest{
 				AutoMP4s: true,
 			},
