@@ -264,7 +264,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 				}
 				videoFilePath = video.Location
 				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
-					Type: "static_file",
+					Type: "static_transcoded_mp4",
 					Path: videoFilePath,
 				})
 			}
@@ -412,7 +412,15 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 	if err != nil {
 		return nil, nil, err
 	}
-
+	outputNames, outputLocations =
+		append(outputNames, OutputNameAssetMP4),
+		append(outputLocations, clients.OutputLocation{
+			Type: "object_store",
+			URL:  url.JoinPath(mp4FileName(tctx.OutputAsset.PlaybackID)).String(),
+			Outputs: &clients.OutputsRequest{
+				AutoMP4s: true,
+			},
+		})
 	// Add Pinata output location
 	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
 		// TODO: This interface is likely going to change so that pinata is just a
@@ -450,15 +458,6 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 				},
 			},
 		}
-	names, locations =
-		append(names, OutputNameAssetMP4),
-		append(locations, clients.OutputLocation{
-			Type: "object_store",
-			URL:  url.JoinPath(mp4FileName(relativePath)).String(),
-			Outputs: &clients.OutputsRequest{
-				AutoMP4s: true,
-			},
-		})
 	if FlagCatalystCopiesSourceFile {
 		names, locations =
 			append(names, OutputNameOSSourceMP4),
