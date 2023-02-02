@@ -28,6 +28,10 @@ func metadataFileName(playbackID string) string {
 	return path.Join(playbackID, "video.json")
 }
 
+func mp4VideoPath(videoPath string) string {
+	return path.Join("mp4", videoPath)
+}
+
 func extractOSUriFilePath(osUri, playbackID string) (string, error) {
 	u, err := url.Parse(osUri)
 	if err != nil {

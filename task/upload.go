@@ -265,7 +265,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 				videoFilePath = video.Location
 				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 					Type: "static_transcoded_mp4",
-					Path: videoFilePath,
+					Path: mp4VideoPath(videoFilePath),
 				})
 			}
 
