@@ -263,9 +263,13 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 					return nil, fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
 				}
 				videoFilePath = video.Location
+				videoFilePath, err = extractOSUriFilePath(videoFilePath, playbackID)
+				if err != nil {
+					return nil, fmt.Errorf("error extracting file path from mp4 video location: %w", err)
+				}
 				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 					Type: "static_transcoded_mp4",
-					Path: mp4FilePath(videoFilePath),
+					Path: videoFilePath,
 				})
 			}
 
