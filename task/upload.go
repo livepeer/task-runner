@@ -403,7 +403,7 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	// Source segments cannot be stored in web3.storage
+	// source segments cannot be stored in web3.storage
 	sourceSegments := !strings.HasPrefix(outURL, "w3s")
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
