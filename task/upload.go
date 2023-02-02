@@ -413,11 +413,12 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 	if err != nil {
 		return nil, nil, err
 	}
+	mp4Url, _ := url.JoinPath(mp4FileName(playbackId))
 	outputNames, outputLocations =
 		append(outputNames, OutputNameAssetMP4),
 		append(outputLocations, clients.OutputLocation{
 			Type: "object_store",
-			URL:  url.JoinPath(mp4FileName(playbackId)).String(),
+			URL:  mp4Url,
 			Outputs: &clients.OutputsRequest{
 				AutoMP4s: true,
 			},
