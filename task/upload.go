@@ -205,13 +205,13 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 	var (
 		playbackID    = tctx.OutputAsset.PlaybackID
 		videoFilePath string
-		isMockResult  bool
 	)
 	for idx, output := range callback.Outputs {
-		// TODO: Remove this once catalyst returns real data
-		if output.Type == "google-s3" || output.Type == "google-s4" {
-			isMockResult = true
-			output.Type = "object_store"
+		if idx >= len(outputNames) {
+			extraOuts := callback.Outputs[idx:]
+			extraOutsStr, _ := json.Marshal(extraOuts)
+			glog.Warningf("Catalyst returned more outputs than requested, ignoring unexpected outputs. extraOutputs=%q", extraOutsStr)
+			break
 		}
 		outName := outputNames[idx]
 		outReq := outputReqs[idx]
@@ -261,9 +261,6 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 
 	assetSpecJson, _ = json.Marshal(output.AssetSpec)
 	glog.Infof("Complemented spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, output.AssetSpec, assetSpecJson)
-	if isMockResult {
-		return nil, UnretriableError{errors.New("catalyst api only has mock results for now, check back later... :(")}
-	}
 	return output, nil
 }
 
