@@ -123,17 +123,17 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 
 func withoutCredentials(upload UploadVODRequest) UploadVODRequest {
 	res := upload
-	res.Url = redactURL(upload.Url)
+	res.Url = RedactURL(upload.Url)
 	res.OutputLocations = []OutputLocation{}
 	for _, ol := range upload.OutputLocations {
 		nol := ol
-		nol.URL = redactURL(ol.URL)
+		nol.URL = RedactURL(ol.URL)
 		res.OutputLocations = append(res.OutputLocations, nol)
 	}
 	return res
 }
 
-func redactURL(urlStr string) string {
+func RedactURL(urlStr string) string {
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return "REDACTED"
