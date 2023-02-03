@@ -3,6 +3,7 @@ package task
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
+	"github.com/livepeer/go-api-client/logs"
 	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/task/encryption"
@@ -99,16 +101,20 @@ func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig
 
 	switch params.Encryption.Algorithm {
 	case "", "aes-256-cbc":
+		glog.V(logs.VERBOSE).Infof("Reading file for decryption file=%s", params.URL)
 		_, _, encrypted, err := getFile(ctx, osSess, cfg, params)
 		if err != nil {
 			return "", 0, nil, fmt.Errorf("failed to get input file: %w", err)
 		}
 
+		glog.V(logs.VVERBOSE).Infof("Decrypting file with key file=%s keyHash=%x", params.URL, sha256.Sum256([]byte(params.Encryption.Key)))
 		decrypted, err := encryption.DecryptAES256CBCReader(encrypted, params.Encryption.Key)
 		if err != nil {
 			encrypted.Close()
 			return "", 0, nil, fmt.Errorf("failed to decrypt input file: %w", err)
 		}
+
+		glog.V(logs.VVERBOSE).Infof("Returning decrypted stream for file=%s", params.URL)
 		return name, size, decrypted, nil
 	default:
 		return "", 0, nil, fmt.Errorf("unknown encryption algorithm: %s", params.Encryption.Algorithm)

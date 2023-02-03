@@ -226,12 +226,14 @@ func getFileUrlForUploadTask(ctx context.Context, osSess drivers.OSSession, os *
 		return params.URL, nil
 	}
 
+	glog.Infof("Downloading file=%s from object store", params.URL)
 	_, _, content, err := getFile(ctx, osSess, cfg, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to get input file: %w", err)
 	}
 	defer content.Close()
 
+	glog.Infof("Uploading decrypted file=%s to object store", params.URL)
 	fullPath := videoFileName(playbackID)
 	fileUrl, err := osSess.SaveData(ctx, fullPath, content, nil, fileUploadTimeout)
 	if err != nil {
