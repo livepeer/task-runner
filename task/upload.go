@@ -229,7 +229,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			return nil, fmt.Errorf("output type mismatch: %s != %s", output.Type, outReq.Type)
 		}
 		manifestPath, err := extractOSUriFilePath(output.Manifest, playbackID)
-		if outName == OutputNameAssetMP4 {
+		if outName != OutputNameAssetMP4 {
 			if err != nil {
 				return nil, fmt.Errorf("error extracting file path from output manifest: %w", err)
 			}
