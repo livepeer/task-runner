@@ -506,15 +506,13 @@ func humanizeCatalystError(err error) error {
 		}
 	}
 
-	if strings.Contains(errMsg, "upload error") && strings.Contains(errMsg, "failed to write file") {
-		// Handle error reading source when copying
-		if strings.Contains(errMsg, "unexpected eof") {
-			return errFileInaccessible
-		}
-	}
-
+	switch {
+	case strings.Contains(errMsg, "upload error") && strings.Contains(errMsg, "failed to write file") && strings.Contains(errMsg, "unexpected eof"):
+		return errFileInaccessible
 	// MediaConvert inaccessible error
-	if strings.Contains(errMsg, "3450") && strings.Contains(errMsg, "error encountered when accessing") {
+	case strings.Contains(errMsg, "3450") && strings.Contains(errMsg, "error encountered when accessing"):
+		return errFileInaccessible
+	case strings.Contains(errMsg, "error copying input file to s3") && strings.Contains(errMsg, "download error"):
 		return errFileInaccessible
 	}
 
@@ -527,6 +525,7 @@ func humanizeCatalystError(err error) error {
 		"readpacketdata file read failed - end of file hit",
 		"no video track found in file",
 		"no pictures decoded",
+		"error probing mp4 input file from s3",
 	}
 
 	// MediaConvert pipeline errors
