@@ -39,7 +39,7 @@ func DecryptAES256CBCReader(reader io.ReadCloser, keyb16 string) (io.ReadCloser,
 		buffer := make([]byte, 256*aes.BlockSize)
 		for {
 			n, err := io.ReadFull(reader, buffer)
-			if n == 0 {
+			if n == 0 || err == io.EOF {
 				break
 			} else if err != nil && err != io.ErrUnexpectedEOF {
 				pipeWriter.CloseWithError(err)
