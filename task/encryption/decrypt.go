@@ -47,7 +47,7 @@ func DecryptAES256CBCReader(reader io.ReadCloser, keyb16 string) (io.ReadCloser,
 			}
 
 			// padding only happens on the last block and we just ignore the extra bytes
-			padSize := n % aes.BlockSize
+			padSize := (aes.BlockSize - (n % aes.BlockSize)) % aes.BlockSize
 			paddedSize := n + padSize
 			stream.CryptBlocks(buffer[:paddedSize], buffer[:paddedSize])
 
