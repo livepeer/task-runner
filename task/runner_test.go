@@ -50,6 +50,12 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("job failed: Decoder closed. No pictures decoded", false)
 	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("external transcoder error: error copying input file to S3: download error: failed to fetch https://cfile.madmen.app/ipfs/ from any of the gateways", false)
+	assert.ErrorIs(humanizeError(err), errFileInaccessible)
+
+	err = NewCatalystError("external transcoder error: error probing MP4 input file from S3: error running ffprobe [] exit status 1", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
