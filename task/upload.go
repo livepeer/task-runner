@@ -1,12 +1,12 @@
 package task
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +16,7 @@ import (
 	"github.com/livepeer/catalyst-api/pipeline"
 	"github.com/livepeer/catalyst-api/video"
 	"github.com/livepeer/go-api-client"
+	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
 )
@@ -113,7 +114,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 
 func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.Upload
-	inUrl, err := getFileUrlForUploadTask(tctx.OutputOSObj, params)
+	inUrl, err := getFileUrlForUploadTask(tctx, tctx.outputOS, tctx.OutputOSObj, tctx.ImportTaskConfig, params, tctx.OutputAsset.PlaybackID)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -212,16 +213,33 @@ func parseUrlToBaseAndPath(URL string) (string, string, error) {
 	return baseUrl, p, nil
 }
 
-func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
-	if params.UploadedObjectKey != "" {
-		u, err := url.Parse(os.PublicURL)
-		if err != nil {
-			return "", err
-		}
-		u.Path = path.Join(u.Path, params.UploadedObjectKey)
-		return u.String(), nil
+func getFileUrlForUploadTask(ctx context.Context, osSess drivers.OSSession, os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams, playbackID string) (string, error) {
+	osPublicURL, err := url.Parse(os.PublicURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing object store public URL: %w", err)
 	}
-	return params.URL, nil
+
+	if params.UploadedObjectKey != "" {
+		return osPublicURL.JoinPath(params.UploadedObjectKey).String(), nil
+	}
+	if params.Encryption.Key == "" {
+		return params.URL, nil
+	}
+
+	_, _, content, err := getFile(ctx, osSess, cfg, params)
+	if err != nil {
+		return "", fmt.Errorf("failed to get input file: %w", err)
+	}
+	defer content.Close()
+
+	fullPath := videoFileName(playbackID)
+	fileUrl, err := osSess.SaveData(ctx, fullPath, content, nil, fileUploadTimeout)
+	if err != nil {
+		return "", fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+	}
+	glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
+
+	return osPublicURL.JoinPath(fullPath).String(), nil
 }
 
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
@@ -372,20 +390,24 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	}
 
 	if !FlagCatalystCopiesSourceFile {
-		input, err := readLocalFile(0.95)
-		if err != nil {
-			return nil, err
-		}
 		fullPath := videoFileName(playbackID)
-		fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-		}
 		assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 			Type: "source_file",
 			Path: toAssetRelativePath(playbackID, fullPath),
 		})
-		glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
+
+		// in case of encrypted input, file will have been copied in the beginning
+		if params.Encryption.Key == "" {
+			input, err := readLocalFile(0.95)
+			if err != nil {
+				return nil, err
+			}
+			fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
+			if err != nil {
+				return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+			}
+			glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
+		}
 	}
 
 	if tctx.OutputAsset.Storage.IPFS != nil {

@@ -16,6 +16,7 @@ import (
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
+	"github.com/livepeer/task-runner/task/encryption"
 )
 
 const IPFS_PREFIX = "ipfs://"
@@ -91,6 +92,30 @@ func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 }
 
 func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
+	name, size, content, err = getFileRaw(ctx, osSess, cfg, params)
+	if err != nil || params.Encryption.Key == "" {
+		return
+	}
+
+	switch params.Encryption.Algorithm {
+	case "", "aes-256-cbc":
+		_, _, encrypted, err := getFile(ctx, osSess, cfg, params)
+		if err != nil {
+			return "", 0, nil, fmt.Errorf("failed to get input file: %w", err)
+		}
+
+		decrypted, err := encryption.DecryptAES256CBCReader(encrypted, params.Encryption.Key)
+		if err != nil {
+			encrypted.Close()
+			return "", 0, nil, fmt.Errorf("failed to decrypt input file: %w", err)
+		}
+		return name, size, decrypted, nil
+	default:
+		return "", 0, nil, fmt.Errorf("unknown encryption algorithm: %s", params.Encryption.Algorithm)
+	}
+}
+
+func getFileRaw(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
 	if upedObjKey := params.UploadedObjectKey; upedObjKey != "" {
 		// TODO: We should simply "move" the file in case of direct import since we
 		// know the file is already in the object store. Independently, we also have
