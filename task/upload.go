@@ -269,6 +269,9 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 					Type: "static_transcoded_mp4",
 					Path: videoFilePath,
+					Spec: api.AssetFileSpec{
+						Size: video.SizeBytes,
+					},
 				})
 			}
 		default:
