@@ -257,24 +257,20 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
 		case OutputNameAssetMP4:
-			if len(output.Videos) != 1 {
-				return nil, fmt.Errorf("unexpected number of videos in source MP4 output: %d", len(output.Videos))
-			}
 			for _, video := range output.Videos {
 				if video.Type != "mp4" {
-					return nil, fmt.Errorf("unexpected video type in source MP4 output: %s", output.Videos[0].Type)
+					return nil, fmt.Errorf("unexpected video type in rendition MP4 output: %s", output.Videos[0].Type)
 				}
 				videoFilePath = video.Location
 				videoFilePath, err = extractOSUriFilePath(videoFilePath, playbackID)
 				if err != nil {
-					return nil, fmt.Errorf("error extracting file path from mp4 video location: %w", err)
+					return nil, fmt.Errorf("error extracting file path from mp4 rendition video location: %w", err)
 				}
 				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 					Type: "static_transcoded_mp4",
 					Path: videoFilePath,
 				})
 			}
-
 		default:
 			return nil, fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
