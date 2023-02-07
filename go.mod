@@ -6,7 +6,7 @@ require (
 	github.com/golang/glog v1.0.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/livepeer/catalyst-api v0.0.13-0.20221206215045-7c65cbfbda4b
-	github.com/livepeer/go-api-client v0.4.3-0.20230204011132-c48ef1e97370
+	github.com/livepeer/go-api-client v0.4.3-0.20230207145728-8eb78c664108
 	github.com/livepeer/go-tools v0.1.1
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
 	github.com/livepeer/livepeer-data v0.6.3
@@ -82,7 +82,9 @@ require (
 	google.golang.org/genproto v0.0.0-20221018160656-63c7b68cfc55 // indirect
 	google.golang.org/grpc v1.50.1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 // replace (
