@@ -373,11 +373,17 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 }
 
 func removeCredentials(metadata *FileMetadata) *FileMetadata {
+	c := 0
 	for _, output := range metadata.CatalystResult.Outputs {
+		v := 0
 		for _, video := range output.Videos {
 			video.Location = RedactURL(video.Location)
+			metadata.CatalystResult.Outputs[c].Videos[v].Location = video.Location
+			v += 1
 		}
 		output.Manifest = RedactURL(output.Manifest)
+		metadata.CatalystResult.Outputs[c].Manifest = output.Manifest
+		c += 1
 	}
 	return metadata
 }
