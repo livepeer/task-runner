@@ -33,51 +33,57 @@ func DecryptAES256CBCReader(reader io.ReadCloser, keyb16 string) (io.ReadCloser,
 	go func() {
 		defer reader.Close()
 		defer pipeWriter.Close()
-		defer func() {
-			if r := recover(); r != nil {
-				pipeWriter.CloseWithError(fmt.Errorf("panic: %v", r))
-			}
-		}()
 
-		buffer := make([]byte, 256*aes.BlockSize)
-		bufReader := bufio.NewReaderSize(reader, 2*len(buffer))
-		for {
-			n, err := io.ReadFull(bufReader, buffer)
-			if n == 0 || err == io.EOF {
-				break
-			} else if err != nil && err != io.ErrUnexpectedEOF {
-				// unexpected EOF is returned when input ends before the buffer size
-				pipeWriter.CloseWithError(err)
-				return
-			} else if n%aes.BlockSize != 0 {
-				// this can only ever happen on the last chunk
-				err := fmt.Errorf("input is not a multiple of AES block size. must be padded with PKCS#7")
-				pipeWriter.CloseWithError(err)
-				return
-			}
-
-			chunk := buffer[:n]
-			decrypter.CryptBlocks(chunk, chunk)
-
-			if _, peekErr := bufReader.Peek(1); peekErr == io.EOF {
-				// this means we're on the last chunk, so handle padding
-				lastBlock := chunk[len(chunk)-aes.BlockSize:]
-				unpadded, err := pkcs7.Unpad(lastBlock)
-				if err != nil {
-					pipeWriter.CloseWithError(fmt.Errorf("bad input PKCS#7 padding: %w", err))
-					return
-				}
-
-				padSize := len(lastBlock) - len(unpadded)
-				chunk = chunk[:len(chunk)-padSize]
-			}
-
-			if _, err := pipeWriter.Write(chunk); err != nil {
-				pipeWriter.CloseWithError(err)
-				return
-			}
+		if err := decryptReaderTo(reader, pipeWriter, decrypter); err != nil {
+			pipeWriter.CloseWithError(err)
 		}
 	}()
 
 	return pipeReader, nil
+}
+
+func decryptReaderTo(readerRaw io.Reader, writer io.Writer, decrypter cipher.BlockMode) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+
+	blockSize := decrypter.BlockSize()
+	buffer := make([]byte, 256*blockSize)
+	reader := bufio.NewReaderSize(readerRaw, 2*len(buffer))
+
+	for {
+		n, err := io.ReadFull(reader, buffer)
+		if n == 0 || err == io.EOF {
+			break
+		} else if err != nil && err != io.ErrUnexpectedEOF {
+			// unexpected EOF is returned when input ends before the buffer size
+			return err
+		} else if n%blockSize != 0 {
+			// this can only ever happen on the last chunk
+			return fmt.Errorf("input is not a multiple of AES block size. must be padded with PKCS#7")
+		}
+
+		chunk := buffer[:n]
+		decrypter.CryptBlocks(chunk, chunk)
+
+		if _, peekErr := reader.Peek(1); peekErr == io.EOF {
+			// this means we're on the last chunk, so handle padding
+			lastBlock := chunk[len(chunk)-blockSize:]
+			unpadded, err := pkcs7.Unpad(lastBlock)
+			if err != nil {
+				return fmt.Errorf("bad input PKCS#7 padding: %w", err)
+			}
+
+			padSize := len(lastBlock) - len(unpadded)
+			chunk = chunk[:len(chunk)-padSize]
+		}
+
+		if _, err := writer.Write(chunk); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
