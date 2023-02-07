@@ -14,6 +14,7 @@ import (
 	"github.com/golang/glog"
 	catalystClients "github.com/livepeer/catalyst-api/clients"
 	"github.com/livepeer/catalyst-api/pipeline"
+	"github.com/livepeer/catalyst-api/video"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
@@ -397,12 +398,12 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 
 func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCallback {
 	res := *metadata
-	res.Outputs = make([]catalystClients.OutputVideo, len(metadata.Outputs))
+	res.Outputs = make([]video.OutputVideo, len(metadata.Outputs))
 
 	for o, output := range metadata.Outputs {
 		res.Outputs[o] = output
 		res.Outputs[o].Manifest = clients.RedactURL(output.Manifest)
-		res.Outputs[o].Videos = make([]catalystClients.OutputVideoFile, len(output.Videos))
+		res.Outputs[o].Videos = make([]video.OutputVideoFile, len(output.Videos))
 		for v, video := range output.Videos {
 			res.Outputs[o].Videos[v] = video
 			res.Outputs[o].Videos[v].Location = clients.RedactURL(video.Location)
