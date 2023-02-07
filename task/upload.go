@@ -359,6 +359,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
 	}
 	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, callback
+	removeCredentials(metadata)
 	_, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("error saving metadata file: %w", err)
@@ -369,6 +370,21 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	})
 
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
+}
+
+func removeCredentials(metadata *FileMetadata) FileMetadata {
+	for _, output := range metadata.CatalystResult.Outputs {
+		for _, video := range output.Videos {
+			video.Location = redactCredentials(video.Location)
+		}
+		output.Manifest = redactCredentials(output.Manifest)
+	}
+	return *metadata
+}
+
+func redactCredentials(location string) string {
+	location = strings.Split(location, "@")[1]
+	return "s3+https://REDACTED:REDACTED@" + location
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
