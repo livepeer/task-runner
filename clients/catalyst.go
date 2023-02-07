@@ -134,6 +134,9 @@ func withoutCredentials(upload UploadVODRequest) UploadVODRequest {
 }
 
 func RedactURL(urlStr string) string {
+	if urlStr == "" {
+		return ""
+	}
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return "REDACTED"
