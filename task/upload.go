@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -146,7 +147,14 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
-			return &TaskHandlerOutput{}, nil
+			if callback.Outputs == nil || len(callback.Outputs) < 1 {
+				return nil, fmt.Errorf("invalid video outputs: %v", callback.Outputs)
+			}
+			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{
+				TranscodeFile: &data.TranscodeFileTaskOutput{
+					VideoFilePath: clients.RedactURL(callback.Outputs[0].Manifest),
+				},
+			}}, nil
 		},
 		profiles:                 params.Profiles,
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
@@ -392,6 +400,8 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
+	// source segments cannot be stored in web3.storage
+	sourceSegments := !strings.HasPrefix(outURL, "w3s")
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
@@ -399,7 +409,7 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 				Type: "object_store",
 				URL:  url.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
-					SourceSegments:     true,
+					SourceSegments:     sourceSegments,
 					TranscodedSegments: true,
 				},
 			},
