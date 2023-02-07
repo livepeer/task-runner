@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	catalystClients "github.com/livepeer/catalyst-api/clients"
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
@@ -382,11 +383,11 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 		}
 	}
 
-	if callback.Status == clients.CatalystStatusError {
+	if callback.Status == catalystClients.TranscodeStatusError {
 		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
 		err := NewCatalystError(callback.Error, callback.Unretriable)
 		return r.publishTaskResult(taskInfo, nil, err)
-	} else if callback.Status == clients.CatalystStatusSuccess {
+	} else if callback.Status == catalystClients.TranscodeStatusCompleted {
 		return r.scheduleTaskStep(task.ID, nextStep, callback)
 	}
 

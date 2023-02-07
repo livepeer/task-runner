@@ -100,7 +100,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		}
 		glog.Infof("Processing upload vod catalyst callback. taskId=%s status=%q",
 			tctx.Task.ID, callback.Status)
-		if callback.Status != "success" {
+		if callback.Status != catalystClients.TranscodeStatusCompleted {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
 
