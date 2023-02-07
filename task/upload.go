@@ -359,7 +359,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
 	}
 	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, callback
-	removeCredentials(metadata)
+	metadata = removeCredentials(metadata)
 	_, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("error saving metadata file: %w", err)
@@ -372,21 +372,15 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 }
 
-func removeCredentials(metadata *FileMetadata) {
-	for _, output := range metadata.CatalystResult.Outputs {
-		for _, video := range output.Videos {
-			video.Location = RedactURL(video.Location)
+func removeCredentials(metadata *FileMetadata) *FileMetadata {
+	res := metadata
+	for o, output := range metadata.CatalystResult.Outputs {
+		res.CatalystResult.Outputs[o].Manifest = clients.RedactURL(output.Manifest)
+		for v, video := range output.Videos {
+			res.CatalystResult.Outputs[o].Videos[v].Location = clients.RedactURL(video.Location)
 		}
-		output.Manifest = RedactURL(output.Manifest)
 	}
-}
-
-func RedactURL(urlStr string) string {
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return "REDACTED"
-	}
-	return u.Redacted()
+	return res
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
