@@ -362,8 +362,8 @@ github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a/go.mod h1:c3At6R
 github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsTZCD3I8kEA=
 github.com/prometheus/procfs v0.8.0 h1:ODq8ZFEaYeCaZOJlZZdJA2AbQR98dSHSM1KW/You5mo=
 github.com/prometheus/procfs v0.8.0/go.mod h1:z7EfXMXOkbkqb9IINtpCn86r/to3BnA0uaxHdg830/4=
-github.com/rabbitmq/amqp091-go v1.6.0 h1:fiFHcMcP+5/A+35MXniiagho1lEXX4+jpHGR+q+LeBU=
-github.com/rabbitmq/amqp091-go v1.6.0/go.mod h1:wfClAtY0C7bOHxd3GjmF26jEHn+rR/0B3+YV+Vn9/NI=
+github.com/rabbitmq/amqp091-go v1.6.1 h1:r6HybD9gOdWeUTP9TKIKdcAuFl4Va4p3OmWUUoeICAU=
+github.com/rabbitmq/amqp091-go v1.6.1/go.mod h1:wfClAtY0C7bOHxd3GjmF26jEHn+rR/0B3+YV+Vn9/NI=
 github.com/rabbitmq/rabbitmq-stream-go-client v1.0.2 h1:r91WWSJCiDHbE4jMnastUbrQKv7TVn6pmXLssYdwtZQ=
 github.com/rabbitmq/rabbitmq-stream-go-client v1.0.2/go.mod h1:cuTsTNCnzj8esYgbBPcoPie0otGAhCqzd0GDh9Q2eLY=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
