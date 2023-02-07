@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	catalystClients "github.com/livepeer/catalyst-api/clients"
 	"github.com/livepeer/catalyst-api/pipeline"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
@@ -358,8 +359,9 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		probed := metadata.AssetSpec
 		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
 	}
-	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, callback
-	metadata = removeCredentials(metadata)
+
+	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, removeCredentials(callback)
+
 	_, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("error saving metadata file: %w", err)
@@ -372,15 +374,21 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 }
 
-func removeCredentials(metadata *FileMetadata) *FileMetadata {
-	res := metadata
-	for o, output := range metadata.CatalystResult.Outputs {
-		res.CatalystResult.Outputs[o].Manifest = clients.RedactURL(output.Manifest)
+func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCallback {
+	res := *metadata
+	res.Outputs = make([]catalystClients.OutputVideo, len(metadata.Outputs))
+
+	for o, output := range metadata.Outputs {
+		res.Outputs[o] = output
+		res.Outputs[o].Manifest = clients.RedactURL(output.Manifest)
+		res.Outputs[o].Videos = make([]catalystClients.OutputVideoFile, len(output.Videos))
 		for v, video := range output.Videos {
-			res.CatalystResult.Outputs[o].Videos[v].Location = clients.RedactURL(video.Location)
+			res.Outputs[o].Videos[v] = video
+			res.Outputs[o].Videos[v].Location = clients.RedactURL(video.Location)
 		}
 	}
-	return res
+
+	return &res
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
