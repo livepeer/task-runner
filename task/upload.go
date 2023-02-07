@@ -375,16 +375,19 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 func removeCredentials(metadata *FileMetadata) FileMetadata {
 	for _, output := range metadata.CatalystResult.Outputs {
 		for _, video := range output.Videos {
-			video.Location = redactCredentials(video.Location)
+			video.Location = RedactURL(video.Location)
 		}
-		output.Manifest = redactCredentials(output.Manifest)
+		output.Manifest = RedactURL(output.Manifest)
 	}
 	return *metadata
 }
 
-func redactCredentials(location string) string {
-	location = strings.Split(location, "@")[1]
-	return "s3+https://REDACTED:REDACTED@" + location
+func RedactURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "REDACTED"
+	}
+	return u.Redacted()
 }
 
 func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
