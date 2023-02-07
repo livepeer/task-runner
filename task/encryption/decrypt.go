@@ -22,8 +22,8 @@ func DecryptAES256CBCReader(reader io.ReadCloser, keyb16 string) (io.ReadCloser,
 		return nil, fmt.Errorf("error creating cipher: %w", err)
 	}
 
-	iv := make([]byte, aes.BlockSize)
-	if _, err := reader.Read(iv); err != nil {
+	iv := make([]byte, block.BlockSize())
+	if _, err := io.ReadFull(reader, iv); err != nil {
 		return nil, fmt.Errorf("error reading iv from input: %w", err)
 	}
 
