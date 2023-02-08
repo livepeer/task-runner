@@ -49,19 +49,27 @@ type handleUploadVODParams struct {
 
 func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 	var (
-		tctx = p.tctx
-		ctx  = tctx.Context
-		step = tctx.Step
+		tctx  = p.tctx
+		ctx   = tctx.Context
+		step  = tctx.Step
+		inUrl = p.inUrl
 	)
 	switch step {
-	case "", "rateLimitBackoff":
+	case "":
+		var err error
+		inUrl, err = decryptInputFile(tctx, inUrl)
+		if err != nil {
+			return nil, fmt.Errorf("error decrypting input file: %w", err)
+		}
+		fallthrough
+	case "rateLimitBackoff":
 		outputLocations, err := p.getOutputLocations()
 		if err != nil {
 			return nil, err
 		}
 		var (
 			req = clients.UploadVODRequest{
-				Url:              p.inUrl,
+				Url:              inUrl,
 				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 				OutputLocations:  outputLocations,
 				PipelineStrategy: p.catalystPipelineStrategy,
@@ -218,16 +226,26 @@ func getFileUrlForUploadTask(ctx context.Context, osSess drivers.OSSession, os *
 	if err != nil {
 		return "", fmt.Errorf("error parsing object store public URL: %w", err)
 	}
-
 	if params.UploadedObjectKey != "" {
 		return osPublicURL.JoinPath(params.UploadedObjectKey).String(), nil
 	}
+	return params.URL, nil
+}
+
+func decryptInputFile(tctx *TaskContext, fileUrl string) (string, error) {
+	var (
+		params     = *tctx.Task.Params.Upload
+		osSess     = tctx.outputOS
+		os         = tctx.OutputOSObj
+		cfg        = tctx.ImportTaskConfig
+		playbackID = tctx.OutputAsset.PlaybackID
+	)
 	if params.Encryption.Key == "" {
-		return params.URL, nil
+		return fileUrl, nil
 	}
 
 	glog.Infof("Downloading file=%s from object store", params.URL)
-	_, _, content, err := getFile(ctx, osSess, cfg, params)
+	_, _, content, err := getFile(tctx, osSess, cfg, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to get input file: %w", err)
 	}
@@ -235,12 +253,16 @@ func getFileUrlForUploadTask(ctx context.Context, osSess drivers.OSSession, os *
 
 	glog.Infof("Uploading decrypted file=%s to object store", params.URL)
 	fullPath := videoFileName(playbackID)
-	fileUrl, err := osSess.SaveData(ctx, fullPath, content, nil, fileUploadTimeout)
+	fileUrl, err = osSess.SaveData(tctx, fullPath, content, nil, fileUploadTimeout)
 	if err != nil {
 		return "", fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
 	}
 	glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
 
+	osPublicURL, err := url.Parse(os.PublicURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing object store public URL: %w", err)
+	}
 	return osPublicURL.JoinPath(fullPath).String(), nil
 }
 
