@@ -258,12 +258,6 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
 		case OutputNameAssetMP4:
-			if output.MP4Outputs == nil {
-				return nil, fmt.Errorf("unexpected nil MP4Outputs in asset MP4 output")
-			}
-			if len(output.MP4Outputs) < 1 {
-				return nil, fmt.Errorf("unexpected number of MP4Outputs in asset MP4 output: %d", len(output.MP4Outputs))
-			}
 			for v, video := range output.MP4Outputs {
 				if video.Type != "mp4" {
 					return nil, fmt.Errorf("unexpected video type in rendition MP4 output: %s", output.Videos[v].Type)
