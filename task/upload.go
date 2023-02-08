@@ -278,9 +278,6 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			}
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
-		case OutputNameAssetMP4:
-			glog.Infof("Received asset MP4 output! taskId=%s output=%+v", tctx.Task.ID, output)
-
 		default:
 			return nil, fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
