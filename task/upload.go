@@ -264,9 +264,9 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			if len(output.MP4Outputs) < 1 {
 				return nil, fmt.Errorf("unexpected number of MP4Outputs in asset MP4 output: %d", len(output.MP4Outputs))
 			}
-			for _, video := range output.MP4Outputs {
+			for v, video := range output.MP4Outputs {
 				if video.Type != "mp4" {
-					return nil, fmt.Errorf("unexpected video type in rendition MP4 output: %s", output.Videos[0].Type)
+					return nil, fmt.Errorf("unexpected video type in rendition MP4 output: %s", output.Videos[v].Type)
 				}
 				videoFilePath = video.Location
 				videoFilePath, err = extractOSUriFilePath(videoFilePath, playbackID)
