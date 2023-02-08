@@ -258,6 +258,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
 		case OutputNameAssetMP4:
+			glog.Infof("Received asset MP4 output! taskId=%s output=%+v", tctx.Task.ID, output)
 			for v, video := range output.MP4Outputs {
 				if video.Type != "mp4" {
 					return nil, fmt.Errorf("unexpected video type in rendition MP4 output: %s", output.Videos[v].Type)
