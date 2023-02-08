@@ -268,6 +268,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 				if err != nil {
 					return nil, fmt.Errorf("error extracting file path from mp4 rendition video location: %w", err)
 				}
+				glog.Infof("Adding mp4 asset file %+v= path=%q", video, videoFilePath)
 				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 					Type: "static_transcoded_mp4",
 					Path: videoFilePath,
