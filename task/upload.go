@@ -271,7 +271,10 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 					Type: "static_transcoded_mp4",
 					Path: videoFilePath,
 					Spec: api.AssetFileSpec{
-						Size: int64(video.SizeBytes),
+						Size:    video.SizeBytes,
+						Width:   video.Width,
+						Height:  video.Height,
+						Bitrate: video.Bitrate,
 					},
 				})
 			}
