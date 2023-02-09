@@ -56,10 +56,12 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 	)
 	switch step {
 	case "":
-		var err error
-		inUrl, err = decryptInputFile(tctx, inUrl)
-		if err != nil {
-			return nil, fmt.Errorf("error decrypting input file: %w", err)
+		if uploadParams := tctx.Params.Upload; uploadParams != nil {
+			var err error
+			inUrl, err = decryptInputFile(tctx, inUrl, *uploadParams)
+			if err != nil {
+				return nil, fmt.Errorf("error decrypting input file: %w", err)
+			}
 		}
 		fallthrough
 	case "rateLimitBackoff":
@@ -232,9 +234,8 @@ func getFileUrlForUploadTask(ctx context.Context, osSess drivers.OSSession, os *
 	return params.URL, nil
 }
 
-func decryptInputFile(tctx *TaskContext, fileUrl string) (string, error) {
+func decryptInputFile(tctx *TaskContext, fileUrl string, params api.UploadTaskParams) (string, error) {
 	var (
-		params     = *tctx.Task.Params.Upload
 		osSess     = tctx.outputOS
 		os         = tctx.OutputOSObj
 		cfg        = tctx.ImportTaskConfig
