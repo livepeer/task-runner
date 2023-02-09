@@ -423,16 +423,6 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 	if err != nil {
 		return nil, nil, err
 	}
-	url, _ := url.Parse(outURL)
-	outputNames, outputLocations =
-		append(outputNames, OutputNameAssetMP4),
-		append(outputLocations, clients.OutputLocation{
-			Type: "object_store",
-			URL:  url.JoinPath(mp4FileName(playbackId)).String(),
-			Outputs: &clients.OutputsRequest{
-				AutoMP4s: true,
-			},
-		})
 	// Add Pinata output location
 	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
 		// TODO: This interface is likely going to change so that pinata is just a
@@ -467,6 +457,7 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 				Outputs: &clients.OutputsRequest{
 					SourceSegments:     sourceSegments,
 					TranscodedSegments: true,
+					AutoMP4:            true,
 				},
 			},
 		}

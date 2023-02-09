@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/golang/glog v1.0.0
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/livepeer/catalyst-api v0.0.13-0.20230208001547-aa0aa76b4c39
+	github.com/livepeer/catalyst-api v0.0.13-0.20230208151113-b719d80a9496
 	github.com/livepeer/go-api-client v0.4.3-0.20230207145728-8eb78c664108
 	github.com/livepeer/go-tools v0.2.2
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
