@@ -121,7 +121,7 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: inUrl,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocations, err := assetOutputLocations(tctx)
+			_, outputLocations, err := uploadTaskOutputLocations(tctx)
 			return outputLocations, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -145,7 +145,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path)
+			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path, false)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -208,7 +208,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		}
 	}
 
-	outputNames, outputReqs, err := assetOutputLocations(tctx)
+	outputNames, outputReqs, err := uploadTaskOutputLocations(tctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting asset output requests: %w", err)
 	}
@@ -416,10 +416,10 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 	return &res
 }
 
-func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
+func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	outputNames, outputLocations, err := outputLocations(outURL, playbackId)
+	outputNames, outputLocations, err := outputLocations(outURL, playbackId, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -441,7 +441,7 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL string, relativePath string) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
@@ -457,7 +457,7 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 				Outputs: &clients.OutputsRequest{
 					SourceSegments:     sourceSegments,
 					TranscodedSegments: true,
-					AutoMP4:            true,
+					AutoMP4:            autoMp4s,
 				},
 			},
 		}
