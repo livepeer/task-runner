@@ -299,8 +299,8 @@ github.com/livepeer/go-tools v0.2.4-0.20230209204125-83366ffbcdb3 h1:+ZknCLY+hGY
 github.com/livepeer/go-tools v0.2.4-0.20230209204125-83366ffbcdb3/go.mod h1:/aZ+20XYLdeebFA3CrQTkHUf7DmiGBzh6Bs8JkbelUA=
 github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07 h1:ISkFQYYDgfnM6Go+VyemF66DKFc8kNoI9SwMv7GC9sM=
 github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07/go.mod h1:RDTLvmm/NJWjzuUpEDyIWmLTqSfpZEcnPnacG8sfh34=
-github.com/livepeer/livepeer-data v0.6.4-0.20230209203958-96fbe2851ac8 h1:ZYkpBbpTy4Dz0exT0+Y4CoNM0NAX9w4O9LPP+F5ooJc=
-github.com/livepeer/livepeer-data v0.6.4-0.20230209203958-96fbe2851ac8/go.mod h1:/PPM48tccbKbD46eogmRKy7E087z4THaMB4Jfvn1cnI=
+github.com/livepeer/livepeer-data v0.6.4-0.20230210074935-ce634bb0de25 h1:nuapk00gqm2VW8P9RvxgBwFpOarPy+oClbxMDu8WqzE=
+github.com/livepeer/livepeer-data v0.6.4-0.20230210074935-ce634bb0de25/go.mod h1:/PPM48tccbKbD46eogmRKy7E087z4THaMB4Jfvn1cnI=
 github.com/livepeer/m3u8 v0.11.1 h1:VkUJzfNTyjy9mqsgp5JPvouwna8wGZMvd/gAfT5FinU=
 github.com/livepeer/m3u8 v0.11.1/go.mod h1:IUqAtwWPAG2CblfQa4SVzTQoDcEMPyfNOaBSxqHMS04=
 github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343 h1:9mAQMfQGIpv7+0X6Z8+qag6zag+/r+zsqLJGB00n+pc=
