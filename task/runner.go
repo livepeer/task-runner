@@ -526,7 +526,9 @@ func humanizeCatalystError(err error) error {
 		"readpacketdata file read failed - end of file hit",
 		"no video track found in file",
 		"no pictures decoded",
-		"error probing mp4 input file from s3",
+		"error running ffprobe [] exit status 1",
+		"zero bytes found for source",
+		"invalid framerate",
 	}
 
 	// MediaConvert pipeline errors
