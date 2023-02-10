@@ -200,7 +200,7 @@ func parseUrlToBaseAndPath(URL string) (string, string, error) {
 	}
 
 	var baseUrl string
-	if strings.HasPrefix(u.Scheme, "ipfs") {
+	if u.Scheme == "ipfs" {
 		// add baseUrl only for IPFS
 		u.Path = ""
 		baseUrl = u.String()
