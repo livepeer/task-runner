@@ -163,7 +163,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileTaskOutput, error) {
 	var res data.TranscodeFileTaskOutput
 
-	if outputs == nil || len(outputs) < 1 {
+	if len(outputs) < 1 {
 		return res, fmt.Errorf("invalid video outputs: %v", outputs)
 	}
 	// we expect only one output
