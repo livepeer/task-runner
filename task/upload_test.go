@@ -43,14 +43,12 @@ func TestToTranscodeFileTaskOutput(t *testing.T) {
 				},
 			},
 			want: data.TranscodeFileTaskOutput{
-				Hls: data.TranscodeFileTaskOutputPath{
+				Hls: &data.TranscodeFileTaskOutputPath{
 					Path: "/video/catalyst/index.m3u8",
 				},
-				Mp4: data.TranscodeFileTaskOutputMp4{
-					Renditions: []data.TranscodeFileTaskOutputPath{
-						{Path: "/video/catalyst/static360p0.mp4"},
-						{Path: "/video/catalyst/static720p0.mp4"},
-					},
+				Mp4: []data.TranscodeFileTaskOutputPath{
+					{Path: "/video/catalyst/static360p0.mp4"},
+					{Path: "/video/catalyst/static720p0.mp4"},
 				},
 			},
 		},
@@ -84,14 +82,37 @@ func TestToTranscodeFileTaskOutput(t *testing.T) {
 			},
 			want: data.TranscodeFileTaskOutput{
 				BaseUrl: "ipfs://bafybeibn34yirlf5mv4xvaouty7gveyc6hvsgkbq6nornzr4w53r7frgvq",
-				Hls: data.TranscodeFileTaskOutputPath{
+				Hls: &data.TranscodeFileTaskOutputPath{
 					Path: "/video/catalyst/index.m3u8",
 				},
-				Mp4: data.TranscodeFileTaskOutputMp4{
-					Renditions: []data.TranscodeFileTaskOutputPath{
-						{Path: "/video/catalyst/static360p0.mp4"},
-						{Path: "/video/catalyst/static720p0.mp4"},
+				Mp4: []data.TranscodeFileTaskOutputPath{
+					{Path: "/video/catalyst/static360p0.mp4"},
+					{Path: "/video/catalyst/static720p0.mp4"},
+				},
+			},
+		},
+		{
+			name: "No MP4 outputs",
+			catalystApiOutputs: []video.OutputVideo{
+				{
+					Type:     "object_store",
+					Manifest: "ipfs://bafybeibn34yirlf5mv4xvaouty7gveyc6hvsgkbq6nornzr4w53r7frgvq/video/catalyst/index.m3u8",
+					Videos: []video.OutputVideoFile{
+						{
+							Type:     "m3u8",
+							Location: "ipfs://bafybeibn34yirlf5mv4xvaouty7gveyc6hvsgkbq6nornzr4w53r7frgvq/video/catalyst/index360p0.m3u8",
+						},
+						{
+							Type:     "m3u8",
+							Location: "ipfs://bafybeibn34yirlf5mv4xvaouty7gveyc6hvsgkbq6nornzr4w53r7frgvq/video/catalyst/index720p0.m3u8",
+						},
 					},
+				},
+			},
+			want: data.TranscodeFileTaskOutput{
+				BaseUrl: "ipfs://bafybeibn34yirlf5mv4xvaouty7gveyc6hvsgkbq6nornzr4w53r7frgvq",
+				Hls: &data.TranscodeFileTaskOutputPath{
+					Path: "/video/catalyst/index.m3u8",
 				},
 			},
 		},

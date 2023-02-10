@@ -169,18 +169,19 @@ func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileT
 	// we expect only one output
 	o := outputs[0]
 
-	var err error
-	res.BaseUrl, res.Hls.Path, err = parseUrlToBaseAndPath(o.Manifest)
+	bu, p, err := parseUrlToBaseAndPath(o.Manifest)
 	if err != nil {
 		return res, err
 	}
+	res.BaseUrl = bu
+	res.Hls = &data.TranscodeFileTaskOutputPath{Path: p}
 
 	for _, m := range o.MP4Outputs {
 		_, p, err := parseUrlToBaseAndPath(m.Location)
 		if err != nil {
 			return res, err
 		}
-		res.Mp4.Renditions = append(res.Mp4.Renditions, data.TranscodeFileTaskOutputPath{Path: p})
+		res.Mp4 = append(res.Mp4, data.TranscodeFileTaskOutputPath{Path: p})
 	}
 
 	return res, nil
