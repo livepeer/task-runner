@@ -14,6 +14,7 @@ import (
 	"github.com/golang/glog"
 	catalystClients "github.com/livepeer/catalyst-api/clients"
 	"github.com/livepeer/catalyst-api/pipeline"
+	"github.com/livepeer/catalyst-api/video"
 	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
@@ -99,7 +100,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		}
 		glog.Infof("Processing upload vod catalyst callback. taskId=%s status=%q",
 			tctx.Task.ID, callback.Status)
-		if callback.Status != "success" {
+		if callback.Status != catalystClients.TranscodeStatusCompleted {
 			return nil, fmt.Errorf("unsucessful callback received. status=%v", callback.Status)
 		}
 
@@ -148,18 +149,65 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
-			if callback.Outputs == nil || len(callback.Outputs) < 1 {
-				return nil, fmt.Errorf("invalid video outputs: %v", callback.Outputs)
+			tfo, err := toTranscodeFileTaskOutput(callback.Outputs)
+			if err != nil {
+				return nil, err
 			}
-			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{
-				TranscodeFile: &data.TranscodeFileTaskOutput{
-					VideoFilePath: clients.RedactURL(callback.Outputs[0].Manifest),
-				},
-			}}, nil
+			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{TranscodeFile: &tfo}}, nil
 		},
 		profiles:                 params.Profiles,
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 	})
+}
+
+func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileTaskOutput, error) {
+	var res data.TranscodeFileTaskOutput
+
+	if len(outputs) < 1 {
+		return res, fmt.Errorf("invalid video outputs: %v", outputs)
+	}
+	// we expect only one output
+	o := outputs[0]
+
+	bu, p, err := parseUrlToBaseAndPath(o.Manifest)
+	if err != nil {
+		return res, err
+	}
+	res.BaseUrl = bu
+	res.Hls = &data.TranscodeFileTaskOutputPath{Path: p}
+
+	for _, m := range o.MP4Outputs {
+		_, p, err := parseUrlToBaseAndPath(m.Location)
+		if err != nil {
+			return res, err
+		}
+		res.Mp4 = append(res.Mp4, data.TranscodeFileTaskOutputPath{Path: p})
+	}
+
+	return res, nil
+}
+
+func parseUrlToBaseAndPath(URL string) (string, string, error) {
+	u, err := url.Parse(URL)
+	if err != nil {
+		return "", "", err
+	}
+
+	p := u.Path
+	if strings.HasPrefix(u.Scheme, "s3+http") {
+		// first part of the Object Store path is a bucket name, skip it
+		ps := strings.Split(strings.TrimLeft(p, "/"), "/")
+		p = "/" + strings.Join(ps[1:], "/")
+	}
+
+	var baseUrl string
+	if u.Scheme == "ipfs" {
+		// add baseUrl only for IPFS
+		u.Path = ""
+		baseUrl = u.String()
+	}
+
+	return baseUrl, p, nil
 }
 
 func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
@@ -376,12 +424,12 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 
 func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCallback {
 	res := *metadata
-	res.Outputs = make([]catalystClients.OutputVideo, len(metadata.Outputs))
+	res.Outputs = make([]video.OutputVideo, len(metadata.Outputs))
 
 	for o, output := range metadata.Outputs {
 		res.Outputs[o] = output
 		res.Outputs[o].Manifest = clients.RedactURL(output.Manifest)
-		res.Outputs[o].Videos = make([]catalystClients.OutputVideoFile, len(output.Videos))
+		res.Outputs[o].Videos = make([]video.OutputVideoFile, len(output.Videos))
 		for v, video := range output.Videos {
 			res.Outputs[o].Videos[v] = video
 			res.Outputs[o].Videos[v].Location = clients.RedactURL(video.Location)
