@@ -19,10 +19,10 @@ const minProgressReportInterval = 10 * time.Second
 const progressCheckInterval = 1 * time.Second
 
 type ProgressReporter struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	lapi   *api.Client
-	taskID string
+	ctx          context.Context
+	cancel       context.CancelFunc
+	lapi         *api.Client
+	taskID, step string
 
 	mu                   sync.Mutex
 	getProgress          func() float64
@@ -32,7 +32,7 @@ type ProgressReporter struct {
 	lastProgress float64
 }
 
-func NewProgressReporter(ctx context.Context, lapi *api.Client, taskID string) *ProgressReporter {
+func NewProgressReporter(ctx context.Context, lapi *api.Client, taskID, step string) *ProgressReporter {
 	ctx, cancel := context.WithCancel(ctx)
 	p := &ProgressReporter{
 		ctx:    ctx,
@@ -110,24 +110,30 @@ func (p *ProgressReporter) reportOnce() {
 		}
 		return
 	}
-	if !shouldReportProgress(progress, p.lastProgress, p.taskID, p.lastReport) {
+	if !shouldReportProgress(progress, p.step, p.lastProgress, p.step, p.taskID, p.lastReport) {
 		return
 	}
-	if err := p.lapi.UpdateTaskStatus(p.taskID, "running", progress); err != nil {
+	if err := p.lapi.UpdateTaskStatus(p.taskID, "running", progress, p.step); err != nil {
 		glog.Errorf("Error updating task progress taskID=%s progress=%v err=%q", p.taskID, progress, err)
 		return
 	}
 	p.lastReport, p.lastProgress = time.Now(), progress
 }
 
-func shouldReportProgress(new, old float64, taskID string, lastReportedAt time.Time) bool {
+func shouldReportProgressTask(new float64, newStep string, task *api.Task) bool {
+	curr, currStep, lastReportedAt := task.Status.Progress, task.Status.Step, time.UnixMilli(task.Status.UpdatedAt)
+	return shouldReportProgress(new, newStep, curr, currStep, task.ID, lastReportedAt)
+}
+
+func shouldReportProgress(new float64, newStep string, curr float64, currStep string, taskID string, lastReportedAt time.Time) bool {
 	// Catalyst currently sends non monotonic progress updates, so we only update
 	// the progress if the new value is not less than the old one.
-	if new < old {
-		glog.Warningf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", taskID, old, new)
+	if new < curr {
+		glog.Warningf("Non monotonic progress received taskID=%s lastProgress=%v progress=%v", taskID, curr, new)
 		return false
 	}
-	return progressBucket(new) != progressBucket(old) ||
+	return progressBucket(new) != progressBucket(curr) ||
+		newStep != currStep ||
 		time.Since(lastReportedAt) >= minProgressReportInterval
 }
 
