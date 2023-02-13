@@ -376,6 +376,10 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 	progress := 0.9 * callback.CompletionRatio
 	progress = math.Round(progress*1000) / 1000
 	step := "catalyst_" + strings.ToLower(callback.Status.String())
+	if callback.Status == catalystClients.TranscodeStatusCompleted {
+		step = nextStep
+	}
+
 	if shouldReportProgressTask(progress, step, task) {
 		err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress, step)
 		if err != nil {
