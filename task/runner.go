@@ -293,7 +293,7 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *T
 			return nil, errors.New("task has already been started before")
 		}
 
-		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0)
+		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0, "")
 		if err == api.ErrRateLimited {
 			glog.Warningf("Task execution rate limited type=%q id=%s userID=%s", taskType, taskID, taskCtx.UserID)
 			return nil, r.delayTaskStep(ctx, taskID, taskCtx.Step, taskCtx.StepInput)
@@ -333,7 +333,7 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	if err != nil {
 		return nil, err
 	}
-	progress := NewProgressReporter(ctx, r.lapi, task.ID)
+	progress := NewProgressReporter(ctx, r.lapi, task.ID, info.Step)
 	return &TaskContext{ctx, r, info, task, progress, inputAsset, outputAsset, inputOSObj, outputOSObj, inputOS, outputOS}, nil
 }
 
@@ -376,9 +376,13 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 
 	progress := 0.9 * callback.CompletionRatio
 	progress = math.Round(progress*1000) / 1000
-	currProgress, taskUpdatedAt := task.Status.Progress, data.NewUnixMillisTime(task.Status.UpdatedAt)
-	if shouldReportProgress(progress, currProgress, task.ID, taskUpdatedAt.Time) {
-		err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress)
+	step := "catalyst_" + strings.ToLower(callback.Status.String())
+	if callback.Status == catalystClients.TranscodeStatusCompleted {
+		step = nextStep
+	}
+
+	if shouldReportProgressTask(progress, step, task) {
+		err = r.lapi.UpdateTaskStatus(task.ID, api.TaskPhaseRunning, progress, step)
 		if err != nil {
 			glog.Warningf("Failed to update task progress. taskID=%s err=%v", task.ID, err)
 		}
