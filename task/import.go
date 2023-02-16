@@ -99,8 +99,8 @@ func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig
 		return
 	}
 
-	switch params.Encryption.Algorithm {
-	case "", "aes-256-cbc":
+	switch strings.ToLower(params.Encryption.Algorithm) {
+	case "", "aes-cbc":
 		glog.V(logs.VVERBOSE).Infof("Decrypting file with key file=%s keyHash=%x", params.URL, sha256.Sum256([]byte(params.Encryption.Key)))
 		decrypted, err := webcrypto.DecryptAESCBC(content, params.Encryption.Key)
 		if err != nil {
