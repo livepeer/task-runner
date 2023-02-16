@@ -1,4 +1,4 @@
-package encryption
+package webcrypto
 
 import (
 	"bufio"
@@ -11,7 +11,7 @@ import (
 	"github.com/d1str0/pkcs7"
 )
 
-func DecryptAES256CBCReader(reader io.ReadCloser, keyb16 string) (io.ReadCloser, error) {
+func DecryptAESCBC(reader io.ReadCloser, keyb16 string) (io.ReadCloser, error) {
 	key, err := hex.DecodeString(keyb16)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding base16 key: %w", err)
