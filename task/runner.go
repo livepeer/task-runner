@@ -533,6 +533,7 @@ func humanizeCatalystError(err error) error {
 		"no pictures decoded",
 		"zero bytes found for source",
 		"invalid framerate",
+		"maximum resolution is",
 	}
 
 	// MediaConvert pipeline errors
