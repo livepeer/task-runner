@@ -86,9 +86,13 @@ func decryptReaderTo(readerRaw io.Reader, writer io.Writer, decrypter cipher.Blo
 
 		decrypter.CryptBlocks(chunk, chunk)
 
-		if _, peekErr := reader.Peek(1); !needsFakePadding && peekErr == io.EOF {
+		if needsFakePadding {
+			// remove the fake padding
+			chunk = chunk[:n]
+		} else if _, peekErr := reader.Peek(1); peekErr == io.EOF {
 			// this means we're on the last chunk, so handle padding
 			lastBlock := chunk[len(chunk)-blockSize:]
+
 			unpadded, err := pkcs7.Unpad(lastBlock)
 			if err != nil {
 				return fmt.Errorf("bad input PKCS#7 padding: %w", err)
@@ -98,8 +102,7 @@ func decryptReaderTo(readerRaw io.Reader, writer io.Writer, decrypter cipher.Blo
 			chunk = chunk[:len(chunk)-padSize]
 		}
 
-		// still need to slice chunk in case we added fake padding
-		if _, err := writer.Write(chunk[:n]); err != nil {
+		if _, err := writer.Write(chunk); err != nil {
 			return err
 		}
 	}
