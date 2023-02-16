@@ -1,7 +1,6 @@
 package task
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"github.com/livepeer/catalyst-api/pipeline"
 	"github.com/livepeer/catalyst-api/video"
 	"github.com/livepeer/go-api-client"
-	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
 )
@@ -125,7 +123,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 
 func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.Upload
-	inUrl, err := getFileUrlForUploadTask(tctx, tctx.outputOS, tctx.OutputOSObj, tctx.ImportTaskConfig, params, tctx.OutputAsset.PlaybackID)
+	inUrl, err := getFileUrlForUploadTask(tctx.OutputOSObj, params)
 	if err != nil {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
@@ -224,7 +222,7 @@ func parseUrlToBaseAndPath(URL string) (string, string, error) {
 	return baseUrl, p, nil
 }
 
-func getFileUrlForUploadTask(ctx context.Context, osSess drivers.OSSession, os *api.ObjectStore, cfg ImportTaskConfig, params api.UploadTaskParams, playbackID string) (string, error) {
+func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
 	osPublicURL, err := url.Parse(os.PublicURL)
 	if err != nil {
 		return "", fmt.Errorf("error parsing object store public URL: %w", err)
