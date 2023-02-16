@@ -223,12 +223,12 @@ func parseUrlToBaseAndPath(URL string) (string, string, error) {
 }
 
 func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
-	osPublicURL, err := url.Parse(os.PublicURL)
-	if err != nil {
-		return "", fmt.Errorf("error parsing object store public URL: %w", err)
-	}
-	if params.UploadedObjectKey != "" {
-		return osPublicURL.JoinPath(params.UploadedObjectKey).String(), nil
+	if key := params.UploadedObjectKey; key != "" {
+		u, err := url.Parse(os.PublicURL)
+		if err != nil {
+			return "", err
+		}
+		return u.JoinPath(key).String(), nil
 	}
 	return params.URL, nil
 }
