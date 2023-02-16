@@ -5,11 +5,11 @@ go 1.19
 require (
 	github.com/golang/glog v1.0.0
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/livepeer/catalyst-api v0.0.13-0.20230208151113-b719d80a9496
+	github.com/livepeer/catalyst-api v0.0.13-0.20230216132322-8b4f260542df
 	github.com/livepeer/go-api-client v0.4.3-0.20230207145728-8eb78c664108
-	github.com/livepeer/go-tools v0.2.2
+	github.com/livepeer/go-tools v0.2.5
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
-	github.com/livepeer/livepeer-data v0.6.3
+	github.com/livepeer/livepeer-data v0.6.4
 	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
 	github.com/peterbourgon/ff v1.7.1
 	github.com/prometheus/client_golang v1.14.0
@@ -30,7 +30,7 @@ require (
 	github.com/Azure/azure-storage-blob-go v0.8.0 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.5 // indirect
 	github.com/Necroforger/dgrouter v0.0.0-20190528143456-040421b5a83e // indirect
-	github.com/aws/aws-sdk-go v1.44.194 // indirect
+	github.com/aws/aws-sdk-go v1.44.198 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bwmarrin/discordgo v0.20.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
@@ -73,7 +73,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/ipfs/go-merkledag v0.9.0 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
-	github.com/ipfs/go-unixfs v0.4.2 // indirect
+	github.com/ipfs/go-unixfs v0.4.3 // indirect
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
 	github.com/ipld/go-car v0.6.0 // indirect
 	github.com/ipld/go-codec-dagpb v1.5.0 // indirect
