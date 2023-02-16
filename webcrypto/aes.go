@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"github.com/d1str0/pkcs7"
+	"github.com/golang/glog"
 )
 
 func DecryptAESCBC(reader io.ReadCloser, keyb16 string) (io.ReadCloser, error) {
@@ -60,15 +61,22 @@ func decryptReaderTo(readerRaw io.Reader, writer io.Writer, decrypter cipher.Blo
 		} else if err != nil && err != io.ErrUnexpectedEOF {
 			// unexpected EOF is returned when input ends before the buffer size
 			return err
-		} else if n%blockSize != 0 {
-			// this can only ever happen on the last chunk
-			return fmt.Errorf("input is not a multiple of AES block size. must be padded with PKCS#7")
 		}
 
 		chunk := buffer[:n]
+
+		// we add some dummy bytes in the end to make a full block and still try to
+		// decrypt. this is non standard and can only ever happen on the last chunk.
+		needsFakePadding := n%blockSize != 0
+		if needsFakePadding {
+			glog.Warningf("Input is not a multiple of AES block size, not padded with PKCS#7")
+			fakePaddingSize := blockSize - (n % blockSize)
+			chunk = buffer[:n+fakePaddingSize]
+		}
+
 		decrypter.CryptBlocks(chunk, chunk)
 
-		if _, peekErr := reader.Peek(1); peekErr == io.EOF {
+		if _, peekErr := reader.Peek(1); !needsFakePadding && peekErr == io.EOF {
 			// this means we're on the last chunk, so handle padding
 			lastBlock := chunk[len(chunk)-blockSize:]
 			unpadded, err := pkcs7.Unpad(lastBlock)
@@ -80,7 +88,8 @@ func decryptReaderTo(readerRaw io.Reader, writer io.Writer, decrypter cipher.Blo
 			chunk = chunk[:len(chunk)-padSize]
 		}
 
-		if _, err := writer.Write(chunk); err != nil {
+		// still need to slice chunk in case we added fake padding
+		if _, err := writer.Write(chunk[:n]); err != nil {
 			return err
 		}
 	}
