@@ -66,11 +66,11 @@ func decryptReaderTo(readerRaw io.Reader, writer io.Writer, decrypter cipher.Blo
 
 	for {
 		n, err := io.ReadFull(reader, buffer)
-		if n == 0 || err == io.EOF {
-			break
-		} else if err != nil && err != io.ErrUnexpectedEOF {
+		if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
 			// unexpected EOF is returned when input ends before the buffer size
 			return err
+		} else if n == 0 {
+			break
 		}
 
 		chunk := buffer[:n]
