@@ -81,7 +81,9 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		return ContinueAsync, nil
 	case "checkCatalyst":
 		task := tctx.Task
-		if task.Status.Phase != api.TaskPhaseRunning {
+		if task.Status.Phase != api.TaskPhaseRunning || task.Status.Step == "finalize" {
+			// Task has already progressed to another phase or step. To stop the loop
+			// of `checkCatalyst` we "continue" without having scheduled another msg.
 			return ContinueAsync, nil
 		}
 		updatedAt := data.NewUnixMillisTime(task.Status.UpdatedAt)
