@@ -56,6 +56,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 	)
 	switch step {
 	case "":
+		// TODO: Move this input decryption logic to catalyst
 		if uploadParams := tctx.Params.Upload; uploadParams != nil {
 			var err error
 			inUrl, err = decryptInputFile(tctx, inUrl, *uploadParams)
