@@ -35,7 +35,6 @@ var (
 	OutputNameOSSourceMP4   = OutputName("source_mp4")
 	OutputNameOSPlaylistHLS = OutputName("playlist_hls")
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
-	OutputNameAssetMP4      = OutputName("asset_mp4")
 )
 
 type handleUploadVODParams struct {
@@ -230,11 +229,10 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			return nil, fmt.Errorf("output type mismatch: %s != %s", output.Type, outReq.Type)
 		}
 		manifestPath, err := extractOSUriFilePath(output.Manifest, playbackID)
-		if outName != OutputNameAssetMP4 {
-			if err != nil {
-				return nil, fmt.Errorf("error extracting file path from output manifest: %w", err)
-			}
+		if err != nil {
+			return nil, fmt.Errorf("error extracting file path from output manifest: %w", err)
 		}
+
 		switch outName {
 		case OutputNameOSSourceMP4:
 			if len(output.Videos) != 1 {
