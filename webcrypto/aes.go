@@ -12,7 +12,22 @@ import (
 	"github.com/golang/glog"
 )
 
+// Decrypts a file encrypted with AES (key length depends on input) in CBC block
+// chaining mode and PKCS#7 padding. The provided key must be encoded in base16,
+// and the first block of the input is the IV. The output is a pipe reader that
+// can be used to stream the decrypted file.
 func DecryptAESCBC(reader io.ReadCloser, keyb16 string) (io.ReadCloser, error) {
+	iv := make([]byte, aes.BlockSize)
+	if _, err := io.ReadFull(reader, iv); err != nil {
+		return nil, fmt.Errorf("error reading iv from input: %w", err)
+	}
+
+	return DecryptAESCBCWithIV(reader, keyb16, iv)
+}
+
+// Just like DecryptAESCBC, but the IV is provided as an argument instead of
+// read from the input stream.
+func DecryptAESCBCWithIV(reader io.ReadCloser, keyb16 string, iv []byte) (io.ReadCloser, error) {
 	key, err := hex.DecodeString(keyb16)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding base16 key: %w", err)
@@ -21,11 +36,6 @@ func DecryptAESCBC(reader io.ReadCloser, keyb16 string) (io.ReadCloser, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("error creating cipher: %w", err)
-	}
-
-	iv := make([]byte, block.BlockSize())
-	if _, err := io.ReadFull(reader, iv); err != nil {
-		return nil, fmt.Errorf("error reading iv from input: %w", err)
 	}
 
 	decrypter := cipher.NewCBCDecrypter(block, iv)
