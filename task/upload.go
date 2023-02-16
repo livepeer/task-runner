@@ -149,18 +149,65 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
-			if callback.Outputs == nil || len(callback.Outputs) < 1 {
-				return nil, fmt.Errorf("invalid video outputs: %v", callback.Outputs)
+			tfo, err := toTranscodeFileTaskOutput(callback.Outputs)
+			if err != nil {
+				return nil, err
 			}
-			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{
-				TranscodeFile: &data.TranscodeFileTaskOutput{
-					VideoFilePath: clients.RedactURL(callback.Outputs[0].Manifest),
-				},
-			}}, nil
+			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{TranscodeFile: &tfo}}, nil
 		},
 		profiles:                 params.Profiles,
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 	})
+}
+
+func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileTaskOutput, error) {
+	var res data.TranscodeFileTaskOutput
+
+	if len(outputs) < 1 {
+		return res, fmt.Errorf("invalid video outputs: %v", outputs)
+	}
+	// we expect only one output
+	o := outputs[0]
+
+	bu, p, err := parseUrlToBaseAndPath(o.Manifest)
+	if err != nil {
+		return res, err
+	}
+	res.BaseUrl = bu
+	res.Hls = &data.TranscodeFileTaskOutputPath{Path: p}
+
+	for _, m := range o.MP4Outputs {
+		_, p, err := parseUrlToBaseAndPath(m.Location)
+		if err != nil {
+			return res, err
+		}
+		res.Mp4 = append(res.Mp4, data.TranscodeFileTaskOutputPath{Path: p})
+	}
+
+	return res, nil
+}
+
+func parseUrlToBaseAndPath(URL string) (string, string, error) {
+	u, err := url.Parse(URL)
+	if err != nil {
+		return "", "", err
+	}
+
+	p := u.Path
+	if strings.HasPrefix(u.Scheme, "s3+http") {
+		// first part of the Object Store path is a bucket name, skip it
+		ps := strings.Split(strings.TrimLeft(p, "/"), "/")
+		p = "/" + strings.Join(ps[1:], "/")
+	}
+
+	var baseUrl string
+	if u.Scheme == "ipfs" {
+		// add baseUrl only for IPFS
+		u.Path = ""
+		baseUrl = u.String()
+	}
+
+	return baseUrl, p, nil
 }
 
 func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {

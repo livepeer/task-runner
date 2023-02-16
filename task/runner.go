@@ -35,7 +35,8 @@ var (
 	// without including extraneous error information from Catalyst
 	errInvalidVideo = UnretriableError{errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")}
 	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
-	errProbe = UnretriableError{errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")}
+	errProbe   = UnretriableError{errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")}
+	errFFProbe = errors.New("error probing input file")
 )
 
 var (
@@ -526,7 +527,8 @@ func humanizeCatalystError(err error) error {
 		"readpacketdata file read failed - end of file hit",
 		"no video track found in file",
 		"no pictures decoded",
-		"error probing mp4 input file from s3",
+		"zero bytes found for source",
+		"invalid framerate",
 	}
 
 	// MediaConvert pipeline errors
@@ -534,6 +536,9 @@ func humanizeCatalystError(err error) error {
 		if strings.Contains(errMsg, e) {
 			return errInvalidVideo
 		}
+	}
+	if strings.Contains(errMsg, "error running ffprobe") && strings.Contains(errMsg, "exit status 1") {
+		return errFFProbe
 	}
 	if strings.Contains(errMsg, "failed probe/open") {
 		return errProbe

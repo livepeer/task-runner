@@ -18,9 +18,7 @@ import (
 )
 
 var (
-	ErrRateLimited        = errors.New("rate limited")
-	CatalystStatusSuccess = clients.TranscodeStatusCompleted.String()
-	CatalystStatusError   = clients.TranscodeStatusError.String()
+	ErrRateLimited = errors.New("rate limited")
 
 	baseTransport = *http.DefaultTransport.(*http.Transport)
 )
