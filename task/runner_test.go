@@ -62,6 +62,9 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("external transcoder error: invalid framerate: 0.000000", false)
 	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("external transcoder error: job failed: video_description [3]: Maximum resolution is [8192]x[4320] or [4320]x[8192] in portrait mode, resolution specified is [5000]x[7000]", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
