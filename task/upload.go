@@ -122,7 +122,7 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: inUrl,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocations, err := assetOutputLocations(tctx)
+			_, outputLocations, err := uploadTaskOutputLocations(tctx)
 			return outputLocations, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -146,7 +146,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path)
+			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path, false)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -256,7 +256,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		}
 	}
 
-	outputNames, outputReqs, err := assetOutputLocations(tctx)
+	outputNames, outputReqs, err := uploadTaskOutputLocations(tctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting asset output requests: %w", err)
 	}
@@ -281,6 +281,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		if err != nil {
 			return nil, fmt.Errorf("error extracting file path from output manifest: %w", err)
 		}
+
 		switch outName {
 		case OutputNameOSSourceMP4:
 			if len(output.Videos) != 1 {
@@ -301,6 +302,27 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 				Type: "catalyst_hls_manifest",
 				Path: manifestPath,
 			})
+			for v, video := range output.MP4Outputs {
+				if video.Type != "mp4" {
+					return nil, fmt.Errorf("unexpected video type in rendition MP4 output: %s", output.Videos[v].Type)
+				}
+				videoFilePath = video.Location
+				videoFilePath, err = extractOSUriFilePath(videoFilePath, playbackID)
+				if err != nil {
+					return nil, fmt.Errorf("error extracting file path from mp4 rendition video location: %w", err)
+				}
+				glog.Infof("Adding mp4 asset file %+v= path=%q", video, videoFilePath)
+				assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+					Type: "static_transcoded_mp4",
+					Path: videoFilePath,
+					Spec: api.AssetFileSpec{
+						Size:    video.SizeBytes,
+						Width:   video.Width,
+						Height:  video.Height,
+						Bitrate: video.Bitrate,
+					},
+				})
+			}
 		case OutputNameIPFSSourceMP4:
 			assetSpec.Storage.IPFS.CID = output.Manifest
 		default:
@@ -441,12 +463,13 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 	return &res
 }
 
-func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
-	outputNames, outputLocations, err := outputLocations(tctx.OutputOSObj.URL, tctx.OutputAsset.PlaybackID)
+func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
+	playbackId := tctx.OutputAsset.PlaybackID
+	outURL := tctx.OutputOSObj.URL
+	outputNames, outputLocations, err := outputLocations(outURL, playbackId, true)
 	if err != nil {
 		return nil, nil, err
 	}
-
 	// Add Pinata output location
 	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
 		// TODO: This interface is likely going to change so that pinata is just a
@@ -465,7 +488,7 @@ func assetOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLoca
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL string, relativePath string) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
@@ -481,6 +504,7 @@ func outputLocations(outURL string, relativePath string) ([]OutputName, []client
 				Outputs: &clients.OutputsRequest{
 					SourceSegments:     sourceSegments,
 					TranscodedSegments: true,
+					AutoMP4:            autoMp4s,
 				},
 			},
 		}
