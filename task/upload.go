@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -48,19 +47,30 @@ type handleUploadVODParams struct {
 
 func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 	var (
-		tctx = p.tctx
-		ctx  = tctx.Context
-		step = tctx.Step
+		tctx  = p.tctx
+		ctx   = tctx.Context
+		step  = tctx.Step
+		inUrl = p.inUrl
 	)
 	switch step {
-	case "", "rateLimitBackoff":
+	case "":
+		// TODO: Move this input decryption logic to catalyst
+		if uploadParams := tctx.Params.Upload; uploadParams != nil {
+			var err error
+			inUrl, err = decryptInputFile(tctx, inUrl, *uploadParams)
+			if err != nil {
+				return nil, fmt.Errorf("error decrypting input file: %w", err)
+			}
+		}
+		fallthrough
+	case "rateLimitBackoff":
 		outputLocations, err := p.getOutputLocations()
 		if err != nil {
 			return nil, err
 		}
 		var (
 			req = clients.UploadVODRequest{
-				Url:              p.inUrl,
+				Url:              inUrl,
 				CallbackUrl:      tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 				OutputLocations:  outputLocations,
 				PipelineStrategy: p.catalystPipelineStrategy,
@@ -213,15 +223,47 @@ func parseUrlToBaseAndPath(URL string) (string, string, error) {
 }
 
 func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (string, error) {
-	if params.UploadedObjectKey != "" {
+	if key := params.UploadedObjectKey; key != "" {
 		u, err := url.Parse(os.PublicURL)
 		if err != nil {
 			return "", err
 		}
-		u.Path = path.Join(u.Path, params.UploadedObjectKey)
-		return u.String(), nil
+		return u.JoinPath(key).String(), nil
 	}
 	return params.URL, nil
+}
+
+func decryptInputFile(tctx *TaskContext, fileUrl string, params api.UploadTaskParams) (string, error) {
+	var (
+		osSess     = tctx.outputOS
+		os         = tctx.OutputOSObj
+		cfg        = tctx.ImportTaskConfig
+		playbackID = tctx.OutputAsset.PlaybackID
+	)
+	if params.Encryption.Key == "" {
+		return fileUrl, nil
+	}
+
+	glog.Infof("Downloading file=%s from object store", params.URL)
+	_, _, content, err := getFile(tctx, osSess, cfg, params)
+	if err != nil {
+		return "", fmt.Errorf("failed to get input file: %w", err)
+	}
+	defer content.Close()
+
+	glog.Infof("Uploading decrypted file=%s to object store", params.URL)
+	fullPath := videoFileName(playbackID)
+	fileUrl, err = osSess.SaveData(tctx, fullPath, content, nil, fileUploadTimeout)
+	if err != nil {
+		return "", fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+	}
+	glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
+
+	osPublicURL, err := url.Parse(os.PublicURL)
+	if err != nil {
+		return "", fmt.Errorf("error parsing object store public URL: %w", err)
+	}
+	return osPublicURL.JoinPath(fullPath).String(), nil
 }
 
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
@@ -372,20 +414,24 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	}
 
 	if !FlagCatalystCopiesSourceFile {
-		input, err := readLocalFile(0.95)
-		if err != nil {
-			return nil, err
-		}
 		fullPath := videoFileName(playbackID)
-		fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-		}
 		assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 			Type: "source_file",
 			Path: toAssetRelativePath(playbackID, fullPath),
 		})
-		glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
+
+		// in case of encrypted input, file will have been copied in the beginning
+		if params.Encryption.Key == "" {
+			input, err := readLocalFile(0.95)
+			if err != nil {
+				return nil, err
+			}
+			fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
+			if err != nil {
+				return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+			}
+			glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
+		}
 	}
 
 	if tctx.OutputAsset.Storage.IPFS != nil {

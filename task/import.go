@@ -3,6 +3,7 @@ package task
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,8 +15,10 @@ import (
 
 	"github.com/golang/glog"
 	api "github.com/livepeer/go-api-client"
+	"github.com/livepeer/go-api-client/logs"
 	"github.com/livepeer/go-tools/drivers"
 	"github.com/livepeer/livepeer-data/pkg/data"
+	"github.com/livepeer/task-runner/webcrypto"
 )
 
 const IPFS_PREFIX = "ipfs://"
@@ -91,6 +94,28 @@ func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 }
 
 func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
+	name, size, content, err = getFileRaw(ctx, osSess, cfg, params)
+	if err != nil || params.Encryption.Key == "" {
+		return
+	}
+
+	switch strings.ToLower(params.Encryption.Algorithm) {
+	case "", "aes-cbc":
+		glog.V(logs.VVERBOSE).Infof("Decrypting file with key file=%s keyHash=%x", params.URL, sha256.Sum256([]byte(params.Encryption.Key)))
+		decrypted, err := webcrypto.DecryptAESCBC(content, params.Encryption.Key)
+		if err != nil {
+			content.Close()
+			return "", 0, nil, fmt.Errorf("failed to decrypt input file: %w", err)
+		}
+
+		glog.V(logs.VVERBOSE).Infof("Returning decrypted stream for file=%s", params.URL)
+		return name, size, decrypted, nil
+	default:
+		return "", 0, nil, fmt.Errorf("unknown encryption algorithm: %s", params.Encryption.Algorithm)
+	}
+}
+
+func getFileRaw(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
 	if upedObjKey := params.UploadedObjectKey; upedObjKey != "" {
 		// TODO: We should simply "move" the file in case of direct import since we
 		// know the file is already in the object store. Independently, we also have
