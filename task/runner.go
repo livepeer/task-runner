@@ -36,7 +36,6 @@ var (
 	errInvalidVideo = UnretriableError{errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")}
 	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
 	errProbe   = UnretriableError{errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")}
-	errFFProbe = errors.New("error probing input file")
 )
 
 var (
@@ -543,7 +542,7 @@ func humanizeCatalystError(err error) error {
 		}
 	}
 	if strings.Contains(errMsg, "error running ffprobe") && strings.Contains(errMsg, "exit status 1") {
-		return errFFProbe
+		return errInvalidVideo 
 	}
 	if strings.Contains(errMsg, "failed probe/open") {
 		return errProbe
