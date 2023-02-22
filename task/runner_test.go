@@ -55,7 +55,7 @@ func TestHumanizeError(t *testing.T) {
 	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 
 	err = NewCatalystError("external transcoder error: error probing MP4 input file from S3: error running ffprobe [] exit status 1", false)
-	assert.ErrorIs(humanizeError(err), errFFProbe)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 
 	err = NewCatalystError("external transcoder error: zero bytes found for source: file:///dev/null", false)
 	assert.ErrorIs(humanizeError(err), errInvalidVideo)
