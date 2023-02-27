@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,14 +49,24 @@ var (
 		"transcode":      TaskTranscode,
 		"transcode-file": TaskTranscodeFile,
 	}
+
 	errInternalProcessingError = errors.New("internal error processing file")
 	taskFatalErrorInfo         = &data.ErrorInfo{Message: errInternalProcessingError.Error(), Unretriable: true}
-	taskExecResultCount        = metrics.Factory.NewCounterVec(
+
+	taskResultCount = metrics.Factory.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: metrics.FQName("task_result_count"),
 			Help: "Breakdown of task execution results by task type and status (success, error, unretriable_error)",
 		},
 		[]string{"task_type", "status"},
+	)
+	taskStepDurationSec = metrics.Factory.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    metrics.FQName("task_step_duration_sec"),
+			Help:    "Time spent executing a task by task type, step and result flags",
+			Buckets: []float64{5, 15, 60, 300, 900, 3600},
+		},
+		[]string{"task_type", "step", "finished", "errored"},
 	)
 )
 
@@ -268,8 +279,15 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 		}
 	}()
 
+	startTime := time.Now()
 	output, err := r.handleTask(ctx, task)
-	if err == nil && output != nil && output.Continue {
+
+	willContinue := err == nil && output != nil && output.Continue
+	taskStepDurationSec.
+		WithLabelValues(task.Type, task.Step, strconv.FormatBool(!willContinue), strconv.FormatBool(err != nil)).
+		Observe(time.Since(startTime).Seconds())
+
+	if willContinue {
 		glog.Infof("Task handler will continue task async type=%q id=%s output=%+v", task.Type, task.ID, output)
 		return nil
 	}
@@ -436,7 +454,7 @@ func (r *runner) scheduleTaskStep(taskID, step string, input interface{}) error 
 func (r *runner) publishTaskResult(task data.TaskInfo, output *TaskHandlerOutput, rawErr error) error {
 	errInfo := makeErrorInfo(rawErr)
 
-	taskExecResultCount.WithLabelValues(task.Type, taskResultStatusLabel(errInfo)).Inc()
+	taskResultCount.WithLabelValues(task.Type, taskResultStatusLabel(errInfo)).Inc()
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q humanError=%q unretriable=%v",
 		task.Type, task.ID, output, errInfo.RawError, errInfo.HumanError, errInfo.Unretriable)
 
