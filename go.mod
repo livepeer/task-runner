@@ -15,7 +15,7 @@ require (
 	github.com/peterbourgon/ff v1.7.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rabbitmq/amqp091-go v1.6.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	golang.org/x/sync v0.1.0
 	gopkg.in/vansante/go-ffprobe.v2 v2.1.1
 )
