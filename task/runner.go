@@ -587,12 +587,14 @@ func humanizeCatalystError(err error) error {
 
 	// Livepeer pipeline errors
 	if strings.Contains(errMsg, "unsupported input pixel format") {
-		return errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")
-	} else if strings.Contains(errMsg, "Unsupported video input") {
-		// TODO(yondonfu): This check probably does not work because the error message will be lowercased
-		return errors.New("unsupported file format")
+		return UnretriableError{errors.New("unsupported input pixel format, must be 'yuv420p' or 'yuvj420p'")}
+	} else if strings.Contains(errMsg, "unsupported video input") {
+		return UnretriableError{errors.New("unsupported file format")}
 	}
 
+	if IsUnretriable(err) {
+		return UnretriableError{errInternalProcessingError}
+	}
 	return errInternalProcessingError
 }
 
