@@ -17,6 +17,8 @@ import (
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
 	"github.com/livepeer/task-runner/clients"
+	"github.com/livepeer/task-runner/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -35,7 +37,7 @@ var (
 	// without including extraneous error information from Catalyst
 	errInvalidVideo = UnretriableError{errors.New("invalid video file codec or container, check your input file against the input codec and container support matrix")}
 	// TODO(yondonfu): Add link in this error message to a page with the input codec/container support matrix
-	errProbe   = UnretriableError{errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")}
+	errProbe = UnretriableError{errors.New("failed to probe or open file, check your input file against the input codec and container support matrix")}
 )
 
 var (
@@ -48,6 +50,13 @@ var (
 	}
 	errInternalProcessingError = errors.New("internal error processing file")
 	taskFatalErrorInfo         = &data.ErrorInfo{Message: errInternalProcessingError.Error(), Unretriable: true}
+	taskExecResultCount        = metrics.Factory.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: metrics.FQName("task_result_count"),
+			Help: "Breakdown of task execution results by task type and status (success, error, unretriable_error)",
+		},
+		[]string{"task_type", "status"},
+	)
 )
 
 type TaskHandlerOutput struct {
@@ -265,6 +274,7 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 		return nil
 	}
 
+	taskExecResultCount.WithLabelValues(task.Type, taskResultStatusLabel(err)).Inc()
 	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
 
 	// return the error directly so that if publishing the result fails we nack the message to try again
@@ -543,7 +553,7 @@ func humanizeCatalystError(err error) error {
 		}
 	}
 	if strings.Contains(errMsg, "error running ffprobe") && strings.Contains(errMsg, "exit status 1") {
-		return errInvalidVideo 
+		return errInvalidVideo
 	}
 	if strings.Contains(errMsg, "failed probe/open") {
 		return errProbe
@@ -631,6 +641,16 @@ func publishLoggedRaw(producer event.AMQPProducer, task data.TaskInfo, exchange,
 		return err
 	}
 	return nil
+}
+
+func taskResultStatusLabel(err error) string {
+	if err == nil {
+		return "success"
+	} else if IsUnretriable(err) {
+		return "unretriable_error"
+	} else {
+		return "error"
+	}
 }
 
 func taskResultMessageKey(ttype, id string) string {
