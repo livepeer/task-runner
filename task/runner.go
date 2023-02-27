@@ -274,9 +274,6 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 		return nil
 	}
 
-	taskExecResultCount.WithLabelValues(task.Type, taskResultStatusLabel(err)).Inc()
-	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q unretriable=%v", task.Type, task.ID, output, err, IsUnretriable(err))
-
 	// return the error directly so that if publishing the result fails we nack the message to try again
 	return r.publishTaskResult(task, output, err)
 }
@@ -436,18 +433,29 @@ func (r *runner) scheduleTaskStep(taskID, step string, input interface{}) error 
 	return nil
 }
 
-func (r *runner) publishTaskResult(task data.TaskInfo, output *TaskHandlerOutput, resultErr error) error {
-	if r.HumanizeErrors {
-		resultErr = humanizeError(resultErr)
-	}
+func (r *runner) publishTaskResult(task data.TaskInfo, output *TaskHandlerOutput, rawErr error) error {
+	errInfo := makeErrorInfo(rawErr)
+
+	taskExecResultCount.WithLabelValues(task.Type, taskResultStatusLabel(errInfo)).Inc()
+	glog.Infof("Task handler processed task type=%q id=%s output=%+v error=%q humanError=%q unretriable=%v",
+		task.Type, task.ID, output, errInfo.RawError, errInfo.HumanError, errInfo.Unretriable)
+
 	var body *data.TaskResultEvent
-	if resultErr != nil {
-		body = data.NewTaskResultEvent(task, errorInfo(resultErr), nil)
+	if errInfo.RawError != nil {
+		evtErrInfo := &data.ErrorInfo{
+			Message:     errInfo.RawError.Error(),
+			Unretriable: errInfo.Unretriable,
+		}
+		if r.HumanizeErrors {
+			evtErrInfo.Message = errInfo.HumanError.Error()
+		}
+		body = data.NewTaskResultEvent(task, evtErrInfo, nil)
 	} else if output != nil {
-		body = data.NewTaskResultEvent(task, errorInfo(resultErr), output.TaskOutput)
+		body = data.NewTaskResultEvent(task, nil, output.TaskOutput)
 	} else {
 		return errors.New("output or resultErr must be non-nil")
 	}
+
 	key := fmt.Sprintf("task.result.%s.%s", task.Type, task.ID)
 	if err := r.publishLogged(task, r.ExchangeName, key, body); err != nil {
 		return fmt.Errorf("error publishing task result event: %w", err)
@@ -491,11 +499,29 @@ func (r *runner) Shutdown(ctx context.Context) error {
 	return r.amqp.Shutdown(ctx)
 }
 
-func errorInfo(err error) *data.ErrorInfo {
+type taskErrInfo struct {
+	RawError, HumanError error
+	Unretriable          bool
+}
+
+func makeErrorInfo(err error) taskErrInfo {
 	if err == nil {
-		return nil
+		return taskErrInfo{}
 	}
-	return &data.ErrorInfo{Message: err.Error(), Unretriable: IsUnretriable(err)}
+	humanErr := humanizeError(err)
+
+	if IsUnretriable(err) && !IsUnretriable(humanErr) {
+		// catch if we ever create a human error that loses the (opt-in) unretriable
+		// flag of the original error. we still consider the original error below.
+		glog.Warningf("Error is unretriable but humanized error is retriable. originalErr=%q humanErr=%q", err, humanErr)
+	}
+	unretriable := IsUnretriable(err) || IsUnretriable(humanErr)
+
+	return taskErrInfo{
+		RawError:    err,
+		HumanError:  humanErr,
+		Unretriable: unretriable,
+	}
 }
 
 // Caller should check if err is a CatalystError first
@@ -643,10 +669,10 @@ func publishLoggedRaw(producer event.AMQPProducer, task data.TaskInfo, exchange,
 	return nil
 }
 
-func taskResultStatusLabel(err error) string {
-	if err == nil {
+func taskResultStatusLabel(errInfo taskErrInfo) string {
+	if errInfo.RawError == nil {
 		return "success"
-	} else if IsUnretriable(err) {
+	} else if errInfo.Unretriable {
 		return "unretriable_error"
 	} else {
 		return "error"
