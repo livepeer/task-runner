@@ -81,8 +81,8 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs := flag.NewFlagSet("livepeer-task-runner", flag.ExitOnError)
 
 	// Catalyst options
-	fs.StringVar(&cli.catalystOpts.BaseURL, "catalyst-url", "http://localhost:4949", "Base URL to the Catalyst API")
-	URLVarFlag(fs, &cli.catalystOpts.OwnBaseURL, "own-base-url", "http://localhost:8080/task-runner", "Base URL to reach the current server. This must include the API root")
+	fs.StringVar(&cli.catalystOpts.BaseURL, "catalyst-url", "http://localhost:7979", "Base URL to the Catalyst API")
+	URLVarFlag(fs, &cli.catalystOpts.OwnBaseURL, "own-base-url", "http://localhost:8082/task-runner", "Base URL to reach the current server. This must include the API root")
 	fs.StringVar(&cli.catalystOpts.Secret, "catalyst-secret", "IAmAuthorized", "Auth secret for the Catalyst API")
 
 	// Runner options
@@ -105,7 +105,7 @@ func parseFlags(build BuildFlags) cliFlags {
 
 	// Server options
 	fs.StringVar(&cli.serverOpts.Host, "host", "localhost", "Hostname to bind to")
-	fs.UintVar(&cli.serverOpts.Port, "port", 8080, "Port to listen on")
+	fs.UintVar(&cli.serverOpts.Port, "port", 8082, "Port to listen on")
 	fs.DurationVar(&cli.serverOpts.ShutdownGracePeriod, "shutdown-grace-perod", 30*time.Second, "Grace period to wait for shutdown before using the force")
 	// API Handler
 	fs.StringVar(&cli.serverOpts.APIRoot, "api-root", "/task-runner", "Root path where to bind the API to")

@@ -44,6 +44,7 @@ var (
 		"import":         TaskImport,
 		"upload":         TaskUpload,
 		"export":         TaskExport,
+		"delete":         TaskDelete,
 		"transcode":      TaskTranscode,
 		"transcode-file": TaskTranscodeFile,
 	}
@@ -292,8 +293,9 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *T
 		if taskCtx.Status.Phase == api.TaskPhaseRunning {
 			return nil, errors.New("task has already been started before")
 		}
-
-		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0, "")
+		if taskType != "delete" {
+			err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0, "")
+		}
 		if err == api.ErrRateLimited {
 			glog.Warningf("Task execution rate limited type=%q id=%s userID=%s", taskType, taskID, taskCtx.UserID)
 			return nil, r.delayTaskStep(ctx, taskID, taskCtx.Step, taskCtx.StepInput)
