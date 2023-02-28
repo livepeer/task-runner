@@ -533,6 +533,7 @@ func humanizeCatalystError(err error) error {
 		"zero bytes found for source",
 		"invalid framerate",
 		"maximum resolution is",
+		"unsupported video input",
 	}
 
 	// MediaConvert pipeline errors
