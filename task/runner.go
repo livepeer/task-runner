@@ -596,11 +596,11 @@ func humanizeCatalystError(err error) error {
 			return errInvalidVideo
 		}
 	}
-	if strings.Contains(errMsg, "error running ffprobe") && strings.Contains(errMsg, "exit status 1") {
-		return errInvalidVideo
-	}
 	if strings.Contains(errMsg, "failed probe/open") {
 		return errProbe
+	}
+	if strings.Contains(errMsg, "error probing") {
+		return errInvalidVideo
 	}
 
 	// Livepeer pipeline errors
