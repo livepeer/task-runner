@@ -437,13 +437,29 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		}
 	}
 
+	metadata := &FileMetadata{}
+	if !FlagCatalystProbesFile {
+		input, err = readLocalFile(1)
+		if err != nil {
+			return nil, err
+		}
+		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, input, false)
+		if err != nil {
+			return nil, err
+		}
+		probed := metadata.AssetSpec
+		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
+	}
+
+	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, removeCredentials(callback)
+
 	if tctx.OutputAsset.Storage.IPFS != nil {
 		ipfs := *tctx.OutputAsset.Storage.IPFS
 		if !FlagCatalystSupportsIPFS {
 			// TODO: Remove this branch once we have reliable catalyst IPFS support
 			var (
 				playbackID  = tctx.OutputAsset.PlaybackID
-				contentType = "video/" + tctx.OutputAsset.VideoSpec.Format
+				contentType = "video/" + assetSpec.VideoSpec.Format
 			)
 			input, err = readLocalFile(0.99)
 			if err != nil {
@@ -466,22 +482,6 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
 		assetSpec.Storage.IPFS = &ipfs
 	}
-
-	metadata := &FileMetadata{}
-	if !FlagCatalystProbesFile {
-		input, err = readLocalFile(1)
-		if err != nil {
-			return nil, err
-		}
-		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, input, false)
-		if err != nil {
-			return nil, err
-		}
-		probed := metadata.AssetSpec
-		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
-	}
-
-	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, removeCredentials(callback)
 
 	_, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
 	if err != nil {
