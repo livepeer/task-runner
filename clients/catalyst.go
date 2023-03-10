@@ -48,7 +48,7 @@ type OutputsRequest struct {
 	SourceSegments     bool `json:"source_segments"`
 	TranscodedSegments bool `json:"transcoded_segments"`
 	AutoMP4            bool `json:"auto_mp4"`
-	GenerateMP4        bool `json:"generate_mp4"`
+	ForceMP4           bool `json:"force_mp4"`
 }
 
 type CatalystOptions struct {

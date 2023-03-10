@@ -511,12 +511,12 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
-	generateMp4s := false
-	if tctx.OutputAsset.GenerateMp4s {
-		generateMp4s = true
+	forceMp4 := false
+	if tctx.OutputAsset.StaticMp4 {
+		forceMp4 = true
 	}
 	outURL := tctx.OutputOSObj.URL
-	outputNames, outputLocations, err := outputLocations(outURL, playbackId, true, generateMp4s)
+	outputNames, outputLocations, err := outputLocations(outURL, playbackId, true, forceMp4)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -538,7 +538,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL string, relativePath string, autoMp4s bool, generateMp4s bool) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL string, relativePath string, autoMp4s bool, forceMp4 bool) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
@@ -555,7 +555,7 @@ func outputLocations(outURL string, relativePath string, autoMp4s bool, generate
 					SourceSegments:     sourceSegments,
 					TranscodedSegments: true,
 					AutoMP4:            autoMp4s,
-					GenerateMP4:        generateMp4s,
+					ForceMP4:           forceMp4,
 				},
 			},
 		}
