@@ -152,11 +152,16 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.TranscodeFile
 
+	forceMp4 := false
+	if params.Outputs.MP4 {
+		forceMp4 = true
+	}
+
 	return handleUploadVOD(handleUploadVODParams{
 		tctx:  tctx,
 		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path, false, false)
+			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path, false, forceMp4)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
