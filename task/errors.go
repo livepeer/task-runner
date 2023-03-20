@@ -7,6 +7,8 @@ import (
 	api "github.com/livepeer/go-api-client"
 )
 
+var assetNotFound = errors.New("asset not found")
+
 type UnretriableError struct{ error }
 
 func (e UnretriableError) Error() string { return e.error.Error() }

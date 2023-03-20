@@ -2,9 +2,13 @@ package task
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/livepeer-data/pkg/event"
 	"github.com/stretchr/testify/assert"
@@ -124,4 +128,26 @@ func (f producerFunc) Publish(ctx context.Context, msg event.AMQPMessage) error 
 
 func (f producerFunc) Shutdown(ctx context.Context) error {
 	return nil
+}
+
+func TestHandleTaskAssetNotFound(t *testing.T) {
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		switch {
+		case strings.Contains(path, "/task/"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"outputAssetId": "397f0b70-0028-44e3-ad9f-2686e43afabe"}`))
+		case strings.Contains(path, "/asset/"):
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer apiServer.Close()
+
+	runner := &runner{
+		lapi: api.NewAPIClient(api.ClientOptions{
+			Server: apiServer.URL,
+		}),
+	}
+	_, err := runner.handleTask(context.Background(), data.TaskInfo{})
+	require.EqualError(t, err, "task cancelled, asset not found")
 }
