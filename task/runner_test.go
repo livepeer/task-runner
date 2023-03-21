@@ -148,6 +148,6 @@ func TestHandleTaskAssetNotFound(t *testing.T) {
 			Server: apiServer.URL,
 		}),
 	}
-	_, err := runner.handleTask(context.Background(), data.TaskInfo{})
-	require.EqualError(t, err, "task cancelled, asset not found")
+	_, err := runner.handleTask(context.Background(), data.TaskInfo{ID: "task"})
+	require.EqualError(t, err, "task cancelled, asset not found. taskID=task")
 }
