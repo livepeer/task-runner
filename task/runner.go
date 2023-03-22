@@ -299,6 +299,10 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *TaskHandlerOutput, err error) {
 	taskCtx, err := r.buildTaskContext(ctx, taskInfo)
 	if err != nil {
+		if errors.Is(err, assetNotFound) {
+			glog.Infof("task cancelled, asset has been deleted. taskID=%s", taskInfo.ID)
+			return nil, UnretriableError{errors.New("task cancelled, asset has been deleted")}
+		}
 		return nil, fmt.Errorf("error building task context: %w", err)
 	}
 	defer taskCtx.Progress.Stop()
@@ -355,6 +359,9 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	}
 	outputAsset, outputOSObj, outputOS, err := r.getAssetAndOS(task.OutputAssetID)
 	if err != nil {
+		if errors.Is(err, api.ErrNotExists) {
+			return nil, assetNotFound
+		}
 		return nil, err
 	}
 	progress := NewProgressReporter(ctx, r.lapi, task.ID, info.Step)
