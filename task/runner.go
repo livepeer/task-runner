@@ -300,7 +300,8 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *T
 	taskCtx, err := r.buildTaskContext(ctx, taskInfo)
 	if err != nil {
 		if errors.Is(err, assetNotFound) {
-			return nil, UnretriableError{fmt.Errorf("task cancelled, asset not found. taskID=%s", taskInfo.ID)}
+			glog.Infof("task cancelled, asset has been deleted. taskID=%s", taskInfo.ID)
+			return nil, UnretriableError{errors.New("task cancelled, asset has been deleted")}
 		}
 		return nil, fmt.Errorf("error building task context: %w", err)
 	}
