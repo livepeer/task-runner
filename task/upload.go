@@ -453,8 +453,8 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 
 	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, removeCredentials(callback)
 
-	if tctx.OutputAsset.Storage.IPFS != nil {
-		ipfs := *tctx.OutputAsset.Storage.IPFS
+	if ipfsSpec := tctx.OutputAsset.Storage.IPFS; ipfsSpec != nil && ipfsSpec.Spec != nil {
+		ipfs := *ipfsSpec
 		if !FlagCatalystSupportsIPFS {
 			// TODO: Remove this branch once we have reliable catalyst IPFS support
 			var (

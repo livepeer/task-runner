@@ -98,11 +98,16 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 			ipfs = clients.NewPinataClientAPIKey(p.APIKey, p.APISecret, extMetadata)
 		}
 	}
+
 	videoCID, metadata, err := ipfs.PinContent(tctx, "asset-"+asset.PlaybackID, contentType, content)
 	if err != nil {
 		return nil, err
 	}
 	template, nftMetadata := params.IPFS.NFTMetadataTemplate, params.IPFS.NFTMetadata
+	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackURL == "" {
+		return nil, fmt.Errorf("cannot create player NFT for asset without playback URL")
+	}
+
 	metadataCID, err := saveNFTMetadata(tctx, ipfs, asset, videoCID, template, nftMetadata, tctx.ExportTaskConfig)
 	if err != nil {
 		return nil, err
@@ -122,9 +127,6 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS,
 	asset *api.Asset, videoCID string, template api.NFTMetadataTemplate,
 	overrides map[string]interface{}, config ExportTaskConfig) (string, error) {
-	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackURL == "" {
-		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
-	}
 	if template == "" {
 		template = api.NFTMetadataTemplateFile
 	}
