@@ -83,6 +83,8 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		err = tctx.catalyst.UploadVOD(ctx, req)
 		if errors.Is(err, clients.ErrRateLimited) {
 			nextStep = "rateLimitBackoff"
+		} else if clients.IsInputError(err) {
+			return nil, UnretriableError{fmt.Errorf("input error on catalyst request: %w", err)}
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to call catalyst: %w", err)
 		}

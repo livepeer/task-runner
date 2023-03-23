@@ -116,6 +116,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 			rateLimitBackoff = 2 * rateLimitBackoff
 			continue
 		case <-ctx.Done():
+			err = ctx.Err()
 			return
 		}
 	}
@@ -163,4 +164,10 @@ func CatalystHookPath(apiRoot, taskId string) string {
 func isTooManyRequestsErr(err error) bool {
 	var statusErr *HTTPStatusError
 	return errors.As(err, &statusErr) && statusErr.Status == http.StatusTooManyRequests
+}
+
+func IsInputError(err error) bool {
+	var statusErr *HTTPStatusError
+	return errors.As(err, &statusErr) &&
+		(statusErr.Status >= 400 && statusErr.Status < 500)
 }
