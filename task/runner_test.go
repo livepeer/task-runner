@@ -72,6 +72,9 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("Unsupported video input: [High 4:4:4 Predictive profile is unsupported]", false)
 	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("external transcoder error: job failed: IP Stage runtime error on gpu [0] pipeline. [Scaler position rectangle is outside output frame ]", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
