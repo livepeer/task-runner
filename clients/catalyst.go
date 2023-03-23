@@ -116,7 +116,6 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 			rateLimitBackoff = 2 * rateLimitBackoff
 			continue
 		case <-ctx.Done():
-			err = ctx.Err()
 			return
 		}
 	}
