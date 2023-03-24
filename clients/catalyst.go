@@ -164,3 +164,9 @@ func isTooManyRequestsErr(err error) bool {
 	var statusErr *HTTPStatusError
 	return errors.As(err, &statusErr) && statusErr.Status == http.StatusTooManyRequests
 }
+
+func IsInputError(err error) bool {
+	var statusErr *HTTPStatusError
+	return errors.As(err, &statusErr) &&
+		(statusErr.Status >= 400 && statusErr.Status < 500)
+}
