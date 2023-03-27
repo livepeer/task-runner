@@ -595,6 +595,7 @@ func humanizeCatalystError(err error) error {
 		"invalid framerate",
 		"maximum resolution is",
 		"unsupported video input",
+		"scaler position rectangle is outside output frame",
 	}
 
 	// MediaConvert pipeline errors
