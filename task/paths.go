@@ -16,10 +16,6 @@ func videoFileName(playbackID string) string {
 	return path.Join(playbackID, "video")
 }
 
-func outputLocation(playbackID string) string {
-	return path.Join(playbackID)
-}
-
 func metadataFileName(playbackID string) string {
 	return path.Join(playbackID, "video.json")
 }

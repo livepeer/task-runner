@@ -559,14 +559,14 @@ func outputLocations(outURL string, hls string, hlsRelPath string, mp4 string, m
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
-				URL:  url.JoinPath(outputLocation(hlsRelPath)).String(),
+				URL:  url.JoinPath(hlsRelPath).String(),
 				Outputs: &clients.OutputsRequest{
 					HLS: hls,
 				},
 			},
 			{
 				Type: "object_store",
-				URL:  url.JoinPath(outputLocation(mp4RelPath)).String(),
+				URL:  url.JoinPath(mp4RelPath).String(),
 				Outputs: &clients.OutputsRequest{
 					MP4: mp4,
 				},
