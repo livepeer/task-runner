@@ -17,7 +17,7 @@ func videoFileName(playbackID string) string {
 }
 
 func hlsRootPlaylistFileName(playbackID string) string {
-	return path.Join(playbackID, "index.m3u8")
+	return path.Join(playbackID)
 }
 
 func metadataFileName(playbackID string) string {

@@ -544,8 +544,12 @@ func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]Outpu
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	// source segments cannot be stored in web3.storage
-	sourceSegments := !strings.HasPrefix(outURL, "w3s")
+	var mp4 string
+	if autoMp4s {
+		mp4 = "only_short"
+	} else {
+		mp4 = "disabled"
+	}
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
@@ -553,9 +557,8 @@ func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]Outpu
 				Type: "object_store",
 				URL:  url.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
 				Outputs: &clients.OutputsRequest{
-					SourceSegments:     sourceSegments,
-					TranscodedSegments: true,
-					AutoMP4:            autoMp4s,
+					HLS: "enabled",
+					MP4: mp4,
 				},
 			},
 		}
