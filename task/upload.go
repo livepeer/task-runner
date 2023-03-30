@@ -199,7 +199,9 @@ func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileT
 		return res, err
 	}
 	res.BaseUrl = bu
-	res.Hls = &data.TranscodeFileTaskOutputPath{Path: p}
+	if len(o.Videos) > 0 {
+		res.Hls = &data.TranscodeFileTaskOutputPath{Path: p}
+	}
 
 	for _, m := range o.MP4Outputs {
 		_, p, err := parseUrlToBaseAndPath(m.Location)
