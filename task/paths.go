@@ -16,7 +16,7 @@ func videoFileName(playbackID string) string {
 	return path.Join(playbackID, "video")
 }
 
-func hlsRootPlaylistFileName(playbackID string) string {
+func outputLocation(playbackID string) string {
 	return path.Join(playbackID)
 }
 

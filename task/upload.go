@@ -160,7 +160,8 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path, false)
+			_, outputLocation, err := outputLocations(params.Storage.URL, isEnabled(params.Outputs.HLS.Path),
+				params.Outputs.HLS.Path, isEnabled(params.Outputs.MP4.Path), params.Outputs.MP4.Path)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -175,6 +176,13 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 		targetSegmentSizeSecs:    params.TargetSegmentSizeSecs,
 	})
+}
+
+func isEnabled(output string) string {
+	if output != "" {
+		return "enabled"
+	}
+	return "disabled"
 }
 
 func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileTaskOutput, error) {
@@ -517,7 +525,7 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	outputNames, outputLocations, err := outputLocations(outURL, playbackId, true)
+	outputNames, outputLocations, err := outputLocations(outURL, "enabled", playbackId, "only_short", playbackId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -539,25 +547,25 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL string, hls string, hlsRelPath string, mp4 string, mp4RelPath string) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
-	}
-	var mp4 string
-	if autoMp4s {
-		mp4 = "only_short"
-	} else {
-		mp4 = "disabled"
 	}
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS},
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
-				URL:  url.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
+				URL:  url.JoinPath(outputLocation(hlsRelPath)).String(),
 				Outputs: &clients.OutputsRequest{
-					HLS: "enabled",
+					HLS: hls,
+				},
+			},
+			{
+				Type: "object_store",
+				URL:  url.JoinPath(outputLocation(mp4RelPath)).String(),
+				Outputs: &clients.OutputsRequest{
 					MP4: mp4,
 				},
 			},
@@ -567,7 +575,7 @@ func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]Outpu
 			append(names, OutputNameOSSourceMP4),
 			append(locations, clients.OutputLocation{
 				Type: "object_store",
-				URL:  url.JoinPath(videoFileName(relativePath)).String(),
+				URL:  url.JoinPath(videoFileName(hlsRelPath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceMp4: true,
 				},
