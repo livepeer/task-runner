@@ -31,6 +31,7 @@ var (
 type OutputName string
 
 var (
+	OutputNameEmpty         = OutputName("empty_output")
 	OutputNameOSSourceMP4   = OutputName("source_mp4")
 	OutputNameOSPlaylistHLS = OutputName("playlist_hls")
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
@@ -555,7 +556,7 @@ func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string) ([]OutputN
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
 	names, locations :=
-		[]OutputName{OutputNameOSPlaylistHLS},
+		[]OutputName{OutputNameOSPlaylistHLS, OutputNameEmpty},
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
