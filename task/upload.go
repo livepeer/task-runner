@@ -19,6 +19,12 @@ import (
 	"github.com/livepeer/task-runner/clients"
 )
 
+const (
+	OUTPUT_ENABLED    = "enabled"
+	OUTPUT_DISABLED   = "disabled"
+	OUTPUT_ONLY_SHORT = "enabled"
+)
+
 var (
 	// Feature flag whether to use Catalyst's IPFS support or not.
 	FlagCatalystSupportsIPFS = false
@@ -181,9 +187,9 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func isEnabled(output string) string {
 	if output != "" {
-		return "enabled"
+		return OUTPUT_ENABLED
 	}
-	return "disabled"
+	return OUTPUT_DISABLED
 }
 
 func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileTaskOutput, error) {
@@ -528,7 +534,7 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	outputNames, outputLocations, err := outputLocations(outURL, "enabled", playbackId, "only_short", playbackId)
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, OUTPUT_ONLY_SHORT, playbackId)
 	if err != nil {
 		return nil, nil, err
 	}
