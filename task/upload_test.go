@@ -3,6 +3,7 @@ package task
 import (
 	"github.com/livepeer/catalyst-api/video"
 	"github.com/livepeer/livepeer-data/pkg/data"
+	"github.com/livepeer/task-runner/clients"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -132,6 +133,80 @@ func TestToTranscodeFileTaskOutput(t *testing.T) {
 				require.NoError(t, err)
 			}
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestOutputLocations(t *testing.T) {
+	tests := []struct {
+		name                    string
+		outURL                  string
+		hls                     string
+		hlsRelPath              string
+		mp4                     string
+		mp4RelPath              string
+		expectedOutputLocations []clients.OutputLocation
+		hasError                bool
+	}{
+		{
+			name:       "Only HLS",
+			outURL:     "s3+https://user:pass@host.com/outbucket",
+			hls:        "enabled",
+			hlsRelPath: "video/hls",
+			mp4:        "disabled",
+			mp4RelPath: "",
+			expectedOutputLocations: []clients.OutputLocation{
+				{
+					Type: "object_store",
+					URL:  "s3+https://user:pass@host.com/outbucket/video/hls",
+					Outputs: &clients.OutputsRequest{
+						HLS: "enabled",
+					},
+				},
+				{
+					Type: "object_store",
+					URL:  "s3+https://user:pass@host.com/outbucket",
+					Outputs: &clients.OutputsRequest{
+						MP4: "disabled",
+					},
+				},
+			},
+		},
+		{
+			name:       "HLS and Short Video MP4",
+			outURL:     "s3+https://user:pass@host.com/outbucket",
+			hls:        "enabled",
+			hlsRelPath: "video/hls",
+			mp4:        "only_short",
+			mp4RelPath: "video/mp4",
+			expectedOutputLocations: []clients.OutputLocation{
+				{
+					Type: "object_store",
+					URL:  "s3+https://user:pass@host.com/outbucket/video/hls",
+					Outputs: &clients.OutputsRequest{
+						HLS: "enabled",
+					},
+				},
+				{
+					Type: "object_store",
+					URL:  "s3+https://user:pass@host.com/outbucket/video/mp4",
+					Outputs: &clients.OutputsRequest{
+						MP4: "only_short",
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, gotOutputLocations, err := outputLocations(tt.outURL, tt.hls, tt.hlsRelPath, tt.mp4, tt.mp4RelPath)
+
+			if tt.hasError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.expectedOutputLocations, gotOutputLocations)
 		})
 	}
 }
