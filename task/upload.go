@@ -549,7 +549,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL string, hls string, hlsRelPath string, mp4 string, mp4RelPath string) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
