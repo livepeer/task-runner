@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/d1str0/pkcs7 v0.0.0-20200424205038-d65c16a5759a
-	github.com/golang/glog v1.1.0
+	github.com/golang/glog v1.1.1
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/livepeer/catalyst-api v0.0.13-0.20230216132322-8b4f260542df
 	github.com/livepeer/go-api-client v0.4.6
