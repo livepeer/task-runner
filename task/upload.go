@@ -19,6 +19,12 @@ import (
 	"github.com/livepeer/task-runner/clients"
 )
 
+const (
+	OUTPUT_ENABLED    = "enabled"
+	OUTPUT_DISABLED   = "disabled"
+	OUTPUT_ONLY_SHORT = "enabled"
+)
+
 var (
 	// Feature flag whether to use Catalyst's IPFS support or not.
 	FlagCatalystSupportsIPFS = false
@@ -31,6 +37,7 @@ var (
 type OutputName string
 
 var (
+	OutputNameEmpty         = OutputName("empty_output")
 	OutputNameOSSourceMP4   = OutputName("source_mp4")
 	OutputNameOSPlaylistHLS = OutputName("playlist_hls")
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
@@ -160,7 +167,8 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := outputLocations(params.Storage.URL, params.Outputs.HLS.Path, false)
+			_, outputLocation, err := outputLocations(params.Storage.URL, isEnabled(params.Outputs.HLS.Path),
+				params.Outputs.HLS.Path, isEnabled(params.Outputs.MP4.Path), params.Outputs.MP4.Path)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -177,6 +185,13 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	})
 }
 
+func isEnabled(output string) string {
+	if output != "" {
+		return OUTPUT_ENABLED
+	}
+	return OUTPUT_DISABLED
+}
+
 func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileTaskOutput, error) {
 	var res data.TranscodeFileTaskOutput
 
@@ -191,7 +206,9 @@ func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileT
 		return res, err
 	}
 	res.BaseUrl = bu
-	res.Hls = &data.TranscodeFileTaskOutputPath{Path: p}
+	if len(o.Videos) > 0 {
+		res.Hls = &data.TranscodeFileTaskOutputPath{Path: p}
+	}
 
 	for _, m := range o.MP4Outputs {
 		_, p, err := parseUrlToBaseAndPath(m.Location)
@@ -517,7 +534,7 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	outputNames, outputLocations, err := outputLocations(outURL, playbackId, true)
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, OUTPUT_ONLY_SHORT, playbackId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -539,23 +556,26 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
 	}
-	// source segments cannot be stored in web3.storage
-	sourceSegments := !strings.HasPrefix(outURL, "w3s")
 	names, locations :=
-		[]OutputName{OutputNameOSPlaylistHLS},
+		[]OutputName{OutputNameOSPlaylistHLS, OutputNameEmpty},
 		[]clients.OutputLocation{
 			{
 				Type: "object_store",
-				URL:  url.JoinPath(hlsRootPlaylistFileName(relativePath)).String(),
+				URL:  url.JoinPath(hlsRelPath).String(),
 				Outputs: &clients.OutputsRequest{
-					SourceSegments:     sourceSegments,
-					TranscodedSegments: true,
-					AutoMP4:            autoMp4s,
+					HLS: hls,
+				},
+			},
+			{
+				Type: "object_store",
+				URL:  url.JoinPath(mp4RelPath).String(),
+				Outputs: &clients.OutputsRequest{
+					MP4: mp4,
 				},
 			},
 		}
@@ -564,7 +584,7 @@ func outputLocations(outURL string, relativePath string, autoMp4s bool) ([]Outpu
 			append(names, OutputNameOSSourceMP4),
 			append(locations, clients.OutputLocation{
 				Type: "object_store",
-				URL:  url.JoinPath(videoFileName(relativePath)).String(),
+				URL:  url.JoinPath(videoFileName(hlsRelPath)).String(),
 				Outputs: &clients.OutputsRequest{
 					SourceMp4: true,
 				},
