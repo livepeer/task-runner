@@ -6,11 +6,11 @@ require (
 	github.com/d1str0/pkcs7 v0.0.0-20200424205038-d65c16a5759a
 	github.com/golang/glog v1.1.1
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/livepeer/catalyst-api v0.0.13-0.20230412091526-f2572ca065e0
+	github.com/livepeer/catalyst-api v0.0.13-0.20230412092340-584bd5df0143
 	github.com/livepeer/go-api-client v0.4.6
 	github.com/livepeer/go-tools v0.2.11
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
-	github.com/livepeer/livepeer-data v0.6.5-0.20230412091414-5ac529b29c9c
+	github.com/livepeer/livepeer-data v0.6.5
 	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
 	github.com/peterbourgon/ff v1.7.1
 	github.com/prometheus/client_golang v1.14.0
