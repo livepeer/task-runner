@@ -29,6 +29,7 @@ const (
 )
 
 type UploadVODRequest struct {
+	ExternalID            string            `json:"external_id,omitempty"`
 	Url                   string            `json:"url"`
 	CallbackUrl           string            `json:"callback_url"`
 	OutputLocations       []OutputLocation  `json:"output_locations,omitempty"`

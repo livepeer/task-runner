@@ -78,6 +78,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		}
 		var (
 			req = clients.UploadVODRequest{
+				ExternalID:            tctx.Task.ID,
 				Url:                   inUrl,
 				CallbackUrl:           tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 				OutputLocations:       outputLocations,
