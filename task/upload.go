@@ -174,7 +174,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
-			tfo, err := toTranscodeFileTaskOutput(callback.Outputs)
+			tfo, err := toTranscodeFileTaskOutput(callback)
 			if err != nil {
 				return nil, err
 			}
@@ -193,14 +193,20 @@ func isEnabled(output string) string {
 	return OUTPUT_DISABLED
 }
 
-func toTranscodeFileTaskOutput(outputs []video.OutputVideo) (data.TranscodeFileTaskOutput, error) {
+func toTranscodeFileTaskOutput(callback *clients.CatalystCallback) (data.TranscodeFileTaskOutput, error) {
 	var res data.TranscodeFileTaskOutput
 
-	if len(outputs) < 1 {
-		return res, fmt.Errorf("invalid video outputs: %v", outputs)
+	res.RequestID = callback.RequestID
+	res.InputVideo = &data.InputVideo{
+		Duration:  callback.InputVideo.Duration,
+		SizeBytes: callback.InputVideo.SizeBytes,
+	}
+
+	if len(callback.Outputs) < 1 {
+		return res, fmt.Errorf("invalid video outputs: %v", callback.Outputs)
 	}
 	// we expect only one output
-	o := outputs[0]
+	o := callback.Outputs[0]
 
 	bu, p, err := parseUrlToBaseAndPath(o.Manifest)
 	if err != nil {
