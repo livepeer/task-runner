@@ -22,7 +22,7 @@ import (
 const (
 	OUTPUT_ENABLED    = "enabled"
 	OUTPUT_DISABLED   = "disabled"
-	OUTPUT_ONLY_SHORT = "enabled"
+	OUTPUT_ONLY_SHORT = "only_short"
 )
 
 var (
