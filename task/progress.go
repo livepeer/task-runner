@@ -39,6 +39,7 @@ func NewProgressReporter(ctx context.Context, lapi *api.Client, taskID, step str
 		cancel: cancel,
 		lapi:   lapi,
 		taskID: taskID,
+		step:   step,
 	}
 	go p.mainLoop()
 	return p
