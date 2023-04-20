@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	catalystUploadRequestTimeout   = 5 * time.Second
+	catalystRequestTimeout         = 5 * time.Second
 	defaultRateLimitInitialBackoff = 2 * time.Second
 	maxAttempts                    = 4
 )
@@ -79,6 +79,7 @@ func NewCatalyst(opts CatalystOptions) Catalyst {
 		},
 		Client: &http.Client{
 			Transport: &transport,
+			Timeout:   catalystRequestTimeout,
 		},
 	}}
 }
@@ -95,11 +96,8 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 	}
 	rateLimitBackoff := c.RateLimitInitialBackoff
 	for attempt := 1; ; attempt++ {
-		reqCtx, cancel := context.WithTimeout(ctx, catalystUploadRequestTimeout)
-		defer cancel()
-
 		var res json.RawMessage
-		err = c.DoRequest(reqCtx, Request{
+		err = c.DoRequest(ctx, Request{
 			Method:      "POST",
 			URL:         "/api/vod",
 			Body:        bytes.NewReader(body),
