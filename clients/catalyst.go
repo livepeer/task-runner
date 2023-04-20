@@ -24,6 +24,7 @@ var (
 )
 
 const (
+	catalystRequestTimeout         = 5 * time.Second
 	defaultRateLimitInitialBackoff = 2 * time.Second
 	maxAttempts                    = 4
 )
@@ -78,6 +79,7 @@ func NewCatalyst(opts CatalystOptions) Catalyst {
 		},
 		Client: &http.Client{
 			Transport: &transport,
+			Timeout:   catalystRequestTimeout,
 		},
 	}}
 }
