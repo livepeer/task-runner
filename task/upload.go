@@ -422,6 +422,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		params     = *tctx.Task.Params.Upload
 		osSess     = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
 	)
+	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 	filename, size, contents, err := getFile(tctx, osSess, tctx.ImportTaskConfig, params)
 	if err != nil {
 		return nil, fmt.Errorf("error getting source file: %w", err)
