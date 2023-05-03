@@ -11,7 +11,6 @@ import (
 	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/metrics"
 	"github.com/livepeer/task-runner/task"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type APIHandlerOptions struct {
@@ -32,7 +31,7 @@ func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.R
 
 	router.HandlerFunc("GET", "/_healthz", router.healthcheck)
 	if opts.Prometheus {
-		router.Handler("GET", "/metrics", promhttp.Handler())
+		router.Handler("GET", "/metrics", metrics.ScrapeHandler())
 	}
 
 	hookHandler := metrics.ObservedHandlerFunc("catalyst_hook", router.catalystHook)
