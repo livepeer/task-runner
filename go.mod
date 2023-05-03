@@ -139,5 +139,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
-
-replace gopkg.in/vansante/go-ffprobe.v2 => github.com/mjh1/go-ffprobe v0.0.0-20230402193815-b6c2609ab5da
