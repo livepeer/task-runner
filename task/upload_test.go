@@ -221,3 +221,25 @@ func TestOutputLocations(t *testing.T) {
 		})
 	}
 }
+
+func TestIsHLSFile(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"https+s3://access-key:secret-key@bucket/some/path/file.m3u8", true},
+		{"file.m3u8", true},
+		{"file.mp4", false},
+		{"file", false},
+		{".m3u8", true},
+		{"file.m3u", false},
+		{"file.m3u8.txt", false},
+	}
+
+	for _, test := range tests {
+		got := isHLSFile(test.input)
+		if got != test.want {
+			t.Errorf("isHLSFile(%q) = %v, want %v", test.input, got, test.want)
+		}
+	}
+}
