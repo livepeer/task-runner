@@ -421,8 +421,11 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		playbackID = tctx.OutputAsset.PlaybackID
 		params     = *tctx.Task.Params.Upload
 		osSess     = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
+		inFile     = params.URL
 	)
-	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
+	if isHLSFile(inFile) {
+		return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
+	}
 	filename, size, contents, err := getFile(tctx, osSess, tctx.ImportTaskConfig, params)
 	if err != nil {
 		return nil, fmt.Errorf("error getting source file: %w", err)
@@ -520,6 +523,14 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	})
 
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
+}
+
+func isHLSFile(fname string) bool {
+	ext := strings.LastIndex(fname, ".")
+	if ext == -1 {
+		return false
+	}
+	return fname[ext:] == ".m3u8"
 }
 
 func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCallback {
