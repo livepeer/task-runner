@@ -30,6 +30,13 @@ func TestMetricsEndpoint(t *testing.T) {
 	require.Equal(http.StatusOK, res.StatusCode)
 	require.Contains(res.Header.Get("Content-Type"), "text/plain")
 
-	// test if it contains some random metric
-	require.Contains(rw.Body.String(), "# TYPE livepeer_task_runner_http_requests_in_flight gauge\n")
+	body := rw.Body.String()
+	require.NotEmpty(body)
+
+	// check that it contains some random metric
+	require.Contains(body, "# TYPE livepeer_task_runner_http_requests_in_flight gauge\n")
+	// check that it does NOT contain metrics from some libs we use
+	require.NotContains(body, "catalyst-api")
+	require.NotContains(body, "transcode_segment_duration_seconds")
+	require.NotContains(body, "livepeer_analyzer")
 }
