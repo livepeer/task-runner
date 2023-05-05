@@ -553,7 +553,13 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, OUTPUT_ONLY_SHORT, playbackId)
+	var mp4 string
+	if tctx.OutputAsset.Source.Type == "recording" {
+		mp4 = OUTPUT_ENABLED
+	} else {
+		mp4 = OUTPUT_ONLY_SHORT
+	}
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId)
 	if err != nil {
 		return nil, nil, err
 	}
