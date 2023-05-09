@@ -75,6 +75,18 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("external transcoder error: job failed: IP Stage runtime error on gpu [0] pipeline. [Scaler position rectangle is outside output frame ]", false)
 	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("error copying input to storage: failed to copy file(s): error downloading HLS input manifest: received non-Media manifest, but currently only Media playlists are supported", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("external transcoder error: job failed: No audio frames decoded on [selector-(Audio Selector 1)-track-1-drc]", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("external transcoder error: job failed: Frame rate is set to follow, but there is no frame rate information in the input stream info", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
+	err = NewCatalystError("external transcoder error: error creating mediaconvert job: InvalidParameter: 2 validation error(s) found.\n- minimum field value of 32, CreateJobInput.Settings.OutputGroups[0].Outputs[0].VideoDescription.Height.\n- minimum field value of 32, CreateJobInput.Settings.OutputGroups[0].Outputs[1].VideoDescription.Height.\n", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
