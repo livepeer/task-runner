@@ -596,6 +596,10 @@ func humanizeCatalystError(err error) error {
 		"maximum resolution is",
 		"unsupported video input",
 		"scaler position rectangle is outside output frame",
+		"received non-media manifest",
+		"no audio frames decoded on",
+		"there is no frame rate information in the input stream info",
+		"minimum field value of",
 	}
 
 	// MediaConvert pipeline errors

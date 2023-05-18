@@ -76,6 +76,14 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		if err != nil {
 			return nil, err
 		}
+		var encryption *clients.EncryptionPayload
+		params := *tctx.Task.Params.Upload
+
+		if params.Encryption.EncryptedKey != "" {
+			encryption = &clients.EncryptionPayload{
+				EncryptedKey: params.Encryption.EncryptedKey,
+			}
+		}
 		var (
 			req = clients.UploadVODRequest{
 				ExternalID:            tctx.Task.ID,
@@ -85,6 +93,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 				PipelineStrategy:      p.catalystPipelineStrategy,
 				Profiles:              p.profiles,
 				TargetSegmentSizeSecs: p.targetSegmentSizeSecs,
+				Encryption:            encryption,
 			}
 			nextStep = "checkCatalyst"
 		)
