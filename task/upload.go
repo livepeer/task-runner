@@ -477,7 +477,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	}
 
 	metadata := &FileMetadata{}
-	if !FlagCatalystProbesFile {
+	if !FlagCatalystProbesFile && params.Encryption.EncryptedKey == "" {
 		input, err = readLocalFile(1)
 		if err != nil {
 			return nil, err
