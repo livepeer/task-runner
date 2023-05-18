@@ -4,7 +4,12 @@ import (
 	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
-	"encoding/hex"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
 
@@ -12,25 +17,81 @@ import (
 	"github.com/golang/glog"
 )
 
+type DecryptionKeys struct {
+	DecryptKey   *rsa.PrivateKey
+	EncryptedKey string
+}
+
+func LoadPrivateKey(privateKeyBase64 string) (*rsa.PrivateKey, error) {
+	privateKey, err := base64.StdEncoding.DecodeString(privateKeyBase64)
+	if err != nil {
+		return nil, fmt.Errorf("file-decrypt: error decoding private key: %v", err)
+	}
+
+	block, _ := pem.Decode(privateKey)
+	if block == nil {
+		return nil, fmt.Errorf("file-decrypt: error decoding PEM block from private key")
+	}
+
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("file-decrypt: error parsing private key: %v", err)
+	}
+
+	return priv, nil
+}
+
+func ValidateKeyPair(pub string, privkey rsa.PrivateKey) (bool, error) {
+	pubkey, err := base64.StdEncoding.DecodeString(pub)
+	if err != nil {
+		glog.Fatalf("Error decoding base64 encoded key: %v", err)
+		return false, err
+	}
+	block, _ := pem.Decode(pubkey)
+	if block == nil {
+		glog.Fatalf("failed to parse PEM block containing the public key")
+		err := fmt.Errorf("failed to parse PEM block containing the public key")
+		return false, err
+	}
+
+	publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if err != nil {
+		glog.Fatalf("Error parsing vod decrypt public key: %v", err)
+		return false, err
+	}
+	if !publicKey.Equal(privkey.Public()) {
+		glog.Fatalf("Public key does not match private key")
+		return false, err
+	}
+	return true, nil
+}
+
 // Decrypts a file encrypted with AES (key length depends on input) in CBC block
 // chaining mode and PKCS#7 padding. The provided key must be encoded in base16,
 // and the first block of the input is the IV. The output is a pipe reader that
 // can be used to stream the decrypted file.
-func DecryptAESCBC(reader io.ReadCloser, keyb16 string) (io.ReadCloser, error) {
+func DecryptAESCBC(reader io.Reader, privateKey *rsa.PrivateKey, encryptedKeyFile string) (io.ReadCloser, error) {
+
 	iv := make([]byte, aes.BlockSize)
 	if _, err := io.ReadFull(reader, iv); err != nil {
 		return nil, fmt.Errorf("error reading iv from input: %w", err)
 	}
 
-	return DecryptAESCBCWithIV(reader, keyb16, iv)
+	return DecryptAESCBCWithIV(io.NopCloser(reader), privateKey, encryptedKeyFile, iv)
 }
 
-// Just like DecryptAESCBC, but the IV is provided as an argument instead of
-// read from the input stream.
-func DecryptAESCBCWithIV(reader io.ReadCloser, keyb16 string, iv []byte) (io.ReadCloser, error) {
-	key, err := hex.DecodeString(keyb16)
+func DecryptAESCBCWithIV(reader io.ReadCloser, privateKey *rsa.PrivateKey, encryptedKeyB64 string, iv []byte) (io.ReadCloser, error) {
+
+	encryptedKey, err := base64.StdEncoding.DecodeString(encryptedKeyB64)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding base16 key: %w", err)
+		glog.Errorf("Error decoding base64 encoded key: %v", err)
+	}
+
+	// Decrypt the key with the RSA private key
+	key, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, encryptedKey, nil)
+
+	if err != nil {
+		glog.Errorf("Error decrypting key: %v", err)
 	}
 
 	block, err := aes.NewCipher(key)

@@ -19,6 +19,7 @@ import (
 	"github.com/livepeer/task-runner/clients"
 	"github.com/livepeer/task-runner/metrics"
 	"github.com/livepeer/task-runner/task"
+	"github.com/livepeer/task-runner/webcrypto"
 	"github.com/peterbourgon/ff"
 	"golang.org/x/sync/errgroup"
 )
@@ -99,6 +100,8 @@ func parseFlags(build BuildFlags) cliFlags {
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.Server, "livepeer-api-server", "localhost:3004", "Base URL for a custom server to use for the Livepeer API")
 	fs.StringVar(&cli.runnerOpts.LivepeerAPIOptions.AccessToken, "livepeer-access-token", "", "Access token for Livepeer API")
 	fs.StringVar(&cli.runnerOpts.PinataAccessToken, "pinata-access-token", "", "JWT access token for the Piñata API")
+	fs.StringVar(&cli.runnerOpts.VodDecryptPrivateKey, "vod-decrypt-private-key", "", "Private key to decrypt VOD stream")
+	fs.StringVar(&cli.runnerOpts.VodDecryptPublicKey, "vod-decrypt-public-key", "", "Public key to decrypt VOD stream")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerImmutableURL, "player-immutable-url", "ipfs://bafybeihcqgu4rmsrlkqvavkzsnu7h5n66jopckes6u5zrhs3kcffqvylge/", "Base URL for an immutable version of the Livepeer Player to be included in NFTs metadata")
 	URLVarFlag(fs, &cli.runnerOpts.PlayerExternalURL, "player-external-url", "https://lvpr.tv/", "Base URL for the updateable version of the Livepeer Player to be included in NFTs external URL")
 	URLSliceVarFlag(fs, &cli.runnerOpts.ImportIPFSGatewayURLs, "import-ipfs-gateway-urls", "https://w3s.link/ipfs/,https://ipfs.io/ipfs/,https://cloudflare-ipfs.com/ipfs/", "Comma delimited ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from")
@@ -156,6 +159,18 @@ func Run(build BuildFlags) {
 	runner := task.NewRunner(cli.runnerOpts)
 	ctx := contextUntilSignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	eg, ctx := errgroup.WithContext(ctx)
+
+	if cli.runnerOpts.VodDecryptPrivateKey != "" && cli.runnerOpts.VodDecryptPublicKey != "" {
+		vodDecryptPrivateKey, err := webcrypto.LoadPrivateKey(cli.runnerOpts.VodDecryptPrivateKey)
+		if err != nil {
+			glog.Fatalf("Error loading vod decrypt private key: %v", err)
+		}
+		isValidKeyPair, err := webcrypto.ValidateKeyPair(cli.runnerOpts.VodDecryptPublicKey, *vodDecryptPrivateKey)
+		if !isValidKeyPair || err != nil {
+			glog.Fatalf("Invalid vod decrypt key pair")
+		}
+	}
+
 	eg.Go(func() error {
 		if err := runner.Start(); err != nil {
 			return fmt.Errorf("error starting runner: %w", err)

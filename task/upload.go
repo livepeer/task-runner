@@ -273,17 +273,18 @@ func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (
 
 func decryptInputFile(tctx *TaskContext, fileUrl string, params api.UploadTaskParams) (string, error) {
 	var (
-		osSess     = tctx.outputOS
-		os         = tctx.OutputOSObj
-		cfg        = tctx.ImportTaskConfig
-		playbackID = tctx.OutputAsset.PlaybackID
+		osSess               = tctx.outputOS
+		os                   = tctx.OutputOSObj
+		cfg                  = tctx.ImportTaskConfig
+		playbackID           = tctx.OutputAsset.PlaybackID
+		vodDecryptPrivateKey = tctx.VodDecryptPrivateKey
 	)
-	if params.Encryption.Key == "" {
+	if params.Encryption.EncryptedKey == "" {
 		return fileUrl, nil
 	}
 
 	glog.Infof("Downloading file=%s from object store", params.URL)
-	_, _, content, err := getFile(tctx, osSess, cfg, params)
+	_, _, content, err := getFile(tctx, osSess, cfg, params, vodDecryptPrivateKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to get input file: %w", err)
 	}
@@ -427,15 +428,16 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 
 func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
 	var (
-		playbackID = tctx.OutputAsset.PlaybackID
-		params     = *tctx.Task.Params.Upload
-		osSess     = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
-		inFile     = params.URL
+		playbackID           = tctx.OutputAsset.PlaybackID
+		params               = *tctx.Task.Params.Upload
+		osSess               = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
+		inFile               = params.URL
+		vodDecryptPrivateKey = tctx.VodDecryptPrivateKey
 	)
 	if isHLSFile(inFile) {
 		return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 	}
-	filename, size, contents, err := getFile(tctx, osSess, tctx.ImportTaskConfig, params)
+	filename, size, contents, err := getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("error getting source file: %w", err)
 	}
@@ -463,7 +465,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		})
 
 		// in case of encrypted input, file will have been copied in the beginning
-		if params.Encryption.Key == "" {
+		if params.Encryption.EncryptedKey == "" {
 			input, err := readLocalFile(0.95)
 			if err != nil {
 				return nil, err
@@ -477,7 +479,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	}
 
 	metadata := &FileMetadata{}
-	if !FlagCatalystProbesFile && params.Encryption.EncryptedKey == "" {
+	if !FlagCatalystProbesFile {
 		input, err = readLocalFile(1)
 		if err != nil {
 			return nil, err
