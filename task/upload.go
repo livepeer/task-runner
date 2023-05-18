@@ -77,11 +77,13 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 			return nil, err
 		}
 		var encryption *clients.EncryptionPayload
-		params := *tctx.Task.Params.Upload
+		params := tctx.Task.Params.Upload
 
-		if params.Encryption.EncryptedKey != "" {
-			encryption = &clients.EncryptionPayload{
-				EncryptedKey: params.Encryption.EncryptedKey,
+		if params != nil {
+			if params.Encryption.EncryptedKey != "" {
+				encryption = &clients.EncryptionPayload{
+					EncryptedKey: params.Encryption.EncryptedKey,
+				}
 			}
 		}
 		var (
