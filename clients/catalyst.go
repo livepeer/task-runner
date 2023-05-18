@@ -30,13 +30,18 @@ const (
 )
 
 type UploadVODRequest struct {
-	ExternalID            string            `json:"external_id,omitempty"`
-	Url                   string            `json:"url"`
-	CallbackUrl           string            `json:"callback_url"`
-	OutputLocations       []OutputLocation  `json:"output_locations,omitempty"`
-	Profiles              []api.Profile     `json:"profiles,omitempty"`
-	PipelineStrategy      pipeline.Strategy `json:"pipeline_strategy,omitempty"`
-	TargetSegmentSizeSecs int64             `json:"target_segment_size_secs,omitempty"`
+	ExternalID            string             `json:"external_id,omitempty"`
+	Url                   string             `json:"url"`
+	CallbackUrl           string             `json:"callback_url"`
+	OutputLocations       []OutputLocation   `json:"output_locations,omitempty"`
+	Profiles              []api.Profile      `json:"profiles,omitempty"`
+	PipelineStrategy      pipeline.Strategy  `json:"pipeline_strategy,omitempty"`
+	TargetSegmentSizeSecs int64              `json:"target_segment_size_secs,omitempty"`
+	Encryption            *EncryptionPayload `json:"encryption,omitempty"`
+}
+
+type EncryptionPayload struct {
+	EncryptedKey string `json:"encrypted_key"`
 }
 
 type OutputLocation struct {
