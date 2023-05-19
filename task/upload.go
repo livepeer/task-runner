@@ -263,40 +263,6 @@ func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (
 	return params.URL, nil
 }
 
-func decryptInputFile(tctx *TaskContext, fileUrl string, params api.UploadTaskParams) (string, error) {
-	var (
-		osSess               = tctx.outputOS
-		os                   = tctx.OutputOSObj
-		cfg                  = tctx.ImportTaskConfig
-		playbackID           = tctx.OutputAsset.PlaybackID
-		vodDecryptPrivateKey = tctx.VodDecryptPrivateKey
-	)
-	if params.Encryption.EncryptedKey == "" {
-		return fileUrl, nil
-	}
-
-	glog.Infof("Downloading file=%s from object store", params.URL)
-	_, _, content, err := getFile(tctx, osSess, cfg, params, vodDecryptPrivateKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to get input file: %w", err)
-	}
-	defer content.Close()
-
-	glog.Infof("Uploading decrypted file=%s to object store", params.URL)
-	fullPath := videoFileName(playbackID)
-	fileUrl, err = osSess.SaveData(tctx, fullPath, content, nil, fileUploadTimeout)
-	if err != nil {
-		return "", fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-	}
-	glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
-
-	osPublicURL, err := url.Parse(os.PublicURL)
-	if err != nil {
-		return "", fmt.Errorf("error parsing object store public URL: %w", err)
-	}
-	return osPublicURL.JoinPath(fullPath).String(), nil
-}
-
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
 	assetSpec := &api.AssetSpec{
 		Name: tctx.OutputAsset.Name,
