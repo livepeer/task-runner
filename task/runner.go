@@ -578,7 +578,7 @@ func humanizeCatalystError(err error) error {
 	// MediaConvert inaccessible error
 	case strings.Contains(errMsg, "3450") && strings.Contains(errMsg, "error encountered when accessing"):
 		return errFileInaccessible
-	case strings.Contains(errMsg, "error copying input file to s3") && strings.Contains(errMsg, "download error"):
+	case strings.Contains(errMsg, "error copying input file to s3") && (strings.Contains(errMsg, "download error") || strings.Contains(errMsg, "unexpected eof")):
 		return errFileInaccessible
 	}
 
