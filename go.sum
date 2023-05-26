@@ -388,8 +388,8 @@ github.com/livepeer/livepeer-data v0.6.5 h1:H/ZbWb20d5BPiBwSxUTTimisZi/f94I/awm+
 github.com/livepeer/livepeer-data v0.6.5/go.mod h1:X/toP4ztP47lVlDchllL3BKjeDv09OQo42tzDEmzJxQ=
 github.com/livepeer/m3u8 v0.11.1 h1:VkUJzfNTyjy9mqsgp5JPvouwna8wGZMvd/gAfT5FinU=
 github.com/livepeer/m3u8 v0.11.1/go.mod h1:IUqAtwWPAG2CblfQa4SVzTQoDcEMPyfNOaBSxqHMS04=
-github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343 h1:9mAQMfQGIpv7+0X6Z8+qag6zag+/r+zsqLJGB00n+pc=
-github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343/go.mod h1:ldpj4E9rjl8TMvi8UVFRV2bmcknGL0wRPz/B7qKUXDk=
+github.com/livepeer/stream-tester v0.13.0-beta.2 h1:T8oYmTDelM66uvYH28LBVQ6LqmQ0Iv1D3QHLmM5O77Y=
+github.com/livepeer/stream-tester v0.13.0-beta.2/go.mod h1:+KytwXC7MOydC4V3EMdFghQNUQp1Xk+IpZF3M0PGTso=
 github.com/mattn/go-colorable v0.1.1/go.mod h1:FuOcm+DKB9mbwrcAfNl7/TZVBZ6rcnceauSikq3lYCQ=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-ieproxy v0.0.0-20190610004146-91bb50d98149/go.mod h1:31jz6HNzdxOmlERGGEc4v/dMssOfmp2p5bT/okiKFFc=

@@ -11,7 +11,7 @@ require (
 	github.com/livepeer/go-tools v0.2.11
 	github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07
 	github.com/livepeer/livepeer-data v0.6.5
-	github.com/livepeer/stream-tester v0.12.22-0.20220912212136-f2dff6bd9343
+	github.com/livepeer/stream-tester v0.13.0-beta.2
 	github.com/peterbourgon/ff v1.7.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rabbitmq/amqp091-go v1.6.0
