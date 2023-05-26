@@ -61,20 +61,18 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		inUrl = p.inUrl
 	)
 	switch step {
-	case "":
-		// TODO: Move this input decryption logic to catalyst
-		if uploadParams := tctx.Params.Upload; uploadParams != nil {
-			var err error
-			inUrl, err = decryptInputFile(tctx, inUrl, *uploadParams)
-			if err != nil {
-				return nil, fmt.Errorf("error decrypting input file: %w", err)
-			}
-		}
-		fallthrough
-	case "rateLimitBackoff":
+	case "", "rateLimitBackoff":
 		outputLocations, err := p.getOutputLocations()
 		if err != nil {
 			return nil, err
+		}
+		var encryption *clients.EncryptionPayload
+		params := tctx.Task.Params.Upload
+
+		if params != nil && params.Encryption.EncryptedKey != "" {
+			encryption = &clients.EncryptionPayload{
+				EncryptedKey: params.Encryption.EncryptedKey,
+			}
 		}
 		var (
 			req = clients.UploadVODRequest{
@@ -85,6 +83,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 				PipelineStrategy:      p.catalystPipelineStrategy,
 				Profiles:              p.profiles,
 				TargetSegmentSizeSecs: p.targetSegmentSizeSecs,
+				Encryption:            encryption,
 			}
 			nextStep = "checkCatalyst"
 		)
@@ -262,39 +261,6 @@ func getFileUrlForUploadTask(os *api.ObjectStore, params api.UploadTaskParams) (
 	return params.URL, nil
 }
 
-func decryptInputFile(tctx *TaskContext, fileUrl string, params api.UploadTaskParams) (string, error) {
-	var (
-		osSess     = tctx.outputOS
-		os         = tctx.OutputOSObj
-		cfg        = tctx.ImportTaskConfig
-		playbackID = tctx.OutputAsset.PlaybackID
-	)
-	if params.Encryption.Key == "" {
-		return fileUrl, nil
-	}
-
-	glog.Infof("Downloading file=%s from object store", params.URL)
-	_, _, content, err := getFile(tctx, osSess, cfg, params)
-	if err != nil {
-		return "", fmt.Errorf("failed to get input file: %w", err)
-	}
-	defer content.Close()
-
-	glog.Infof("Uploading decrypted file=%s to object store", params.URL)
-	fullPath := videoFileName(playbackID)
-	fileUrl, err = osSess.SaveData(tctx, fullPath, content, nil, fileUploadTimeout)
-	if err != nil {
-		return "", fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-	}
-	glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
-
-	osPublicURL, err := url.Parse(os.PublicURL)
-	if err != nil {
-		return "", fmt.Errorf("error parsing object store public URL: %w", err)
-	}
-	return osPublicURL.JoinPath(fullPath).String(), nil
-}
-
 func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
 	assetSpec := &api.AssetSpec{
 		Name: tctx.OutputAsset.Name,
@@ -418,15 +384,16 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 
 func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
 	var (
-		playbackID = tctx.OutputAsset.PlaybackID
-		params     = *tctx.Task.Params.Upload
-		osSess     = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
-		inFile     = params.URL
+		playbackID           = tctx.OutputAsset.PlaybackID
+		params               = *tctx.Task.Params.Upload
+		osSess               = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
+		inFile               = params.URL
+		vodDecryptPrivateKey = tctx.VodDecryptPrivateKey
 	)
 	if isHLSFile(inFile) {
 		return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 	}
-	filename, size, contents, err := getFile(tctx, osSess, tctx.ImportTaskConfig, params)
+	filename, size, contents, err := getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("error getting source file: %w", err)
 	}
@@ -454,7 +421,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		})
 
 		// in case of encrypted input, file will have been copied in the beginning
-		if params.Encryption.Key == "" {
+		if params.Encryption.EncryptedKey == "" {
 			input, err := readLocalFile(0.95)
 			if err != nil {
 				return nil, err
@@ -553,9 +520,11 @@ func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCall
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	var mp4 = OUTPUT_ONLY_SHORT
+	var mp4 string
 	if tctx.OutputAsset.Source.Type == "recording" {
 		mp4 = OUTPUT_ENABLED
+	} else {
+		mp4 = OUTPUT_ONLY_SHORT
 	}
 	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId)
 	if err != nil {

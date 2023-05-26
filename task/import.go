@@ -31,12 +31,13 @@ type ImportTaskConfig struct {
 
 func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	var (
-		ctx        = tctx.Context
-		playbackID = tctx.OutputAsset.PlaybackID
-		params     = *tctx.Task.Params.Import
-		osSess     = tctx.outputOS // Import deals with outputOS only (URL -> ObjectStorage)
+		ctx                  = tctx.Context
+		playbackID           = tctx.OutputAsset.PlaybackID
+		params               = *tctx.Task.Params.Import
+		osSess               = tctx.outputOS // Import deals with outputOS only (URL -> ObjectStorage)
+		vodDecryptPrivateKey = tctx.VodDecryptPrivateKey
 	)
-	filename, size, contents, err := getFile(ctx, osSess, tctx.ImportTaskConfig, params)
+	filename, size, contents, err := getFile(ctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -94,26 +95,25 @@ func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		}}}, nil
 }
 
-func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {
+func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams, vodDecryptPrivateKey string) (name string, size uint64, content io.ReadCloser, err error) {
 	name, size, content, err = getFileRaw(ctx, osSess, cfg, params)
-	if err != nil || params.Encryption.Key == "" {
+	if err != nil || params.Encryption.EncryptedKey == "" {
 		return
 	}
 
-	switch strings.ToLower(params.Encryption.Algorithm) {
-	case "", "aes-cbc":
-		glog.V(logs.VVERBOSE).Infof("Decrypting file with key file=%s keyHash=%x", params.URL, sha256.Sum256([]byte(params.Encryption.Key)))
-		decrypted, err := webcrypto.DecryptAESCBC(content, params.Encryption.Key)
-		if err != nil {
-			content.Close()
-			return "", 0, nil, fmt.Errorf("failed to decrypt input file: %w", err)
-		}
-
-		glog.V(logs.VVERBOSE).Infof("Returning decrypted stream for file=%s", params.URL)
-		return name, size, decrypted, nil
-	default:
-		return "", 0, nil, fmt.Errorf("unknown encryption algorithm: %s", params.Encryption.Algorithm)
+	decryptPrivateKey, err := webcrypto.LoadPrivateKey(vodDecryptPrivateKey)
+	if err != nil {
+		return "", 0, nil, fmt.Errorf("failed to load private key: %w", err)
 	}
+	glog.V(logs.VVERBOSE).Infof("Decrypting file with key file=%s keyHash=%x", params.URL, sha256.Sum256([]byte(params.Encryption.EncryptedKey)))
+	decrypted, err := webcrypto.DecryptAESCBC(content, decryptPrivateKey, params.Encryption.EncryptedKey)
+	if err != nil {
+		content.Close()
+		return "", 0, nil, fmt.Errorf("failed to decrypt input file: %w", err)
+	}
+
+	glog.V(logs.VVERBOSE).Infof("Returning decrypted stream for file=%s", params.URL)
+	return name, size, decrypted, nil
 }
 
 func getFileRaw(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams) (name string, size uint64, content io.ReadCloser, err error) {

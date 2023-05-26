@@ -124,6 +124,9 @@ type RunnerOptions struct {
 	ExportTaskConfig
 	ImportTaskConfig
 
+	VodDecryptPrivateKey string
+	VodDecryptPublicKey  string
+
 	TaskHandlers map[string]TaskHandler
 }
 
