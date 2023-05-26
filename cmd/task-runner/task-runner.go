@@ -161,6 +161,10 @@ func Run(build BuildFlags) {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	if cli.runnerOpts.VodDecryptPrivateKey != "" && cli.runnerOpts.VodDecryptPublicKey != "" {
+		// TODO: This needs to become catalyst only. For this to happen, we need to
+		// have the /video file as decrypted after catalyst has decrypted it.
+		// This is currently not the case, so we need to decrypt it here.
+		// This is a temporary solution until we have the above, so task-runner can probe the file
 		vodDecryptPrivateKey, err := webcrypto.LoadPrivateKey(cli.runnerOpts.VodDecryptPrivateKey)
 		if err != nil {
 			glog.Fatalf("Error loading vod decrypt private key: %v", err)

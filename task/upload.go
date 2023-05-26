@@ -61,9 +61,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		inUrl = p.inUrl
 	)
 	switch step {
-	case "":
-		fallthrough
-	case "rateLimitBackoff":
+	case "", "rateLimitBackoff":
 		outputLocations, err := p.getOutputLocations()
 		if err != nil {
 			return nil, err
