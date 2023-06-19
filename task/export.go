@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/golang/glog"
@@ -47,7 +48,7 @@ func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		return nil, fmt.Errorf("unable to find download filename for asset: %s", asset.ID)
 	}
 
-	file, err := osSess.ReadData(ctx, downloadFile)
+	file, err := osSess.ReadData(ctx, path.Join(asset.PlaybackID, downloadFile))
 	if err != nil {
 		return nil, err
 	}
