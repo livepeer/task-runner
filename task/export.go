@@ -36,7 +36,7 @@ func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	)
 	downloadFile := ""
 	for _, file := range asset.Files {
-		if file.Type == "static_transcoded_mp4" {
+		if file.Type == "static_transcoded_mp4" || file.Type == "source_file" {
 			downloadFile = file.Path
 			if strings.HasSuffix(asset.DownloadURL, file.Path) {
 				// we've found an exact match to the download URL so exit the loop
