@@ -33,7 +33,21 @@ func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		size   = asset.Size
 		osSess = tctx.inputOS
 	)
-	file, err := osSess.ReadData(ctx, videoFileName(asset.PlaybackID))
+	downloadFile := ""
+	for _, file := range asset.Files {
+		if file.Type == "static_transcoded_mp4" {
+			downloadFile = file.Path
+			if strings.HasSuffix(asset.DownloadURL, file.Path) {
+				// we've found an exact match to the download URL so exit the loop
+				break
+			}
+		}
+	}
+	if downloadFile == "" {
+		return nil, fmt.Errorf("unable to find download filename for asset: %s", asset.ID)
+	}
+
+	file, err := osSess.ReadData(ctx, downloadFile)
 	if err != nil {
 		return nil, err
 	}
