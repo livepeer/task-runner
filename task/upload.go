@@ -128,6 +128,29 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		}
 
 		return p.finalize(callback)
+	case "resultPartial":
+		var sourcePlayback *video.OutputVideo
+		if err := json.Unmarshal(tctx.StepInput, &sourcePlayback); err != nil {
+			return nil, fmt.Errorf("error parsing step input: %w", err)
+		}
+		manifestPath, err := extractOSUriFilePath(sourcePlayback.Manifest, tctx.OutputAsset.PlaybackID)
+		if err != nil {
+			return nil, fmt.Errorf("error extracting file path from output manifest: %w", err)
+		}
+
+		return &TaskHandlerOutput{
+			TaskOutput: &data.TaskOutput{
+				Upload: &data.UploadTaskOutput{
+					AssetSpec: api.AssetSpec{Files: []api.AssetFile{
+						{
+							Type: "catalyst_hls_manifest",
+							Path: manifestPath,
+						},
+					}},
+				},
+			},
+			Continue: true,
+		}, nil
 	}
 	return nil, fmt.Errorf("unknown task step: %s", step)
 }

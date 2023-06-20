@@ -290,6 +290,17 @@ func (r *runner) handleAMQPMessage(msg amqp.Delivery) (err error) {
 		WithLabelValues(task.Type, task.Step, strconv.FormatBool(!willContinue), strconv.FormatBool(err != nil)).
 		Observe(time.Since(startTime).Seconds())
 
+	// send partial message to studio here
+	if willContinue && output.TaskOutput != nil && output.TaskOutput.Upload != nil {
+		body := data.NewTaskResultPartialEvent(task, &data.TaskPartialOutput{
+			Upload: output.TaskOutput.Upload,
+		})
+		key := fmt.Sprintf("task.resultPartial.%s.%s", task.Type, task.ID)
+		if err = r.publishLogged(task, r.ExchangeName, key, body); err != nil {
+			return fmt.Errorf("error publishing task partial event: %w", err)
+		}
+	}
+
 	if willContinue {
 		glog.Infof("Task handler will continue task async type=%q id=%s output=%+v", task.Type, task.ID, output)
 		return nil
@@ -406,6 +417,13 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 	} else if curr := catalystTaskAttemptID(task); attemptID != "" && attemptID != curr {
 		return fmt.Errorf("outdated catalyst job callback, "+
 			"task has already been retried (callback: %s current: %s)", attemptID, curr)
+	}
+
+	if callback.SourcePlayback != nil {
+		err = r.scheduleTaskStep(task.ID, "resultPartial", callback.SourcePlayback)
+		if err != nil {
+			glog.Warningf("Failed to schedule resultPartial step. taskID=%s err=%v", task.ID, err)
+		}
 	}
 
 	progress := 0.9 * callback.CompletionRatio

@@ -1,11 +1,15 @@
 package task
 
 import (
+	"context"
+	"encoding/json"
+	"testing"
+
 	"github.com/livepeer/catalyst-api/video"
+	"github.com/livepeer/go-api-client"
 	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/clients"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestToTranscodeFileTaskOutput(t *testing.T) {
@@ -241,5 +245,89 @@ func TestIsHLSFile(t *testing.T) {
 		if got != test.want {
 			t.Errorf("isHLSFile(%q) = %v, want %v", test.input, got, test.want)
 		}
+	}
+}
+
+func Test_handleUploadVOD(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     handleUploadVODParams
+		manifest string
+		want     *TaskHandlerOutput
+		wantErr  string
+	}{
+		{
+			name: "happy",
+			args: handleUploadVODParams{
+				tctx: &TaskContext{
+					Context: context.Background(),
+					TaskInfo: data.TaskInfo{
+						Step: "resultPartial",
+					},
+					OutputAsset: &api.Asset{
+						PlaybackID: "playbackID",
+					},
+				},
+			},
+			manifest: "/hls/playbackID/master.m3u8",
+			want: &TaskHandlerOutput{
+				TaskOutput: &data.TaskOutput{
+					Upload: &data.UploadTaskOutput{
+						AssetSpec: api.AssetSpec{Files: []api.AssetFile{
+							{
+								Type: "catalyst_hls_manifest",
+								Path: "master.m3u8",
+							},
+						}},
+					},
+				},
+				Continue: true,
+			},
+		},
+		{
+			name: "parsing error",
+			args: handleUploadVODParams{
+				tctx: &TaskContext{
+					Context: context.Background(),
+					TaskInfo: data.TaskInfo{
+						Step:      "resultPartial",
+						StepInput: []byte{},
+					},
+				},
+			},
+			wantErr: "error parsing step input: unexpected end of JSON input",
+		},
+		{
+			name: "url extract error",
+			args: handleUploadVODParams{
+				tctx: &TaskContext{
+					Context: context.Background(),
+					TaskInfo: data.TaskInfo{
+						Step: "resultPartial",
+					},
+					OutputAsset: &api.Asset{
+						PlaybackID: "playbackID",
+					},
+				},
+			},
+			manifest: "foo",
+			wantErr:  "error extracting file path from output manifest: no playback ID in URL path",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.manifest != "" {
+				input := &video.OutputVideo{Manifest: tt.manifest}
+				inputBytes, err := json.Marshal(input)
+				require.NoError(t, err)
+				tt.args.tctx.StepInput = inputBytes
+			}
+
+			got, err := handleUploadVOD(tt.args)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+			}
+			require.Equal(t, tt.want, got)
+		})
 	}
 }
