@@ -29,10 +29,12 @@ type ExportTaskConfig struct {
 
 func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	var (
-		ctx    = tctx.Context
-		asset  = tctx.InputAsset
-		size   = asset.Size
-		osSess = tctx.inputOS
+		ctx          = tctx.Context
+		asset        = tctx.InputAsset
+		size         = asset.Size
+		osSess       = tctx.inputOS
+		customParams = tctx.Params.Export.Custom
+		ipfsParams   = tctx.Params.Export.IPFS
 	)
 	downloadFile := ""
 	for _, file := range asset.Files {
@@ -61,13 +63,65 @@ func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	defer cancel()
 	tctx = tctx.WithContext(ctx)
 	content := tctx.Progress.TrackReader(file.Body, size, 1)
-	output, err := uploadFile(tctx, asset, content)
+
+	name := "asset-" + asset.PlaybackID
+	contentType := "video/" + asset.VideoSpec.Format
+	cid, internalMetadata, err := uploadFile(tctx, customParams, ipfsParams, name, content, contentType)
+	if err != nil {
+		return nil, err
+	}
+	nftCid, err := uploadNftMetadata(tctx, ipfsParams, cid)
 	if err != nil {
 		return nil, err
 	}
 	return &TaskHandlerOutput{
-		TaskOutput: &data.TaskOutput{Export: output},
+		TaskOutput: &data.TaskOutput{
+			Export: &data.ExportTaskOutput{
+				Internal: internalMetadata,
+				IPFS: &data.IPFSExportInfo{
+					VideoFileCID:   cid,
+					NFTMetadataCID: nftCid,
+				},
+			},
+		},
 	}, nil
+}
+
+func TaskExportData(tctx *TaskContext) (*TaskHandlerOutput, error) {
+	var (
+		params = tctx.Params.ExportData
+	)
+	content := strings.NewReader(params.Content)
+	name := fmt.Sprintf("%s-%s", params.Type, params.ID)
+	contentType := "application/json"
+
+	cid, _, err := uploadFile(tctx, params.Custom, params.IPFS, name, content, contentType)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TaskHandlerOutput{
+		TaskOutput: &data.TaskOutput{
+			ExportData: &data.ExportDataTaskOutput{
+				IPFS: &data.IPFSExportDataInfo{
+					CID: cid,
+				},
+			},
+		},
+	}, nil
+}
+
+func uploadNftMetadata(tctx *TaskContext, ipfsParams *api.IPFSParams, cid string) (string, error) {
+	var (
+		params = tctx.Task.Params.Export
+		asset  = tctx.InputAsset
+	)
+	template, nftMetadata := params.IPFS.NFTMetadataTemplate, params.IPFS.NFTMetadata
+	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackURL == "" {
+		return "", fmt.Errorf("cannot create player NFT for asset without playback URL")
+	}
+	ipfs, _ := createIpfs(tctx, ipfsParams)
+	return saveNFTMetadata(tctx, ipfs, asset, cid, template, nftMetadata, tctx.ExportTaskConfig)
 }
 
 type internalMetadata struct {
@@ -75,10 +129,8 @@ type internalMetadata struct {
 	Pinata   interface{} `json:"pinata"`
 }
 
-func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.ExportTaskOutput, error) {
-	params := tctx.Task.Params.Export
-	contentType := "video/" + asset.VideoSpec.Format
-	if c := params.Custom; c != nil {
+func uploadFile(tctx *TaskContext, customParams *api.CustomParams, ipfsParams *api.IPFSParams, name string, content io.Reader, contentType string) (string, *internalMetadata, error) {
+	if c := customParams; c != nil {
 		req := clients.Request{
 			Method:      strings.ToUpper(c.Method),
 			URL:         c.URL,
@@ -93,16 +145,29 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 			if httpErr, ok := err.(*clients.HTTPStatusError); ok && httpErr.Status < 500 {
 				err = UnretriableError{err}
 			}
-			return nil, fmt.Errorf("error on export request: %w", err)
+			return "", nil, fmt.Errorf("error on export request: %w", err)
 		}
-		return &data.ExportTaskOutput{Internal: internalMetadata{DestType: "custom"}}, nil
-	} else if params.IPFS == nil {
-		return nil, fmt.Errorf("missing `ipfs` or `custom` export desination params: %+v", params)
+		return "", &internalMetadata{DestType: "custom"}, nil
+	} else if ipfsParams == nil {
+		return "", nil, fmt.Errorf("missing `ipfs` or `custom` export desination params: custom=%+v, ipfs=%+v", customParams, ipfsParams)
 	}
 
-	destType := "own-pinata"
+	ipfs, destType := createIpfs(tctx, ipfsParams)
+	cid, metadata, err := ipfs.PinContent(tctx, name, contentType, content)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return cid, &internalMetadata{
+		DestType: destType,
+		Pinata:   metadata,
+	}, nil
+}
+
+func createIpfs(tctx *TaskContext, ipfsParams *api.IPFSParams) (clients.IPFS, string) {
 	ipfs := tctx.ipfs
-	if p := params.IPFS.Pinata; p != nil {
+	destType := "own-pinata"
+	if p := ipfsParams.Pinata; p != nil {
 		destType = "ext-pinata"
 		extMetadata := map[string]string{
 			"createdBy": clients.UserAgent,
@@ -113,30 +178,7 @@ func uploadFile(tctx *TaskContext, asset *api.Asset, content io.Reader) (*data.E
 			ipfs = clients.NewPinataClientAPIKey(p.APIKey, p.APISecret, extMetadata)
 		}
 	}
-
-	videoCID, metadata, err := ipfs.PinContent(tctx, "asset-"+asset.PlaybackID, contentType, content)
-	if err != nil {
-		return nil, err
-	}
-	template, nftMetadata := params.IPFS.NFTMetadataTemplate, params.IPFS.NFTMetadata
-	if template == api.NFTMetadataTemplatePlayer && asset.PlaybackURL == "" {
-		return nil, fmt.Errorf("cannot create player NFT for asset without playback URL")
-	}
-
-	metadataCID, err := saveNFTMetadata(tctx, ipfs, asset, videoCID, template, nftMetadata, tctx.ExportTaskConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &data.ExportTaskOutput{
-		Internal: &internalMetadata{
-			DestType: destType,
-			Pinata:   metadata,
-		},
-		IPFS: &data.IPFSExportInfo{
-			VideoFileCID:   videoCID,
-			NFTMetadataCID: metadataCID,
-		},
-	}, nil
+	return ipfs, destType
 }
 
 func saveNFTMetadata(ctx context.Context, ipfs clients.IPFS,
