@@ -89,13 +89,14 @@ func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func TaskExportData(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	var (
-		params = tctx.Params.ExportData
+		params       = tctx.Params.ExportData
+		customParams = params.Custom
+		ipfsParams   = params.IPFS
 	)
 	content := strings.NewReader(params.Content)
 	name := fmt.Sprintf("%s-%s", params.Type, params.ID)
 	contentType := "application/json"
-
-	cid, _, err := uploadFile(tctx, params.Custom, params.IPFS, name, content, contentType)
+	cid, _, err := uploadFile(tctx, customParams, ipfsParams, name, content, contentType)
 	if err != nil {
 		return nil, err
 	}
