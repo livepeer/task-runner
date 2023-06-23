@@ -70,9 +70,12 @@ func TaskExport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	nftCid, err := uploadNftMetadata(tctx, ipfsParams, cid)
-	if err != nil {
-		return nil, err
+	var nftCid string
+	if ipfsParams != nil {
+		nftCid, err = uploadNftMetadata(tctx, ipfsParams, cid)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &TaskHandlerOutput{
 		TaskOutput: &data.TaskOutput{
