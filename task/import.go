@@ -97,7 +97,7 @@ func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams, vodDecryptPrivateKey string) (name string, size uint64, content io.ReadCloser, err error) {
 	name, size, content, err = getFileRaw(ctx, osSess, cfg, params)
-	if err != nil || params.Encryption.Key == "" {
+	if err != nil || params.Encryption.EncryptedKey == "" {
 		return
 	}
 
@@ -105,8 +105,8 @@ func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig
 	if err != nil {
 		return "", 0, nil, fmt.Errorf("failed to load private key: %w", err)
 	}
-	glog.V(logs.VVERBOSE).Infof("Decrypting file with key file=%s keyHash=%x", params.URL, sha256.Sum256([]byte(params.Encryption.Key)))
-	decrypted, err := webcrypto.DecryptAESCBC(content, decryptPrivateKey, params.Encryption.Key)
+	glog.V(logs.VVERBOSE).Infof("Decrypting file with key file=%s keyHash=%x", params.URL, sha256.Sum256([]byte(params.Encryption.EncryptedKey)))
+	decrypted, err := webcrypto.DecryptAESCBC(content, decryptPrivateKey, params.Encryption.EncryptedKey)
 	if err != nil {
 		content.Close()
 		return "", 0, nil, fmt.Errorf("failed to decrypt input file: %w", err)

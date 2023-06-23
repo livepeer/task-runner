@@ -69,9 +69,9 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		var encryption *clients.EncryptionPayload
 		params := tctx.Task.Params.Upload
 
-		if params != nil && params.Encryption.Key != "" {
+		if params != nil && params.Encryption.EncryptedKey != "" {
 			encryption = &clients.EncryptionPayload{
-				EncryptedKey: params.Encryption.Key,
+				EncryptedKey: params.Encryption.EncryptedKey,
 			}
 		}
 		var (
@@ -444,7 +444,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		})
 
 		// in case of encrypted input, file will have been copied in the beginning
-		if params.Encryption.Key == "" {
+		if params.Encryption.EncryptedKey == "" {
 			input, err := readLocalFile(0.95)
 			if err != nil {
 				return nil, err
