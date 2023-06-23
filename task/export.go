@@ -112,7 +112,7 @@ func TaskExportData(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	}, nil
 }
 
-func uploadNftMetadata(tctx *TaskContext, ipfsParams *api.IPFSParams, cid string) (string, error) {
+func uploadNftMetadata(tctx *TaskContext, ipfsParams *api.ExportIPFSParams, cid string) (string, error) {
 	var (
 		params = tctx.Task.Params.Export
 		asset  = tctx.InputAsset
@@ -130,7 +130,7 @@ type internalMetadata struct {
 	Pinata   interface{} `json:"pinata"`
 }
 
-func uploadFile(tctx *TaskContext, customParams *api.CustomParams, ipfsParams *api.IPFSParams, name string, content io.Reader, contentType string) (string, *internalMetadata, error) {
+func uploadFile(tctx *TaskContext, customParams *api.ExportCustomParams, ipfsParams *api.ExportIPFSParams, name string, content io.Reader, contentType string) (string, *internalMetadata, error) {
 	if c := customParams; c != nil {
 		req := clients.Request{
 			Method:      strings.ToUpper(c.Method),
@@ -165,7 +165,7 @@ func uploadFile(tctx *TaskContext, customParams *api.CustomParams, ipfsParams *a
 	}, nil
 }
 
-func createIpfs(tctx *TaskContext, ipfsParams *api.IPFSParams) (clients.IPFS, string) {
+func createIpfs(tctx *TaskContext, ipfsParams *api.ExportIPFSParams) (clients.IPFS, string) {
 	ipfs := tctx.ipfs
 	destType := "own-pinata"
 	if p := ipfsParams.Pinata; p != nil {
