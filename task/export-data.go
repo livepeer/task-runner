@@ -1,9 +1,8 @@
 package task
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
-
 	"github.com/livepeer/livepeer-data/pkg/data"
 )
 
@@ -13,7 +12,7 @@ func TaskExportData(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		customParams = params.Custom
 		ipfsParams   = params.IPFS
 	)
-	content := strings.NewReader(params.Content)
+	content := bytes.NewReader(params.Content)
 	name := fmt.Sprintf("%s-%s", params.Type, params.ID)
 	contentType := "application/json"
 	cid, _, err := uploadFile(tctx, customParams, ipfsParams, name, content, contentType)
