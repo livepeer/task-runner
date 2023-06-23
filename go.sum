@@ -386,6 +386,12 @@ github.com/livepeer/catalyst-api v0.1.2-0.20230612153934-449655e3778a h1:3so4Zd2
 github.com/livepeer/catalyst-api v0.1.2-0.20230612153934-449655e3778a/go.mod h1:d6XPE9ehhCutWhCqqcmlYqQa+e9bf3Ke92x+gRZlzoQ=
 github.com/livepeer/go-api-client v0.4.8-0.20230623074501-bbafe178beae h1:xjTN6BKNedk1IrVJpqE8Qx9lRNyfkPH/9K6OSTWQaWc=
 github.com/livepeer/go-api-client v0.4.8-0.20230623074501-bbafe178beae/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
+github.com/livepeer/go-api-client v0.4.8-0.20230623081523-b36307e214a5 h1:6FWaFru0gv5pGUy55gevroeptlUxcT4eCEx3yxuzPCo=
+github.com/livepeer/go-api-client v0.4.8-0.20230623081523-b36307e214a5/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
+github.com/livepeer/go-api-client v0.4.8-0.20230623082059-cd5ba8f16ad1 h1:gqAzoW+q4D8aokHzLHMbdwXODnmqJEaRD42LinaqTT8=
+github.com/livepeer/go-api-client v0.4.8-0.20230623082059-cd5ba8f16ad1/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
+github.com/livepeer/go-api-client v0.4.8-0.20230623082253-65247449e516 h1:fK872WtxUd6YUoBM9YHXPUMWkng5xkYI/Nx9aQqlaHw=
+github.com/livepeer/go-api-client v0.4.8-0.20230623082253-65247449e516/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-tools v0.3.1 h1:StK9kR9WHRc2vy/E022sMrfWaqPPHGt30NMwxUBiqWE=
 github.com/livepeer/go-tools v0.3.1/go.mod h1:qs31y68b3PQPmSr8nR8l5WQiIWI623z6pqOccqebjos=
 github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07 h1:ISkFQYYDgfnM6Go+VyemF66DKFc8kNoI9SwMv7GC9sM=
