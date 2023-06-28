@@ -412,14 +412,31 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		osSess               = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
 		inFile               = params.URL
 		vodDecryptPrivateKey = tctx.VodDecryptPrivateKey
+		contents             io.ReadCloser
+		size                 uint64
+		filename             string
+		catalystCopiedSource = false
 	)
 	if isHLSFile(inFile) {
 		return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 	}
-	filename, size, contents, err := getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("error getting source file: %w", err)
+
+	catalystSource, err := osSess.ReadData(tctx, videoFileName(playbackID))
+	if err == nil {
+		glog.Infof("Found source copy from catalyst taskId=%s filename=%s", tctx.Task.ID, catalystSource.Name)
+		contents = catalystSource.Body
+		if catalystSource.Size != nil && *catalystSource.Size > 0 {
+			size = uint64(*catalystSource.Size)
+		}
+		filename = catalystSource.FileInfo.Name
+		catalystCopiedSource = true
+	} else {
+		filename, size, contents, err = getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("error getting source file: %w", err)
+		}
 	}
+
 	defer contents.Close()
 	input := tctx.Progress.TrackReader(contents, size, 0.94)
 	sizeInt := int64(size)
@@ -436,7 +453,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		return tctx.Progress.TrackReader(rawSourceFile, size, endProgress), nil
 	}
 
-	if !FlagCatalystCopiesSourceFile {
+	if !catalystCopiedSource {
 		fullPath := videoFileName(playbackID)
 		assetSpec.Files = append(assetSpec.Files, api.AssetFile{
 			Type: "source_file",
@@ -456,22 +473,6 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 			glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
 		}
 	}
-
-	metadata := &FileMetadata{}
-	if !FlagCatalystProbesFile {
-		input, err = readLocalFile(1)
-		if err != nil {
-			return nil, err
-		}
-		metadata, err = Probe(tctx, tctx.OutputAsset.ID, filename, input, false)
-		if err != nil {
-			return nil, err
-		}
-		probed := metadata.AssetSpec
-		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
-	}
-
-	metadata.AssetSpec, metadata.CatalystResult = &assetSpec, removeCredentials(callback)
 
 	if ipfsSpec := tctx.OutputAsset.Storage.IPFS; ipfsSpec != nil && ipfsSpec.Spec != nil {
 		ipfs := *ipfsSpec
@@ -502,15 +503,6 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		ipfs.NFTMetadata = &api.IPFSFileInfo{CID: metadataCID}
 		assetSpec.Storage.IPFS = &ipfs
 	}
-
-	_, metadataPath, err := saveMetadataFile(tctx, tctx.outputOS, tctx.OutputAsset.PlaybackID, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("error saving metadata file: %w", err)
-	}
-	assetSpec.Files = append(assetSpec.Files, api.AssetFile{
-		Type: "metadata",
-		Path: toAssetRelativePath(playbackID, metadataPath),
-	})
 
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 }
