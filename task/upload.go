@@ -474,6 +474,19 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		}
 	}
 
+	if !FlagCatalystProbesFile {
+		input, err = readLocalFile(1)
+		if err != nil {
+			return nil, err
+		}
+		metadata, err := Probe(tctx, tctx.OutputAsset.ID, filename, input, false)
+		if err != nil {
+			return nil, err
+		}
+		probed := metadata.AssetSpec
+		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
+	}
+
 	if ipfsSpec := tctx.OutputAsset.Storage.IPFS; ipfsSpec != nil && ipfsSpec.Spec != nil {
 		ipfs := *ipfsSpec
 		if !FlagCatalystSupportsIPFS {
