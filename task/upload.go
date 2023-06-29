@@ -306,13 +306,13 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			DurationSec: track.DurationSec,
 			Bitrate:     float64(track.Bitrate),
 
-			Width:       int(track.VideoTrack.Width),
-			Height:      int(track.VideoTrack.Height),
-			PixelFormat: track.VideoTrack.PixelFormat,
-			FPS:         float64(track.VideoTrack.FPS) / 1000,
+			Width:       int(track.Width),
+			Height:      int(track.Height),
+			PixelFormat: track.PixelFormat,
+			FPS:         float64(track.FPS) / 1000,
 
-			Channels:   track.AudioTrack.Channels,
-			SampleRate: track.AudioTrack.SampleRate,
+			Channels:   track.Channels,
+			SampleRate: track.SampleRate,
 		}
 	}
 
