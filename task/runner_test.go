@@ -90,6 +90,9 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("error copying input to storage: failed to copy file(s): error copying input file to S3: failed to write to OS URL \"s3+https://storage.googleapis.com/lp-us-catalyst-vod-com/hls/source/bdfgehfe/transfer\": MultipartUpload: upload multipart failed\n\tupload id: ABPnzm6RnhkmNJDt42Vk-cVm7lmNqrPVScIXmjIImSYzxlZ6L0MRhBSn0yfWu6_GNUko9e4\ncaused by: ReadRequestBody: read multipart upload data failed\ncaused by: unexpected EOF", false)
 	assert.ErrorIs(humanizeError(err), errFileInaccessible)
+
+	err = NewCatalystError("failed to write to OS URL \"s3+https:/key:************************@s3.filebase.com/videos-dev/foo/hls/index540p0_00002.ts\": AccessDenied: Access Denied\n\tstatus code: 403, request id: 150640cd52de34f9ce9932a563aab747, host id: ZmlsZWJhc2UtN2ZiYjhiZDRjNy10NW1ycA==", false)
+	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {
