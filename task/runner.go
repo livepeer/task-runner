@@ -602,6 +602,8 @@ func humanizeCatalystError(err error) error {
 		return errFileInaccessible
 	case strings.Contains(errMsg, "error copying input file to s3") && (strings.Contains(errMsg, "download error") || strings.Contains(errMsg, "unexpected eof")):
 		return errFileInaccessible
+	case strings.Contains(errMsg, "failed to write to os url") && strings.Contains(errMsg, "accessdenied"):
+		return errFileInaccessible
 	}
 
 	invalidVideoErrs := []string{
