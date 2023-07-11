@@ -390,6 +390,12 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 	assetSpecJson, _ := json.Marshal(assetSpec)
 	glog.Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, assetSpec, assetSpecJson)
 
+	fullPath := videoFileName(playbackID)
+	assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+		Type: "source_file",
+		Path: toAssetRelativePath(playbackID, fullPath),
+	})
+
 	output, err := complementCatalystPipeline(tctx, *assetSpec, callback)
 	if err != nil {
 		return nil, err
@@ -426,6 +432,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		filename = catalystSource.FileInfo.Name
 		catalystCopiedSource = true
 	} else {
+		glog.Infof("Source copy from catalyst not found taskId=%s filename=%s", tctx.Task.ID, catalystSource.Name)
 		filename, size, contents, err = getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
 		if err != nil {
 			return nil, fmt.Errorf("error getting source file: %w", err)
@@ -448,11 +455,6 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		return tctx.Progress.TrackReader(rawSourceFile, size, endProgress), nil
 	}
 
-	fullPath := videoFileName(playbackID)
-	assetSpec.Files = append(assetSpec.Files, api.AssetFile{
-		Type: "source_file",
-		Path: toAssetRelativePath(playbackID, fullPath),
-	})
 	if !catalystCopiedSource {
 		// in case of encrypted input, file will have been copied in the beginning
 		if params.Encryption.EncryptedKey == "" {
@@ -460,6 +462,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 			if err != nil {
 				return nil, err
 			}
+			fullPath := videoFileName(playbackID)
 			fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
 			if err != nil {
 				return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
