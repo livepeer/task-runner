@@ -457,7 +457,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 
 	if !catalystCopiedSource {
 		// in case of encrypted input, file will have been copied in the beginning
-		if params.Encryption.EncryptedKey == "" {
+		if !isEncryptionEnabled(params) {
 			input, err := readLocalFile(0.95)
 			if err != nil {
 				return nil, err
@@ -525,6 +525,10 @@ func isHLSFile(fname string) bool {
 	return fname[ext:] == ".m3u8"
 }
 
+func isEncryptionEnabled(params api.UploadTaskParams) bool {
+	return params.Encryption.EncryptedKey != ""
+}
+
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
@@ -534,7 +538,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
 	}
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, true)
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, !isEncryptionEnabled(*tctx.Task.Params.Upload))
 	if err != nil {
 		return nil, nil, err
 	}
