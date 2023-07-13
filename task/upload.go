@@ -28,8 +28,6 @@ const (
 var (
 	// Feature flag whether to use Catalyst's IPFS support or not.
 	FlagCatalystSupportsIPFS = false
-	// Feature flag whether to use Catalyst for copying source file to object store.
-	FlagCatalystCopiesSourceFile = false
 	// Feature flag whether Catalyst is able to generate all required probe info.
 	FlagCatalystProbesFile = false
 )
@@ -191,7 +189,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
 			_, outputLocation, err := outputLocations(params.Storage.URL, isEnabled(params.Outputs.HLS.Path),
-				params.Outputs.HLS.Path, isEnabled(params.Outputs.MP4.Path), params.Outputs.MP4.Path)
+				params.Outputs.HLS.Path, isEnabled(params.Outputs.MP4.Path), params.Outputs.MP4.Path, false)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -389,11 +387,14 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 			return nil, fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
 		}
 	}
-	if FlagCatalystCopiesSourceFile && videoFilePath == "" {
-		return nil, fmt.Errorf("no video file path found in catalyst output")
-	}
 	assetSpecJson, _ := json.Marshal(assetSpec)
 	glog.Infof("Parsed asset spec from Catalyst: taskId=%s assetSpec=%+v, assetSpecJson=%q", tctx.Task.ID, assetSpec, assetSpecJson)
+
+	fullPath := videoFileName(playbackID)
+	assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+		Type: "source_file",
+		Path: toAssetRelativePath(playbackID, fullPath),
+	})
 
 	output, err := complementCatalystPipeline(tctx, *assetSpec, callback)
 	if err != nil {
@@ -431,6 +432,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		filename = catalystSource.FileInfo.Name
 		catalystCopiedSource = true
 	} else {
+		glog.Infof("Source copy from catalyst not found taskId=%s filename=%s", tctx.Task.ID, catalystSource.Name)
 		filename, size, contents, err = getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
 		if err != nil {
 			return nil, fmt.Errorf("error getting source file: %w", err)
@@ -454,18 +456,13 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 	}
 
 	if !catalystCopiedSource {
-		fullPath := videoFileName(playbackID)
-		assetSpec.Files = append(assetSpec.Files, api.AssetFile{
-			Type: "source_file",
-			Path: toAssetRelativePath(playbackID, fullPath),
-		})
-
 		// in case of encrypted input, file will have been copied in the beginning
-		if params.Encryption.EncryptedKey == "" {
+		if !isEncryptionEnabled(params) {
 			input, err := readLocalFile(0.95)
 			if err != nil {
 				return nil, err
 			}
+			fullPath := videoFileName(playbackID)
 			fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
 			if err != nil {
 				return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
@@ -528,21 +525,8 @@ func isHLSFile(fname string) bool {
 	return fname[ext:] == ".m3u8"
 }
 
-func removeCredentials(metadata *clients.CatalystCallback) *clients.CatalystCallback {
-	res := *metadata
-	res.Outputs = make([]video.OutputVideo, len(metadata.Outputs))
-
-	for o, output := range metadata.Outputs {
-		res.Outputs[o] = output
-		res.Outputs[o].Manifest = clients.RedactURL(output.Manifest)
-		res.Outputs[o].Videos = make([]video.OutputVideoFile, len(output.Videos))
-		for v, video := range output.Videos {
-			res.Outputs[o].Videos[v] = video
-			res.Outputs[o].Videos[v].Location = clients.RedactURL(video.Location)
-		}
-	}
-
-	return &res
+func isEncryptionEnabled(params api.UploadTaskParams) bool {
+	return params.Encryption.EncryptedKey != ""
 }
 
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
@@ -554,7 +538,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
 	}
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId)
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, !isEncryptionEnabled(*tctx.Task.Params.Upload))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -576,7 +560,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string, sourceCopy bool) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
@@ -599,7 +583,7 @@ func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string) ([]OutputN
 				},
 			},
 		}
-	if FlagCatalystCopiesSourceFile {
+	if sourceCopy {
 		names, locations =
 			append(names, OutputNameOSSourceMP4),
 			append(locations, clients.OutputLocation{

@@ -97,7 +97,7 @@ func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams, vodDecryptPrivateKey string) (name string, size uint64, content io.ReadCloser, err error) {
 	name, size, content, err = getFileRaw(ctx, osSess, cfg, params)
-	if err != nil || params.Encryption.EncryptedKey == "" {
+	if err != nil || !isEncryptionEnabled(params) {
 		return
 	}
 
