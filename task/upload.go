@@ -432,7 +432,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 		filename = catalystSource.FileInfo.Name
 		catalystCopiedSource = true
 	} else {
-		glog.Infof("Source copy from catalyst not found taskId=%s", tctx.Task.ID)
+		glog.Infof("Source copy from catalyst not found taskId=%s err=%v", tctx.Task.ID, err)
 		filename, size, contents, err = getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
 		if err != nil {
 			return nil, fmt.Errorf("error getting source file: %w", err)
