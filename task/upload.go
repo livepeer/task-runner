@@ -188,8 +188,16 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		tctx:  tctx,
 		inUrl: params.Input.URL,
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
-			_, outputLocation, err := outputLocations(params.Storage.URL, isEnabled(params.Outputs.HLS.Path),
-				params.Outputs.HLS.Path, isEnabled(params.Outputs.MP4.Path), params.Outputs.MP4.Path, false)
+			_, outputLocation, err := outputLocations(
+				params.Storage.URL,
+				isEnabled(params.Outputs.HLS.Path),
+				params.Outputs.HLS.Path,
+				isEnabled(params.Outputs.MP4.Path),
+				params.Outputs.MP4.Path,
+				isEnabled(params.Outputs.FMP4.Path),
+				params.Outputs.FMP4.Path,
+				false,
+			)
 			return outputLocation, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
@@ -538,7 +546,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
 	}
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, !isEncryptionEnabled(*tctx.Task.Params.Upload))
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", !isEncryptionEnabled(*tctx.Task.Params.Upload))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -560,7 +568,16 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	return outputNames, outputLocations, nil
 }
 
-func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string, sourceCopy bool) ([]OutputName, []clients.OutputLocation, error) {
+func outputLocations(
+	outURL,
+	hls,
+	hlsRelPath,
+	mp4,
+	mp4RelPath,
+	fmp4,
+	fmp4RelPath string,
+	sourceCopy bool,
+) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing object store URL: %w", err)
@@ -583,6 +600,17 @@ func outputLocations(outURL, hls, hlsRelPath, mp4, mp4RelPath string, sourceCopy
 				},
 			},
 		}
+	if fmp4 == OUTPUT_ENABLED {
+		names, locations =
+			append(names, OutputNameEmpty),
+			append(locations, clients.OutputLocation{
+				Type: "object_store",
+				URL:  url.JoinPath(videoFileName(fmp4RelPath)).String(),
+				Outputs: &clients.OutputsRequest{
+					FMP4: fmp4,
+				},
+			})
+	}
 	if sourceCopy {
 		names, locations =
 			append(names, OutputNameOSSourceMP4),

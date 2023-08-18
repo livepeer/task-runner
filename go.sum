@@ -394,6 +394,8 @@ github.com/livepeer/go-api-client v0.4.8-0.20230623082253-65247449e516 h1:fK872W
 github.com/livepeer/go-api-client v0.4.8-0.20230623082253-65247449e516/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-api-client v0.4.8 h1:vDMROyjtwbSVZNBb2Ckk/TYxBT+M4N4Lbji+KCMYveo=
 github.com/livepeer/go-api-client v0.4.8/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
+github.com/livepeer/go-api-client v0.4.9-0.20230818122953-366df6f5d816 h1:OIYSVTUvZuTrnvfWCQa1qHAy+0ReuhQJC7nvUoGyE0k=
+github.com/livepeer/go-api-client v0.4.9-0.20230818122953-366df6f5d816/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-tools v0.3.1 h1:StK9kR9WHRc2vy/E022sMrfWaqPPHGt30NMwxUBiqWE=
 github.com/livepeer/go-tools v0.3.1/go.mod h1:qs31y68b3PQPmSr8nR8l5WQiIWI623z6pqOccqebjos=
 github.com/livepeer/joy4 v0.1.2-0.20220210094601-95e4d28f5f07 h1:ISkFQYYDgfnM6Go+VyemF66DKFc8kNoI9SwMv7GC9sM=
