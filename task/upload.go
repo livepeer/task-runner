@@ -605,7 +605,7 @@ func outputLocations(
 			append(names, OutputNameEmpty),
 			append(locations, clients.OutputLocation{
 				Type: "object_store",
-				URL:  url.JoinPath(videoFileName(fmp4RelPath)).String(),
+				URL:  url.JoinPath(fmp4RelPath).String(),
 				Outputs: &clients.OutputsRequest{
 					FMP4: fmp4,
 				},
