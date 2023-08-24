@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -526,11 +527,14 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 }
 
 func isHLSFile(fname string) bool {
-	ext := strings.LastIndex(fname, ".")
-	if ext == -1 {
+	if filepath.Ext(fname) == ".m3u8" {
+		return true
+	}
+	u, err := url.Parse(fname)
+	if err != nil {
 		return false
 	}
-	return fname[ext:] == ".m3u8"
+	return filepath.Ext(u.Path) == ".m3u8"
 }
 
 func isEncryptionEnabled(params api.UploadTaskParams) bool {

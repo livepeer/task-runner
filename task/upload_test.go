@@ -265,6 +265,7 @@ func TestIsHLSFile(t *testing.T) {
 		want  bool
 	}{
 		{"https+s3://access-key:secret-key@bucket/some/path/file.m3u8", true},
+		{"https+s3://access-key:secret-key@bucket/some/path/file.m3u8?foo", true},
 		{"file.m3u8", true},
 		{"file.mp4", false},
 		{"file", false},
