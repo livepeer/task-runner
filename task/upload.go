@@ -29,8 +29,6 @@ const (
 var (
 	// Feature flag whether to use Catalyst's IPFS support or not.
 	FlagCatalystSupportsIPFS = false
-	// Feature flag whether Catalyst is able to generate all required probe info.
-	FlagCatalystProbesFile = false
 )
 
 type OutputName string
@@ -405,7 +403,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		Path: toAssetRelativePath(playbackID, fullPath),
 	})
 
-	output, err := complementCatalystPipeline(tctx, *assetSpec, callback)
+	output, err := complementCatalystPipeline(tctx, *assetSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +413,7 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 	return output, nil
 }
 
-func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, callback *clients.CatalystCallback) (*data.UploadTaskOutput, error) {
+func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*data.UploadTaskOutput, error) {
 	var (
 		playbackID           = tctx.OutputAsset.PlaybackID
 		params               = *tctx.Task.Params.Upload
@@ -478,19 +476,6 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec, call
 			}
 			glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
 		}
-	}
-
-	if !FlagCatalystProbesFile {
-		input, err = readLocalFile(1)
-		if err != nil {
-			return nil, err
-		}
-		metadata, err := Probe(tctx, tctx.OutputAsset.ID, filename, input, false)
-		if err != nil {
-			return nil, err
-		}
-		probed := metadata.AssetSpec
-		assetSpec.Hash, assetSpec.Size, assetSpec.VideoSpec = probed.Hash, probed.Size, probed.VideoSpec
 	}
 
 	if ipfsSpec := tctx.OutputAsset.Storage.IPFS; ipfsSpec != nil && ipfsSpec.Spec != nil {
