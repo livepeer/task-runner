@@ -445,8 +445,15 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*da
 			return nil, fmt.Errorf("error getting source file: %w", err)
 		}
 	}
-
 	defer contents.Close()
+
+	ipfsSpec := tctx.OutputAsset.Storage.IPFS
+	ipfsRequired := ipfsSpec != nil && ipfsSpec.Spec != nil
+	if !ipfsRequired && catalystCopiedSource {
+		glog.Infof("Skipping file download")
+		return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
+	}
+
 	input := tctx.Progress.TrackReader(contents, size, 0.94)
 	sizeInt := int64(size)
 	rawSourceFile, err := readFile(filename, &sizeInt, input)
@@ -478,7 +485,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*da
 		}
 	}
 
-	if ipfsSpec := tctx.OutputAsset.Storage.IPFS; ipfsSpec != nil && ipfsSpec.Spec != nil {
+	if ipfsRequired {
 		ipfs := *ipfsSpec
 		if !FlagCatalystSupportsIPFS {
 			// TODO: Remove this branch once we have reliable catalyst IPFS support
