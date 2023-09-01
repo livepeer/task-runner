@@ -613,7 +613,6 @@ func humanizeCatalystError(err error) error {
 		// Keeping it simple for now and returning errInvalidVideo for this
 		// But, should there be a separate humanized error for this?
 		"readpacketdata file read failed - end of file hit",
-		"no video track found in file",
 		"no pictures decoded",
 		"zero bytes found for source",
 		"invalid framerate",
