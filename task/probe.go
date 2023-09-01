@@ -98,9 +98,6 @@ func toAssetSpec(filename string, strict bool, probeData *ffprobe.ProbeData, siz
 		hasAudio = hasAudio || track.Type == "audio"
 		spec.VideoSpec.Tracks = append(spec.VideoSpec.Tracks, track)
 	}
-	if !hasVideo {
-		return nil, fmt.Errorf("no video track found in file")
-	}
 	if !hasAudio && strict {
 		return nil, fmt.Errorf("no audio track found in file")
 	}
