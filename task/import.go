@@ -1,10 +1,8 @@
 package task
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -17,7 +15,6 @@ import (
 	api "github.com/livepeer/go-api-client"
 	"github.com/livepeer/go-api-client/logs"
 	"github.com/livepeer/go-tools/drivers"
-	"github.com/livepeer/livepeer-data/pkg/data"
 	"github.com/livepeer/task-runner/webcrypto"
 )
 
@@ -27,72 +24,6 @@ const ARWEAVE_PREFIX = "ar://"
 type ImportTaskConfig struct {
 	// Ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from
 	ImportIPFSGatewayURLs []*url.URL
-}
-
-func TaskImport(tctx *TaskContext) (*TaskHandlerOutput, error) {
-	var (
-		ctx                  = tctx.Context
-		playbackID           = tctx.OutputAsset.PlaybackID
-		params               = *tctx.Task.Params.Import
-		osSess               = tctx.outputOS // Import deals with outputOS only (URL -> ObjectStorage)
-		vodDecryptPrivateKey = tctx.VodDecryptPrivateKey
-	)
-	filename, size, contents, err := getFile(ctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
-	if err != nil {
-		return nil, err
-	}
-	defer contents.Close()
-
-	// Download the file to local disk (or memory).
-	input := tctx.Progress.TrackReader(contents, size, 0.09)
-	sizeInt := int64(size)
-	sourceFile, err := readFile(filename, &sizeInt, input)
-	if err != nil {
-		return nil, err
-	}
-	defer sourceFile.Close()
-
-	// Probe metadata from the source file and save it to object store.
-	input = tctx.Progress.TrackReader(sourceFile, size, 0.11)
-	isRecording := params.RecordedSessionID != ""
-	metadata, err := Probe(ctx, tctx.OutputAsset.ID, filename, input, !isRecording)
-	if err != nil {
-		return nil, err
-	}
-	metadataFilePath, _, err := saveMetadataFile(ctx, osSess, playbackID, metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	// Save source file to object store.
-	_, err = sourceFile.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("error seeking to start of source file: %w", err)
-	}
-	input = tctx.Progress.TrackReader(sourceFile, size, 0.2)
-	fullPath := videoFileName(playbackID)
-	videoFilePath, err := osSess.SaveData(ctx, fullPath, input, nil, fileUploadTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
-	}
-	glog.Infof("Saved file=%s to url=%s", fullPath, videoFilePath)
-
-	_, err = sourceFile.Seek(0, io.SeekStart)
-	if err != nil {
-		return nil, fmt.Errorf("error seeking to start of source file: %w", err)
-	}
-	playbackRecordingID, err := prepareImportedAsset(tctx, metadata, sourceFile)
-	if err != nil {
-		return nil, fmt.Errorf("error preparing asset: %w", err)
-	}
-	assetSpec := *metadata.AssetSpec
-	assetSpec.PlaybackRecordingID = playbackRecordingID
-	return &TaskHandlerOutput{
-		TaskOutput: &data.TaskOutput{Import: &data.UploadTaskOutput{
-			VideoFilePath:    videoFilePath,
-			MetadataFilePath: metadataFilePath,
-			AssetSpec:        assetSpec,
-		}}}, nil
 }
 
 func getFile(ctx context.Context, osSess drivers.OSSession, cfg ImportTaskConfig, params api.UploadTaskParams, vodDecryptPrivateKey string) (name string, size uint64, content io.ReadCloser, err error) {
@@ -185,19 +116,6 @@ func getFileWithUrl(ctx context.Context, url string) (name string, size uint64, 
 	return filename(req, resp), size, resp.Body, nil
 }
 
-func prepareImportedAsset(tctx *TaskContext, metadata *FileMetadata, sourceFile io.ReadSeekCloser) (string, error) {
-	if sessID := tctx.Params.Import.RecordedSessionID; sessID != "" {
-		return sessID, nil
-	}
-
-	playbackRecordingID, err := Prepare(tctx, metadata.AssetSpec, sourceFile)
-	if err != nil {
-		glog.Errorf("Error preparing file assetId=%s taskType=import err=%q", tctx.OutputAsset.ID, err)
-		return "", err
-	}
-	return playbackRecordingID, nil
-}
-
 func filename(req *http.Request, resp *http.Response) string {
 	contentDisposition := resp.Header.Get("Content-Disposition")
 	_, params, _ := mime.ParseMediaType(contentDisposition)
@@ -208,17 +126,4 @@ func filename(req *http.Request, resp *http.Response) string {
 		return base
 	}
 	return ""
-}
-
-func saveMetadataFile(ctx context.Context, osSess drivers.OSSession, playbackID string, metadata interface{}) (string, string, error) {
-	path := metadataFileName(playbackID)
-	raw, err := json.Marshal(metadata)
-	if err != nil {
-		return "", "", fmt.Errorf("error marshaling file metadat: %w", err)
-	}
-	fullPath, err := osSess.SaveData(ctx, path, bytes.NewReader(raw), nil, fileUploadTimeout)
-	if err != nil {
-		return "", "", fmt.Errorf("error saving metadata file: %w", err)
-	}
-	return fullPath, path, nil
 }

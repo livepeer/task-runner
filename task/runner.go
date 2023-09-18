@@ -43,11 +43,9 @@ var (
 
 var (
 	defaultTasks = map[string]TaskHandler{
-		"import":         TaskImport,
 		"upload":         TaskUpload,
 		"export":         TaskExport,
 		"export-data":    TaskExportData,
-		"transcode":      TaskTranscode,
 		"transcode-file": TaskTranscodeFile,
 	}
 
