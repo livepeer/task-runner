@@ -121,7 +121,7 @@ type RunnerOptions struct {
 	LivepeerAPIOptions api.ClientOptions
 	Catalyst           *clients.CatalystOptions
 	ExportTaskConfig
-	ImportTaskConfig
+	UploadTaskConfig
 
 	VodDecryptPrivateKey string
 	VodDecryptPublicKey  string
