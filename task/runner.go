@@ -43,11 +43,9 @@ var (
 
 var (
 	defaultTasks = map[string]TaskHandler{
-		"import":         TaskImport,
 		"upload":         TaskUpload,
 		"export":         TaskExport,
 		"export-data":    TaskExportData,
-		"transcode":      TaskTranscode,
 		"transcode-file": TaskTranscodeFile,
 	}
 
@@ -123,7 +121,7 @@ type RunnerOptions struct {
 	LivepeerAPIOptions api.ClientOptions
 	Catalyst           *clients.CatalystOptions
 	ExportTaskConfig
-	ImportTaskConfig
+	UploadTaskConfig
 
 	VodDecryptPrivateKey string
 	VodDecryptPublicKey  string

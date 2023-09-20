@@ -21,15 +21,24 @@ import (
 )
 
 const (
-	OUTPUT_ENABLED    = "enabled"
-	OUTPUT_DISABLED   = "disabled"
-	OUTPUT_ONLY_SHORT = "only_short"
+	OUTPUT_ENABLED       = "enabled"
+	OUTPUT_DISABLED      = "disabled"
+	OUTPUT_ONLY_SHORT    = "only_short"
+	IPFS_PREFIX          = "ipfs://"
+	ARWEAVE_PREFIX       = "ar://"
+	segLen               = 2 * time.Second
+	maxFileSizeForMemory = 50_000_000
 )
 
 var (
 	// Feature flag whether to use Catalyst's IPFS support or not.
 	FlagCatalystSupportsIPFS = false
 )
+
+type UploadTaskConfig struct {
+	// Ordered list of IPFS gateways (includes /ipfs/ suffix) to import assets from
+	ImportIPFSGatewayURLs []*url.URL
+}
 
 type OutputName string
 
@@ -440,7 +449,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*da
 		catalystCopiedSource = true
 	} else {
 		glog.Infof("Source copy from catalyst not found taskId=%s err=%v", tctx.Task.ID, err)
-		filename, size, contents, err = getFile(tctx, osSess, tctx.ImportTaskConfig, params, vodDecryptPrivateKey)
+		filename, size, contents, err = getFile(tctx, osSess, tctx.UploadTaskConfig, params, vodDecryptPrivateKey)
 		if err != nil {
 			return nil, fmt.Errorf("error getting source file: %w", err)
 		}

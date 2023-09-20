@@ -33,13 +33,3 @@ func respondJson(rw http.ResponseWriter, status int, response interface{}) {
 		glog.Errorf("Error writing response. err=%q, response=%+v", err, response)
 	}
 }
-
-func nonNilErrs(errs ...error) []error {
-	var nonNil []error
-	for _, err := range errs {
-		if err != nil {
-			nonNil = append(nonNil, err)
-		}
-	}
-	return nonNil
-}
