@@ -63,6 +63,7 @@ type OutputsRequest struct {
 	HLS       string `json:"hls"`
 	MP4       string `json:"mp4"`
 	FMP4      string `json:"fragmented_mp4"`
+	Clip      string `json:"clip"`
 }
 
 type CatalystOptions struct {

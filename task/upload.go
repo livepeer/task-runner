@@ -47,6 +47,7 @@ var (
 	OutputNameOSSourceMP4   = OutputName("source_mp4")
 	OutputNameOSPlaylistHLS = OutputName("playlist_hls")
 	OutputNameIPFSSourceMP4 = OutputName("ipfs_source_mp4")
+	OutputNameClipSource    = OutputName("clip_source")
 )
 
 type handleUploadVODParams struct {
@@ -642,13 +643,25 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 
 func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
+	inputURL := tctx.Params.Clip.URL
 	outURL := tctx.OutputOSObj.URL
 	var mp4 string
+
+	clipSourceURL := strings.Replace(inputURL, "output.m3u8", "clip_"+playbackId+"/clip.m3u8", 1)
 
 	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", false)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	outputNames, outputLocations =
+		append(outputNames, OutputNameClipSource),
+		append(outputLocations, clients.OutputLocation{
+			Type: "clip",
+			Outputs: &clients.OutputsRequest{
+				Clip: clipSourceURL,
+			},
+		})
 
 	return outputNames, outputLocations, nil
 }
