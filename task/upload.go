@@ -78,9 +78,8 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 
 		if tctx.Task.Params.Clip != nil {
 			clipParams := tctx.Task.Params.Clip
-			if clipParams != nil && clipParams.ClipStrategy.Enabled {
+			if clipParams != nil {
 				clipStrategy = &video.ClipStrategy{
-					Enabled:    true,
 					StartTime:  clipParams.ClipStrategy.StartTime,
 					EndTime:    clipParams.ClipStrategy.EndTime,
 					PlaybackID: clipParams.ClipStrategy.PlaybackId,
@@ -105,7 +104,11 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 				Profiles:              p.profiles,
 				TargetSegmentSizeSecs: p.targetSegmentSizeSecs,
 				Encryption:            encryption,
-				ClipStrategy:          clipStrategy,
+				ClipStrategy: clients.ClipStrategy{
+					StartTime:  clipStrategy.StartTime,
+					EndTime:    clipStrategy.EndTime,
+					PlaybackID: clipStrategy.PlaybackID,
+				},
 			}
 			nextStep = "checkCatalyst"
 		)
@@ -256,7 +259,6 @@ func TaskClip(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		},
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 		clipStrategy: video.ClipStrategy{
-			Enabled:    true,
 			StartTime:  params.ClipStrategy.StartTime,
 			EndTime:    params.ClipStrategy.EndTime,
 			PlaybackID: params.ClipStrategy.PlaybackId,
