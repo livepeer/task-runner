@@ -75,20 +75,23 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		}
 		var encryption *clients.EncryptionPayload
 		var clipStrategy *video.ClipStrategy
-		params := tctx.Task.Params.Upload
 
-		if params != nil && params.Encryption.EncryptedKey != "" {
-			encryption = &clients.EncryptionPayload{
-				EncryptedKey: params.Encryption.EncryptedKey,
+		if tctx.Task.Params.Clip != nil {
+			clipParams := tctx.Task.Params.Clip
+			if clipParams != nil && clipParams.ClipStrategy.Enabled {
+				clipStrategy = &video.ClipStrategy{
+					Enabled:    true,
+					StartTime:  clipParams.ClipStrategy.StartTime,
+					EndTime:    clipParams.ClipStrategy.EndTime,
+					PlaybackID: clipParams.ClipStrategy.PlaybackId,
+				}
 			}
-		}
-
-		if params != nil && params.ClipStrategy.Enabled {
-			clipStrategy = &video.ClipStrategy{
-				Enabled:    true,
-				StartTime:  params.ClipStrategy.StartTime,
-				EndTime:    params.ClipStrategy.EndTime,
-				PlaybackID: params.ClipStrategy.PlaybackId,
+		} else {
+			uploadParams := tctx.Task.Params.Upload
+			if uploadParams != nil && uploadParams.Encryption.EncryptedKey != "" {
+				encryption = &clients.EncryptionPayload{
+					EncryptedKey: uploadParams.Encryption.EncryptedKey,
+				}
 			}
 		}
 
@@ -229,7 +232,6 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 			}
 			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{TranscodeFile: &tfo}}, nil
 		},
-		profiles:                 params.Profiles,
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 		targetSegmentSizeSecs:    params.TargetSegmentSizeSecs,
 	})
@@ -237,17 +239,22 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 
 func TaskClip(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.Clip
-
 	return handleUploadVOD(handleUploadVODParams{
-		tctx: tctx,
+		tctx:  tctx,
+		inUrl: params.URL,
+		getOutputLocations: func() ([]clients.OutputLocation, error) {
+			_, outputLocations, err := clipTaskOutputLocations(tctx)
+			return outputLocations, err
+		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
 			tctx.Progress.Set(1)
-			tfo, err := toClipOutput(callback)
+			clipOutput, err := toClipOutput(callback)
 			if err != nil {
 				return nil, err
 			}
-			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{Clip: &tfo}}, nil
+			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{Clip: &clipOutput}}, nil
 		},
+		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 		clipStrategy: video.ClipStrategy{
 			Enabled:    true,
 			StartTime:  params.ClipStrategy.StartTime,
@@ -626,6 +633,19 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 					SourceMp4: true,
 				},
 			})
+	}
+
+	return outputNames, outputLocations, nil
+}
+
+func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
+	playbackId := tctx.OutputAsset.PlaybackID
+	outURL := tctx.OutputOSObj.URL
+	var mp4 string
+
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", false)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return outputNames, outputLocations, nil
