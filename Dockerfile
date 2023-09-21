@@ -18,12 +18,11 @@ RUN	make "version=$version"
 FROM	debian:buster-slim
 
 RUN	apt update \
-	&& apt install -yqq ffmpeg ca-certificates \
+	&& apt install -yqq ca-certificates \
 	&& apt clean \
 	&& apt autoclean
 
-RUN	ffmpeg -version \
-	&& update-ca-certificates
+RUN	update-ca-certificates
 
 WORKDIR	/app
 
