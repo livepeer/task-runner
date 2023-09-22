@@ -108,8 +108,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 	if err != nil {
 		return err
 	}
-	bodyJsonString := string(body)
-	glog.Infof(" |||||| Catalyst upload VOD request: req=%s", bodyJsonString)
+
 	rateLimitBackoff := c.RateLimitInitialBackoff
 	for attempt := 1; ; attempt++ {
 		var res json.RawMessage
