@@ -224,6 +224,8 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 				params.Outputs.MP4.Path,
 				isEnabled(params.Outputs.FMP4.Path),
 				params.Outputs.FMP4.Path,
+				"",
+				"",
 				false,
 			)
 			return outputLocation, err
@@ -619,7 +621,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
 	}
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", !isEncryptionEnabled(*tctx.Task.Params.Upload))
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", "", "", !isEncryptionEnabled(*tctx.Task.Params.Upload))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -643,25 +645,17 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 
 func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
-	inputURL := tctx.Params.Clip.URL
+	sessionId := tctx.Task.Params.Clip.InputSessionID
 	outURL := tctx.OutputOSObj.URL
 	var mp4 string
 
-	clipSourceURL := strings.Replace(inputURL, "output.m3u8", "clip_"+playbackId+"/clip.m3u8", 1)
+	clipRelPath := sessionId + "/clip_" + playbackId + "/clip.m3u8"
 
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", false)
+	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", OUTPUT_ENABLED, clipRelPath, false)
+
 	if err != nil {
 		return nil, nil, err
 	}
-
-	outputNames, outputLocations =
-		append(outputNames, OutputNameClipSource),
-		append(outputLocations, clients.OutputLocation{
-			Type: "clip",
-			Outputs: &clients.OutputsRequest{
-				Clip: clipSourceURL,
-			},
-		})
 
 	return outputNames, outputLocations, nil
 }
@@ -673,7 +667,9 @@ func outputLocations(
 	mp4,
 	mp4RelPath,
 	fmp4,
-	fmp4RelPath string,
+	fmp4RelPath,
+	clip,
+	clipRelPath string,
 	sourceCopy bool,
 ) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
@@ -706,6 +702,17 @@ func outputLocations(
 				URL:  url.JoinPath(fmp4RelPath).String(),
 				Outputs: &clients.OutputsRequest{
 					FMP4: fmp4,
+				},
+			})
+	}
+	if clip == OUTPUT_ENABLED {
+		names, locations =
+			append(names, OutputNameEmpty),
+			append(locations, clients.OutputLocation{
+				Type: "object_store",
+				URL:  url.JoinPath(clipRelPath).String(),
+				Outputs: &clients.OutputsRequest{
+					Clip: clip,
 				},
 			})
 	}
