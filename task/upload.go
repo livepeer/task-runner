@@ -657,11 +657,12 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 
 func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
+	sourcePlaybackId := tctx.Task.Params.Clip.ClipStrategy.PlaybackId
 	sessionId := tctx.Task.Params.Clip.InputSessionID
 	outURL := tctx.OutputOSObj.URL
 	var mp4 string
 
-	clipRelPath := sessionId + "/clip_" + playbackId + "/clip.m3u8"
+	clipRelPath := sourcePlaybackId + "/" + sessionId + "/clip_" + playbackId + "/clip.m3u8"
 
 	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", OUTPUT_ENABLED, clipRelPath, false)
 
