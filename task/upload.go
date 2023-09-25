@@ -265,12 +265,14 @@ func TaskClip(tctx *TaskContext) (*TaskHandlerOutput, error) {
 			return outputLocations, err
 		},
 		finalize: func(callback *clients.CatalystCallback) (*TaskHandlerOutput, error) {
-			tctx.Progress.Set(1)
-			clipOutput, err := toClipOutput(callback)
+			tctx.Progress.Set(0.9)
+			taskOutput, err := processCatalystCallback(tctx, callback)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("error processing catalyst callback: %w", err)
 			}
-			return &TaskHandlerOutput{TaskOutput: &data.TaskOutput{Clip: &clipOutput}}, nil
+			return &TaskHandlerOutput{
+				TaskOutput: &data.TaskOutput{Upload: taskOutput},
+			}, nil
 		},
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 		clipStrategy: video.ClipStrategy{
@@ -318,29 +320,6 @@ func toTranscodeFileTaskOutput(callback *clients.CatalystCallback) (data.Transco
 			return res, err
 		}
 		res.Mp4 = append(res.Mp4, data.TranscodeFileTaskOutputPath{Path: p})
-	}
-
-	return res, nil
-}
-
-func toClipOutput(callback *clients.CatalystCallback) (data.ClipTaskOutput, error) {
-	var res data.ClipTaskOutput
-
-	res.RequestID = callback.RequestID
-
-	if len(callback.Outputs) < 1 {
-		return res, fmt.Errorf("invalid video outputs: %v", callback.Outputs)
-	}
-	// we expect only one output
-	o := callback.Outputs[0]
-
-	bu, p, err := parseUrlToBaseAndPath(o.Manifest)
-	if err != nil {
-		return res, err
-	}
-	res.BaseUrl = bu
-	if len(o.Videos) > 0 {
-		res.Hls = &data.ClipTaskOutputPath{Path: p}
 	}
 
 	return res, nil
