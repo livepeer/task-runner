@@ -30,9 +30,9 @@ const (
 )
 
 type ClipStrategy struct {
-	StartTime  float64 `json:"start_time,omitempty"`
-	EndTime    float64 `json:"end_time,omitempty"`
-	PlaybackID string  `json:"playback_id,omitempty"` // playback-id of asset to clip
+	StartTime  int64  `json:"start_time,omitempty"`
+	EndTime    int64  `json:"end_time,omitempty"`
+	PlaybackID string `json:"playback_id,omitempty"` // playback-id of asset to clip
 }
 
 type UploadVODRequest struct {

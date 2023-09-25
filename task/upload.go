@@ -74,6 +74,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		var encryption *clients.EncryptionPayload
 		var clipStrategy *video.ClipStrategy
 
@@ -95,24 +96,28 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 			}
 		}
 
-		var (
-			req = clients.UploadVODRequest{
-				ExternalID:            tctx.Task.ID,
-				Url:                   inUrl,
-				CallbackUrl:           tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
-				OutputLocations:       outputLocations,
-				PipelineStrategy:      p.catalystPipelineStrategy,
-				Profiles:              p.profiles,
-				TargetSegmentSizeSecs: p.targetSegmentSizeSecs,
-				Encryption:            encryption,
-				ClipStrategy: clients.ClipStrategy{
-					StartTime:  clipStrategy.StartTime,
-					EndTime:    clipStrategy.EndTime,
-					PlaybackID: clipStrategy.PlaybackID,
-				},
+		var req clients.UploadVODRequest
+		req = clients.UploadVODRequest{
+			ExternalID:            tctx.Task.ID,
+			Url:                   inUrl,
+			CallbackUrl:           tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
+			OutputLocations:       outputLocations,
+			PipelineStrategy:      p.catalystPipelineStrategy,
+			Profiles:              p.profiles,
+			TargetSegmentSizeSecs: p.targetSegmentSizeSecs,
+			Encryption:            encryption,
+		}
+
+		if clipStrategy != nil {
+			req.ClipStrategy = clients.ClipStrategy{
+				StartTime:  clipStrategy.StartTime,
+				EndTime:    clipStrategy.EndTime,
+				PlaybackID: clipStrategy.PlaybackID,
 			}
-			nextStep = "checkCatalyst"
-		)
+		}
+
+		var nextStep = "checkCatalyst"
+
 		err = tctx.catalyst.UploadVOD(ctx, req)
 		if errors.Is(err, clients.ErrRateLimited) {
 			nextStep = "rateLimitBackoff"
