@@ -4,17 +4,17 @@ go 1.19
 
 require (
 	github.com/d1str0/pkcs7 v0.0.0-20200424205038-d65c16a5759a
-	github.com/golang/glog v1.1.1
+	github.com/golang/glog v1.1.2
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/livepeer/catalyst-api v0.1.2-0.20230612153934-449655e3778a
-	github.com/livepeer/go-api-client v0.4.9
-	github.com/livepeer/go-tools v0.3.1
-	github.com/livepeer/livepeer-data v0.7.3
+	github.com/livepeer/catalyst-api v0.1.2-0.20230920152923-16133c19c256
+	github.com/livepeer/go-api-client v0.4.10-0.20230921143104-0278c61438cc
+	github.com/livepeer/go-tools v0.3.2
+	github.com/livepeer/livepeer-data v0.7.5-0.20230921143521-27f16ce24e3d
 	github.com/peterbourgon/ff v1.7.1
-	github.com/prometheus/client_golang v1.15.1
+	github.com/prometheus/client_golang v1.16.0
 	github.com/rabbitmq/amqp091-go v1.8.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/sync v0.2.0
+	golang.org/x/sync v0.3.0
 )
 
 require (
@@ -23,7 +23,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.0 // indirect
 	cloud.google.com/go/storage v1.30.1 // indirect
-	github.com/aws/aws-sdk-go v1.44.273 // indirect
+	github.com/aws/aws-sdk-go v1.44.285 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
@@ -44,7 +44,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.10.0 // indirect
 	github.com/grafov/m3u8 v0.12.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.2 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-block-format v0.1.2 // indirect
@@ -90,12 +90,12 @@ require (
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rabbitmq/rabbitmq-stream-go-client v1.1.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
-	github.com/u2takey/ffmpeg-go v0.4.1 // indirect
+	github.com/u2takey/ffmpeg-go v0.5.0 // indirect
 	github.com/u2takey/go-utils v0.3.1 // indirect
 	github.com/whyrusleeping/cbor-gen v0.0.0-20230418232409-daab9ece03a0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
@@ -112,7 +112,7 @@ require (
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.125.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

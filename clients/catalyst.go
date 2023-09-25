@@ -14,6 +14,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/livepeer/catalyst-api/clients"
 	"github.com/livepeer/catalyst-api/pipeline"
+	"github.com/livepeer/catalyst-api/video"
 	"github.com/livepeer/go-api-client"
 )
 
@@ -30,14 +31,15 @@ const (
 )
 
 type UploadVODRequest struct {
-	ExternalID            string             `json:"external_id,omitempty"`
-	Url                   string             `json:"url"`
-	CallbackUrl           string             `json:"callback_url"`
-	OutputLocations       []OutputLocation   `json:"output_locations,omitempty"`
-	Profiles              []api.Profile      `json:"profiles,omitempty"`
-	PipelineStrategy      pipeline.Strategy  `json:"pipeline_strategy,omitempty"`
-	TargetSegmentSizeSecs int64              `json:"target_segment_size_secs,omitempty"`
-	Encryption            *EncryptionPayload `json:"encryption,omitempty"`
+	ExternalID            string              `json:"external_id,omitempty"`
+	Url                   string              `json:"url"`
+	CallbackUrl           string              `json:"callback_url"`
+	OutputLocations       []OutputLocation    `json:"output_locations,omitempty"`
+	Profiles              []api.Profile       `json:"profiles,omitempty"`
+	PipelineStrategy      pipeline.Strategy   `json:"pipeline_strategy,omitempty"`
+	TargetSegmentSizeSecs int64               `json:"target_segment_size_secs,omitempty"`
+	Encryption            *EncryptionPayload  `json:"encryption,omitempty"`
+	ClipStrategy          *video.ClipStrategy `json:"clip_strategy,omitempty"`
 }
 
 type EncryptionPayload struct {
