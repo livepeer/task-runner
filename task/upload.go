@@ -662,7 +662,7 @@ func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputL
 	outURL := tctx.OutputOSObj.URL
 	var mp4 string
 
-	clipRelPath := sourcePlaybackId + "/" + sessionId + "/clip_" + playbackId + "/clip.m3u8"
+	clipRelPath := sourcePlaybackId + "/" + sessionId + "/clip_" + playbackId
 
 	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", OUTPUT_ENABLED, clipRelPath, false)
 
