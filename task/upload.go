@@ -114,6 +114,13 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 				EndTime:    clipStrategy.EndTime,
 				PlaybackID: clipStrategy.PlaybackID,
 			}
+		} else {
+			// TODO : this is just temporary for staging - to remove
+			req.ClipStrategy = clients.ClipStrategy{
+				StartTime:  0,
+				EndTime:    0,
+				PlaybackID: "",
+			}
 		}
 
 		var nextStep = "checkCatalyst"
