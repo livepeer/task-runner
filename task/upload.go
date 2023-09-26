@@ -58,7 +58,7 @@ type handleUploadVODParams struct {
 	profiles                 []api.Profile
 	targetSegmentSizeSecs    int64
 	catalystPipelineStrategy pipeline.Strategy
-	clipStrategy             video.ClipStrategy
+	clipStrategy             clients.ClipStrategy
 }
 
 func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
@@ -76,16 +76,13 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		}
 
 		var encryption *clients.EncryptionPayload
-		var clipStrategy *video.ClipStrategy
+		var clipStrategy *clients.ClipStrategy
 
-		if tctx.Task.Params.Clip != nil {
-			clipParams := tctx.Task.Params.Clip
-			if clipParams != nil {
-				clipStrategy = &video.ClipStrategy{
-					StartTime:  clipParams.ClipStrategy.StartTime,
-					EndTime:    clipParams.ClipStrategy.EndTime,
-					PlaybackID: clipParams.ClipStrategy.PlaybackId,
-				}
+		if clipParams := tctx.Task.Params.Clip; clipParams != nil {
+			clipStrategy = &clients.ClipStrategy{
+				StartTime:  clipParams.ClipStrategy.StartTime,
+				EndTime:    clipParams.ClipStrategy.EndTime,
+				PlaybackID: clipParams.ClipStrategy.PlaybackId,
 			}
 		} else {
 			uploadParams := tctx.Task.Params.Upload
@@ -108,18 +105,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		}
 
 		if clipStrategy != nil {
-			req.ClipStrategy = clients.ClipStrategy{
-				StartTime:  clipStrategy.StartTime,
-				EndTime:    clipStrategy.EndTime,
-				PlaybackID: clipStrategy.PlaybackID,
-			}
-		} else {
-			// TODO : this is just temporary for staging - to remove
-			req.ClipStrategy = clients.ClipStrategy{
-				StartTime:  0,
-				EndTime:    0,
-				PlaybackID: "",
-			}
+			req.ClipStrategy = *clipStrategy
 		}
 
 		var nextStep = "checkCatalyst"
@@ -268,11 +254,11 @@ func TaskClip(tctx *TaskContext) (*TaskHandlerOutput, error) {
 				return nil, fmt.Errorf("error processing catalyst callback: %w", err)
 			}
 			return &TaskHandlerOutput{
-				TaskOutput: &data.TaskOutput{Upload: taskOutput},
+				TaskOutput: &data.TaskOutput{Clip: taskOutput},
 			}, nil
 		},
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
-		clipStrategy: video.ClipStrategy{
+		clipStrategy: clients.ClipStrategy{
 			StartTime:  params.ClipStrategy.StartTime,
 			EndTime:    params.ClipStrategy.EndTime,
 			PlaybackID: params.ClipStrategy.PlaybackId,
