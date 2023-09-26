@@ -374,7 +374,17 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		}
 	}
 
-	outputNames, outputReqs, err := uploadTaskOutputLocations(tctx)
+	var outputNames []OutputName
+	var outputReqs []clients.OutputLocation
+	var err error
+
+	if tctx.Task.Params.Upload != nil {
+		outputNames, outputReqs, err = uploadTaskOutputLocations(tctx)
+	} else {
+		glog.Infof("Processing clip task outputs")
+		outputNames, outputReqs, err = clipTaskOutputLocations(tctx)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("error getting asset output requests: %w", err)
 	}
@@ -456,7 +466,14 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		Path: toAssetRelativePath(playbackID, fullPath),
 	})
 
-	output, err := complementCatalystPipeline(tctx, *assetSpec)
+	var output *data.UploadTaskOutput
+
+	if tctx.Task.Params.Upload != nil {
+		output, err = complementCatalystPipeline(tctx, *assetSpec)
+	} else {
+		output, err = complementClipCatalystPipeline(tctx, *assetSpec)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -571,6 +588,66 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*da
 	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
 }
 
+func complementClipCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*data.UploadTaskOutput, error) {
+	var (
+		playbackID           = tctx.OutputAsset.PlaybackID
+		params               = *tctx.Task.Params.Clip
+		osSess               = tctx.outputOS // Upload deals with outputOS only (URL -> ObjectStorage)
+		inFile               = params.URL
+		contents             io.ReadCloser
+		size                 uint64
+		filename             string
+		catalystCopiedSource = false
+	)
+	if isHLSFile(inFile) {
+		return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
+	}
+
+	catalystSource, err := osSess.ReadData(tctx, videoFileName(playbackID))
+	if err == nil {
+		glog.Infof("Found source copy from catalyst taskId=%s filename=%s", tctx.Task.ID, catalystSource.Name)
+		contents = catalystSource.Body
+		if catalystSource.Size != nil && *catalystSource.Size > 0 {
+			size = uint64(*catalystSource.Size)
+		}
+		filename = catalystSource.FileInfo.Name
+		catalystCopiedSource = true
+	} else {
+		return nil, fmt.Errorf("source copy from catalyst not found taskId=%s err=%v", tctx.Task.ID, err)
+	}
+	defer contents.Close()
+
+	input := tctx.Progress.TrackReader(contents, size, 0.94)
+	sizeInt := int64(size)
+	rawSourceFile, err := readFile(filename, &sizeInt, input)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading source file to disk: %w", err)
+	}
+	defer rawSourceFile.Close()
+	readLocalFile := func(endProgress float64) (*ReadCounter, error) {
+		_, err = rawSourceFile.Seek(0, io.SeekStart)
+		if err != nil {
+			return nil, fmt.Errorf("error seeking to start of source file: %w", err)
+		}
+		return tctx.Progress.TrackReader(rawSourceFile, size, endProgress), nil
+	}
+
+	if !catalystCopiedSource {
+		input, err := readLocalFile(0.95)
+		if err != nil {
+			return nil, err
+		}
+		fullPath := videoFileName(playbackID)
+		fileUrl, err := osSess.SaveData(tctx, fullPath, input, nil, fileUploadTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("error uploading file=%q to object store: %w", fullPath, err)
+		}
+		glog.Infof("Saved file=%s to url=%s", fullPath, fileUrl)
+	}
+
+	return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
+}
+
 func isHLSFile(fname string) bool {
 	if filepath.Ext(fname) == ".m3u8" {
 		return true
@@ -620,13 +697,20 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	sourceURL := tctx.Task.Params.Clip.URL
-	cleanUrl := strings.TrimSuffix(sourceURL, "/output.m3u8")
+	sourceObjectStoreID := tctx.Task.Params.Clip.SourceObjectStoreID
 
-	clipURL, err := url.Parse(cleanUrl)
+	sourceOSObj, err := tctx.lapi.GetObjectStore(sourceObjectStoreID)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing clip URL: %w", err)
+		return nil, nil, fmt.Errorf("error fetching object store %w", err)
+	}
+
+	inUrl := sourceOSObj.URL
+	sourceUrl, err := url.Parse(inUrl)
+	clipSourceUrl := sourceUrl.JoinPath(tctx.Task.Params.Clip.ClipStrategy.PlaybackId, tctx.Task.Params.Clip.InputSessionID)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("error parsing object store URL %w", err)
 	}
 
 	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, OUTPUT_ENABLED, playbackId, "", "", false)
@@ -634,7 +718,7 @@ func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputL
 	if err != nil {
 		return nil, nil, err
 	}
-	clipOutputLocationUrl := clipURL.JoinPath("/clip_" + playbackId).String()
+	clipOutputLocationUrl := clipSourceUrl.JoinPath("/clip_" + playbackId).String()
 
 	outputNames, outputLocations =
 		append(outputNames, OutputNameClipSource),
