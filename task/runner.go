@@ -47,6 +47,7 @@ var (
 		"export":         TaskExport,
 		"export-data":    TaskExportData,
 		"transcode-file": TaskTranscodeFile,
+		"clip":           TaskClip,
 	}
 
 	errInternalProcessingError = errors.New("internal error processing file")

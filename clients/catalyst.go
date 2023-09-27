@@ -29,6 +29,12 @@ const (
 	maxAttempts                    = 4
 )
 
+type ClipStrategy struct {
+	StartTime  int64  `json:"start_time,omitempty"`
+	EndTime    int64  `json:"end_time,omitempty"`
+	PlaybackID string `json:"playback_id,omitempty"` // playback-id of asset to clip
+}
+
 type UploadVODRequest struct {
 	ExternalID            string             `json:"external_id,omitempty"`
 	Url                   string             `json:"url"`
@@ -38,6 +44,7 @@ type UploadVODRequest struct {
 	PipelineStrategy      pipeline.Strategy  `json:"pipeline_strategy,omitempty"`
 	TargetSegmentSizeSecs int64              `json:"target_segment_size_secs,omitempty"`
 	Encryption            *EncryptionPayload `json:"encryption,omitempty"`
+	ClipStrategy          ClipStrategy       `json:"clip_strategy,omitempty"`
 }
 
 type EncryptionPayload struct {
@@ -56,6 +63,7 @@ type OutputsRequest struct {
 	HLS       string `json:"hls"`
 	MP4       string `json:"mp4"`
 	FMP4      string `json:"fragmented_mp4"`
+	Clip      string `json:"clip"`
 }
 
 type CatalystOptions struct {
@@ -100,6 +108,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 	if err != nil {
 		return err
 	}
+
 	rateLimitBackoff := c.RateLimitInitialBackoff
 	for attempt := 1; ; attempt++ {
 		var res json.RawMessage
