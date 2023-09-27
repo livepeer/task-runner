@@ -285,8 +285,8 @@ github.com/livepeer/go-api-client v0.4.10-0.20230926213058-6b6f4bf9bde0 h1:mVzmS
 github.com/livepeer/go-api-client v0.4.10-0.20230926213058-6b6f4bf9bde0/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-tools v0.3.2 h1:5pOUrOmkkGbbcWnpCt2yrSD6cD85G4GcpO4B25NpMJM=
 github.com/livepeer/go-tools v0.3.2/go.mod h1:qs31y68b3PQPmSr8nR8l5WQiIWI623z6pqOccqebjos=
-github.com/livepeer/livepeer-data v0.7.5-0.20230926204801-49b661e121cb h1:/SgG8I2fUblOm9P0/remFEaUq/Vp1ilOiD1JpPZ0KZs=
-github.com/livepeer/livepeer-data v0.7.5-0.20230926204801-49b661e121cb/go.mod h1:Jpf4jHK+fbWioBHRDRM1WadNT1qmY27g2YicTdO0Rtc=
+github.com/livepeer/livepeer-data v0.7.5-0.20230927031152-b938ac1dc665 h1:EXlI922Fsv9lyIw1LQ7pZN6slCuYya8NQrCFWN8INg4=
+github.com/livepeer/livepeer-data v0.7.5-0.20230927031152-b938ac1dc665/go.mod h1:Jpf4jHK+fbWioBHRDRM1WadNT1qmY27g2YicTdO0Rtc=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-isatty v0.0.14/go.mod h1:7GGIvUiUoEMVVmxf/4nioHXj79iQHKdU27kJ6hsGG94=
 github.com/mattn/go-isatty v0.0.19 h1:JITubQf0MOLdlGRuRq+jtsDlekdYPia9ZFsB8h/APPA=
