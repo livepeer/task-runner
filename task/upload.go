@@ -156,6 +156,10 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 		if err := json.Unmarshal(tctx.StepInput, &sourcePlayback); err != nil {
 			return nil, fmt.Errorf("error parsing step input: %w", err)
 		}
+		if tctx.Task.Type == "transcode-file" || tctx.OutputAsset == nil {
+			glog.Infof("not sending partial result. taskId=%s type=%s outputAssetNil=%t", tctx.Task.ID, tctx.Task.Type, tctx.OutputAsset == nil)
+			return ContinueAsync, nil
+		}
 		manifestPath, err := extractOSUriFilePath(sourcePlayback.Manifest, tctx.OutputAsset.PlaybackID)
 		if err != nil {
 			return nil, fmt.Errorf("error extracting file path from output manifest: %w", err)
