@@ -301,6 +301,9 @@ func Test_handleUploadVOD(t *testing.T) {
 					OutputAsset: &api.Asset{
 						PlaybackID: "playbackID",
 					},
+					Task: &api.Task{
+						Type: "upload",
+					},
 				},
 			},
 			manifest: "/hls/playbackID/master.m3u8",
@@ -315,6 +318,27 @@ func Test_handleUploadVOD(t *testing.T) {
 						}},
 					},
 				},
+				Continue: true,
+			},
+		},
+		{
+			name: "happy transcode api",
+			args: handleUploadVODParams{
+				tctx: &TaskContext{
+					Context: context.Background(),
+					TaskInfo: data.TaskInfo{
+						Step: "resultPartial",
+					},
+					OutputAsset: &api.Asset{
+						PlaybackID: "playbackID",
+					},
+					Task: &api.Task{
+						Type: "transcode-file",
+					},
+				},
+			},
+			manifest: "/hls/playbackID/master.m3u8",
+			want: &TaskHandlerOutput{
 				Continue: true,
 			},
 		},
