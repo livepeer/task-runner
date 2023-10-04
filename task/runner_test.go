@@ -93,6 +93,11 @@ func TestHumanizeError(t *testing.T) {
 
 	err = NewCatalystError("failed to write to OS URL \"s3+https:/key:************************@s3.filebase.com/videos-dev/foo/hls/index540p0_00002.ts\": AccessDenied: Access Denied\n\tstatus code: 403, request id: 150640cd52de34f9ce9932a563aab747, host id: ZmlsZWJhc2UtN2ZiYjhiZDRjNy10NW1ycA==", false)
 	assert.ErrorIs(humanizeError(err), errFileInaccessible)
+
+	// catalyst throws "probe failed for segment" when there is an issue with segments from the segmenting stage
+	// don't humanize, this is an internal error which should be retried and investigated
+	err = NewCatalystError("probe failed for segment s3+https://jwanjs7ubkrhavis4bgvlnpcui3a:jzyzwnplxgj3vi6l7nz2qcwlrgj3hkcgsudjzox3ml6qfppfa33me@gateway.storjshare.io/catalyst-vod-monster/hls/source/55i1gxd3/source/index0.ts: error probing", false)
+	assert.ErrorIs(humanizeError(err), errInternalProcessingError)
 }
 
 func TestSimplePublishErrorDoesNotPanic(t *testing.T) {

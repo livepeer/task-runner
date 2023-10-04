@@ -574,6 +574,10 @@ func makeErrorInfo(err error) taskErrInfo {
 func humanizeCatalystError(err error) error {
 	errMsg := strings.ToLower(err.Error())
 
+	if strings.Contains(errMsg, "probe failed for segment") {
+		return errInternalProcessingError
+	}
+
 	fileNotAccessibleErrs := []string{
 		// This should trigger retry logic so probably can be removed
 		"504 gateway timeout",
