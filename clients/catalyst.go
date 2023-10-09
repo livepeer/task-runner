@@ -32,6 +32,7 @@ const (
 type ClipStrategy struct {
 	StartTime  int64  `json:"start_time,omitempty"`
 	EndTime    int64  `json:"end_time,omitempty"`
+	Offset     int64  `json:"offset,omitempty"`
 	PlaybackID string `json:"playback_id,omitempty"` // playback-id of asset to clip
 }
 

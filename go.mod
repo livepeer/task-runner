@@ -7,7 +7,7 @@ require (
 	github.com/golang/glog v1.1.2
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/livepeer/catalyst-api v0.1.2-0.20230925142340-c311569665b4
-	github.com/livepeer/go-api-client v0.4.10-0.20230926213058-6b6f4bf9bde0
+	github.com/livepeer/go-api-client v0.4.10-0.20231009083235-59b707bdf76d
 	github.com/livepeer/go-tools v0.3.2
 	github.com/livepeer/livepeer-data v0.7.5-0.20230927031152-b938ac1dc665
 	github.com/peterbourgon/ff v1.7.1
