@@ -239,6 +239,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		},
 		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
 		targetSegmentSizeSecs:    params.TargetSegmentSizeSecs,
+		profiles:                 params.Profiles,
 	})
 }
 
