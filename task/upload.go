@@ -82,6 +82,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 			clipStrategy = &clients.ClipStrategy{
 				StartTime:  clipParams.ClipStrategy.StartTime,
 				EndTime:    clipParams.ClipStrategy.EndTime,
+				Offset:     clipParams.ClipStrategy.Offset,
 				PlaybackID: clipParams.ClipStrategy.PlaybackId,
 			}
 		} else {
@@ -266,6 +267,7 @@ func TaskClip(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		clipStrategy: clients.ClipStrategy{
 			StartTime:  params.ClipStrategy.StartTime,
 			EndTime:    params.ClipStrategy.EndTime,
+			Offset:     params.ClipStrategy.Offset,
 			PlaybackID: params.ClipStrategy.PlaybackId,
 		},
 	})
