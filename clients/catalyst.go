@@ -59,11 +59,12 @@ type OutputLocation struct {
 }
 
 type OutputsRequest struct {
-	SourceMp4 bool   `json:"source_mp4"`
-	HLS       string `json:"hls"`
-	MP4       string `json:"mp4"`
-	FMP4      string `json:"fragmented_mp4"`
-	Clip      string `json:"clip"`
+	SourceMp4  bool   `json:"source_mp4"`
+	HLS        string `json:"hls"`
+	MP4        string `json:"mp4"`
+	FMP4       string `json:"fragmented_mp4"`
+	Clip       string `json:"clip"`
+	Thumbnails string `json:"thumbnails"`
 }
 
 type CatalystOptions struct {
