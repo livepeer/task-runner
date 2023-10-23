@@ -219,12 +219,11 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		getOutputLocations: func() ([]clients.OutputLocation, error) {
 			_, outputLocation, err := outputLocations(
 				params.Storage.URL,
-				isEnabled(params.Outputs.HLS.Path),
-				params.Outputs.HLS.Path,
-				isEnabled(params.Outputs.MP4.Path),
-				params.Outputs.MP4.Path,
-				isEnabled(params.Outputs.FMP4.Path),
-				params.Outputs.FMP4.Path,
+				outputs{
+					hls:  out(isEnabled(params.Outputs.HLS.Path), params.Outputs.HLS.Path),
+					mp4:  out(isEnabled(params.Outputs.MP4.Path), params.Outputs.MP4.Path),
+					fmp4: out(isEnabled(params.Outputs.FMP4.Path), params.Outputs.FMP4.Path),
+				},
 				false,
 			)
 			return outputLocation, err
@@ -677,7 +676,19 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
 	}
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, mp4, playbackId, "", "", !isEncryptionEnabled(*tctx.Task.Params.Upload))
+	thumbsEnabled := ""
+	if tctx.Task.Params.Upload.Thumbnails {
+		thumbsEnabled = OUTPUT_ENABLED
+	}
+	outputNames, outputLocations, err := outputLocations(
+		outURL,
+		outputs{
+			hls:        out(OUTPUT_ENABLED, playbackId),
+			mp4:        out(mp4, playbackId),
+			thumbnails: out(thumbsEnabled, playbackId),
+		},
+		!isEncryptionEnabled(*tctx.Task.Params.Upload),
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -718,7 +729,14 @@ func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputL
 		return nil, nil, fmt.Errorf("error parsing object store URL %w", err)
 	}
 
-	outputNames, outputLocations, err := outputLocations(outURL, OUTPUT_ENABLED, playbackId, OUTPUT_ENABLED, playbackId, "", "", false)
+	outputNames, outputLocations, err := outputLocations(
+		outURL,
+		outputs{
+			hls: out(OUTPUT_ENABLED, playbackId),
+			mp4: out(OUTPUT_ENABLED, playbackId),
+		},
+		false,
+	)
 
 	if err != nil {
 		return nil, nil, err
@@ -738,14 +756,30 @@ func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputL
 	return outputNames, outputLocations, nil
 }
 
+// out is a helper to create an output, to avoid repeated struct attribute names in the code
+func out(enabled, path string) output {
+	return output{
+		enabled: enabled,
+		path:    path,
+	}
+}
+
+// output represents each requested media output for outputLocations()
+type output struct {
+	enabled string
+	path    string
+}
+
+type outputs struct {
+	hls        output
+	mp4        output
+	fmp4       output
+	thumbnails output
+}
+
 func outputLocations(
-	outURL,
-	hls,
-	hlsRelPath,
-	mp4,
-	mp4RelPath,
-	fmp4,
-	fmp4RelPath string,
+	outURL string,
+	outs outputs,
 	sourceCopy bool,
 ) ([]OutputName, []clients.OutputLocation, error) {
 	url, err := url.Parse(outURL)
@@ -755,44 +789,33 @@ func outputLocations(
 	names, locations :=
 		[]OutputName{OutputNameOSPlaylistHLS, OutputNameEmpty},
 		[]clients.OutputLocation{
-			{
-				Type: "object_store",
-				URL:  url.JoinPath(hlsRelPath).String(),
-				Outputs: &clients.OutputsRequest{
-					HLS: hls,
-				},
-			},
-			{
-				Type: "object_store",
-				URL:  url.JoinPath(mp4RelPath).String(),
-				Outputs: &clients.OutputsRequest{
-					MP4: mp4,
-				},
-			},
+			outputLocation(url, outs.hls.path, &clients.OutputsRequest{HLS: outs.hls.enabled}),
+			outputLocation(url, outs.mp4.path, &clients.OutputsRequest{MP4: outs.mp4.enabled}),
 		}
-	if fmp4 == OUTPUT_ENABLED {
+	if outs.fmp4.enabled == OUTPUT_ENABLED {
 		names, locations =
 			append(names, OutputNameEmpty),
-			append(locations, clients.OutputLocation{
-				Type: "object_store",
-				URL:  url.JoinPath(fmp4RelPath).String(),
-				Outputs: &clients.OutputsRequest{
-					FMP4: fmp4,
-				},
-			})
+			append(locations, outputLocation(url, outs.fmp4.path, &clients.OutputsRequest{FMP4: outs.fmp4.enabled}))
 	}
 	if sourceCopy {
 		names, locations =
 			append(names, OutputNameOSSourceMP4),
-			append(locations, clients.OutputLocation{
-				Type: "object_store",
-				URL:  url.JoinPath(videoFileName(hlsRelPath)).String(),
-				Outputs: &clients.OutputsRequest{
-					SourceMp4: true,
-				},
-			})
+			append(locations, outputLocation(url, videoFileName(outs.hls.path), &clients.OutputsRequest{SourceMp4: true}))
+	}
+	if outs.thumbnails.enabled == OUTPUT_ENABLED {
+		names, locations =
+			append(names, OutputNameEmpty),
+			append(locations, outputLocation(url, outs.thumbnails.path, &clients.OutputsRequest{Thumbnails: outs.thumbnails.enabled}))
 	}
 	return names, locations, nil
+}
+
+func outputLocation(url *url.URL, path string, request *clients.OutputsRequest) clients.OutputLocation {
+	return clients.OutputLocation{
+		Type:    "object_store",
+		URL:     url.JoinPath(path).String(),
+		Outputs: request,
+	}
 }
 
 func catalystTaskAttemptID(task *api.Task) string {

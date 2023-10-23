@@ -160,6 +160,8 @@ func TestOutputLocations(t *testing.T) {
 		hlsRelPath              string
 		mp4                     string
 		mp4RelPath              string
+		thumbs                  string
+		thumbsRelPath           string
 		sourceCopy              bool
 		expectedOutputLocations []clients.OutputLocation
 		hasError                bool
@@ -244,10 +246,49 @@ func TestOutputLocations(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "Thumbnails",
+			outURL:        "s3+https://user:pass@host.com/outbucket",
+			hls:           "enabled",
+			hlsRelPath:    "video/hls",
+			thumbs:        "enabled",
+			thumbsRelPath: "video/thumbs",
+			expectedOutputLocations: []clients.OutputLocation{
+				{
+					Type: "object_store",
+					URL:  "s3+https://user:pass@host.com/outbucket/video/hls",
+					Outputs: &clients.OutputsRequest{
+						HLS: "enabled",
+					},
+				},
+				{
+					Type: "object_store",
+					URL:  "s3+https://user:pass@host.com/outbucket",
+					Outputs: &clients.OutputsRequest{
+						MP4: "",
+					},
+				},
+				{
+					Type: "object_store",
+					URL:  "s3+https://user:pass@host.com/outbucket/video/thumbs",
+					Outputs: &clients.OutputsRequest{
+						Thumbnails: "enabled",
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, gotOutputLocations, err := outputLocations(tt.outURL, tt.hls, tt.hlsRelPath, tt.mp4, tt.mp4RelPath, "", "", tt.sourceCopy)
+			_, gotOutputLocations, err := outputLocations(
+				tt.outURL,
+				outputs{
+					hls:        out(tt.hls, tt.hlsRelPath),
+					mp4:        out(tt.mp4, tt.mp4RelPath),
+					thumbnails: out(tt.thumbs, tt.thumbsRelPath),
+				},
+				tt.sourceCopy,
+			)
 
 			if tt.hasError {
 				require.Error(t, err)
