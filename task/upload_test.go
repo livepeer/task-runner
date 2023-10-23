@@ -280,7 +280,15 @@ func TestOutputLocations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, gotOutputLocations, err := outputLocations(tt.outURL, out(tt.hls, tt.hlsRelPath), out(tt.mp4, tt.mp4RelPath), output{}, out(tt.thumbs, tt.thumbsRelPath), tt.sourceCopy)
+			_, gotOutputLocations, err := outputLocations(
+				tt.outURL,
+				outputs{
+					hls:        out(tt.hls, tt.hlsRelPath),
+					mp4:        out(tt.mp4, tt.mp4RelPath),
+					thumbnails: out(tt.thumbs, tt.thumbsRelPath),
+				},
+				tt.sourceCopy,
+			)
 
 			if tt.hasError {
 				require.Error(t, err)
