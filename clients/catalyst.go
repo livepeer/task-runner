@@ -45,6 +45,7 @@ type UploadVODRequest struct {
 	TargetSegmentSizeSecs int64              `json:"target_segment_size_secs,omitempty"`
 	Encryption            *EncryptionPayload `json:"encryption,omitempty"`
 	ClipStrategy          ClipStrategy       `json:"clip_strategy,omitempty"`
+	C2PA                  bool               `json:"c2pa,omitempty"`
 }
 
 type EncryptionPayload struct {
