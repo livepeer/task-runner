@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -474,6 +475,18 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 		Path: toAssetRelativePath(playbackID, fullPath),
 	})
 
+	// add thumbs vtt output file
+	thumbsLocation := "thumbnails/thumbnails.vtt"
+	_, err = tctx.outputOS.ReadData(tctx, path.Join(playbackID, thumbsLocation))
+	if err != nil {
+		glog.Warningf("Thumbnails VTT not found: taskId=%s err=%q", tctx.Task.ID, err)
+	} else {
+		assetSpec.Files = append(assetSpec.Files, api.AssetFile{
+			Type: "thumbnails_vtt",
+			Path: thumbsLocation,
+		})
+	}
+
 	var output *data.UploadTaskOutput
 
 	if tctx.Task.Params.Upload != nil {
@@ -674,13 +687,13 @@ func isEncryptionEnabled(params api.UploadTaskParams) bool {
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	var mp4 string
+	var mp4, thumbsEnabled string
 	if tctx.OutputAsset.Source.Type == "recording" {
 		mp4 = OUTPUT_ENABLED
+		thumbsEnabled = OUTPUT_ENABLED
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
 	}
-	thumbsEnabled := ""
 	if tctx.Task.Params.Upload.Thumbnails {
 		thumbsEnabled = OUTPUT_ENABLED
 	}
@@ -736,8 +749,9 @@ func clipTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputL
 	outputNames, outputLocations, err := outputLocations(
 		outURL,
 		outputs{
-			hls: out(OUTPUT_ENABLED, playbackId),
-			mp4: out(OUTPUT_ENABLED, playbackId),
+			hls:        out(OUTPUT_ENABLED, playbackId),
+			mp4:        out(OUTPUT_ENABLED, playbackId),
+			thumbnails: out(OUTPUT_ENABLED, playbackId),
 		},
 		false,
 	)
