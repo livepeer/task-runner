@@ -192,6 +192,11 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		return nil, fmt.Errorf("error building file URL: %w", err)
 	}
 
+	strategy := pipeline.Strategy(params.CatalystPipelineStrategy)
+	if isRecording(tctx) || strings.HasSuffix(inUrl, ".m3u8") { // disable external transcode fallback for recordings
+		strategy = pipeline.StrategyCatalystFfmpegDominance
+	}
+
 	return handleUploadVOD(handleUploadVODParams{
 		tctx:  tctx,
 		inUrl: inUrl,
@@ -209,9 +214,16 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 				TaskOutput: &data.TaskOutput{Upload: taskOutput},
 			}, nil
 		},
-		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+		catalystPipelineStrategy: strategy,
 		c2pa:                     params.C2PA,
 	})
+}
+
+func isRecording(tctx *TaskContext) bool {
+	if tctx == nil || tctx.OutputAsset == nil {
+		return false
+	}
+	return tctx.OutputAsset.Source.Type == "recording"
 }
 
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
@@ -688,7 +700,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
 	var mp4 string
-	if tctx.OutputAsset.Source.Type == "recording" {
+	if isRecording(tctx) {
 		mp4 = OUTPUT_ENABLED
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
