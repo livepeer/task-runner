@@ -96,7 +96,7 @@ jobs:
           tar -czf "../releases/livepeer-task-runner-${GOOS}-${GOARCH}.tar.gz" ./livepeer-task-runner
 
       - name: Upload artifacts for processing further in linux
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v3
         with:
           name: release-artifacts
           path: releases/
