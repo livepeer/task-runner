@@ -278,7 +278,7 @@ func TaskClip(tctx *TaskContext) (*TaskHandlerOutput, error) {
 				TaskOutput: &data.TaskOutput{Clip: taskOutput},
 			}, nil
 		},
-		catalystPipelineStrategy: pipeline.Strategy(params.CatalystPipelineStrategy),
+		catalystPipelineStrategy: pipeline.StrategyCatalystFfmpegDominance,
 		clipStrategy: clients.ClipStrategy{
 			StartTime:  params.ClipStrategy.StartTime,
 			EndTime:    params.ClipStrategy.EndTime,
