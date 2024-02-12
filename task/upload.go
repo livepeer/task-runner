@@ -217,7 +217,7 @@ func TaskUpload(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		catalystPipelineStrategy: strategy,
 		c2pa:                     params.C2PA,
 		profiles:                 params.Profiles,
-		targetSegmentSizeSecs:    params.targetSegmentSizeSecs,
+		targetSegmentSizeSecs:    params.TargetSegmentSizeSecs,
 	})
 }
 
