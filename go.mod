@@ -4,10 +4,10 @@ go 1.19
 
 require (
 	github.com/d1str0/pkcs7 v0.0.0-20200424205038-d65c16a5759a
-	github.com/golang/glog v1.1.2
+	github.com/golang/glog v1.2.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/livepeer/catalyst-api v0.1.2-0.20230925142340-c311569665b4
-	github.com/livepeer/go-api-client v0.4.16
+	github.com/livepeer/go-api-client v0.4.17
 	github.com/livepeer/go-tools v0.3.2
 	github.com/livepeer/livepeer-data v0.7.5-0.20230927031152-b938ac1dc665
 	github.com/peterbourgon/ff v1.7.1
@@ -37,7 +37,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
