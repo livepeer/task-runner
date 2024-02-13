@@ -701,11 +701,14 @@ func isEncryptionEnabled(params api.UploadTaskParams) bool {
 func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.OutputLocation, error) {
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
-	var mp4 string
+	var mp4, thumbsEnabled string
 	if isRecording(tctx) {
 		mp4 = OUTPUT_ENABLED
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
+	}
+	if tctx.Task.Params.Upload.Thumbnails {
+		thumbsEnabled = OUTPUT_ENABLED
 	}
 
 	outputNames, outputLocations, err := outputLocations(
@@ -713,7 +716,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 		outputs{
 			hls:        out(OUTPUT_ENABLED, playbackId),
 			mp4:        out(mp4, playbackId),
-			thumbnails: out(OUTPUT_ENABLED, playbackId),
+			thumbnails: out(thumbsEnabled, playbackId),
 		},
 		!isEncryptionEnabled(*tctx.Task.Params.Upload),
 	)
