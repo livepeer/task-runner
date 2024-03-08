@@ -104,6 +104,7 @@ type Runner interface {
 	Start() error
 	HandleCatalysis(ctx context.Context, taskId, nextStep, attemptID string, callback *clients.CatalystCallback) error
 	Shutdown(ctx context.Context) error
+	CronJobForAssetDeletion(ctx context.Context) error
 }
 
 type RunnerOptions struct {
@@ -543,6 +544,32 @@ func (r *runner) Shutdown(ctx context.Context) error {
 		return errors.New("runner not started")
 	}
 	return r.amqp.Shutdown(ctx)
+}
+
+func (r *runner) CronJobForAssetDeletion(ctx context.Context) error {
+	// Loop every hour to delete assets
+	ticker := time.NewTicker(60 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			assets, err := r.lapi.GetDeletingAssets()
+			if err != nil {
+				glog.Errorf("Error deleting expired assets: %v", err)
+			}
+			for _, asset := range assets {
+				// Delete asset from object store
+				// Placeholder
+				err := r.lapi.DeleteAsset(asset.ID)
+				if err != nil {
+					glog.Errorf("Error deleting asset %s: %v", asset.ID, err)
+				}
+			}
+		}
+	}
 }
 
 type taskErrInfo struct {
