@@ -414,9 +414,12 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 	if task.Status.Phase != api.TaskPhaseRunning &&
 		task.Status.Phase != api.TaskPhaseWaiting {
 		return fmt.Errorf("task %s is not running", taskId)
-	} else if curr := catalystTaskAttemptID(task); attemptID != "" && attemptID != curr {
+	}
+	currAttempt := catalystTaskAttemptID(task)
+	isSameAttempt := attemptID == currAttempt
+	if !isSameAttempt {
 		glog.Warningf("Received outdated catalyst job callback, task has already been retried taskId=%s callbackAttempt=%s currentAttempt=%s",
-			task.ID, attemptID, curr)
+			task.ID, attemptID, currAttempt)
 	}
 
 	if callback.SourcePlayback != nil {
@@ -441,9 +444,12 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 	}
 
 	if callback.Status == catalystClients.TranscodeStatusError {
-		glog.Infof("Catalyst job failed for task type=%q id=%s error=%q unretriable=%v", task.Type, task.ID, callback.Error, callback.Unretriable)
-		err := NewCatalystError(callback.Error, callback.Unretriable)
-		return r.publishTaskResult(taskInfo, nil, err)
+		glog.Infof("Catalyst job failed for task type=%q id=%s attempt=%s error=%q unretriable=%v", task.Type, task.ID, attemptID, callback.Error, callback.Unretriable)
+		// Make sure not to fail the task with errors from previous attempts.
+		if isSameAttempt {
+			err := NewCatalystError(callback.Error, callback.Unretriable)
+			return r.publishTaskResult(taskInfo, nil, err)
+		}
 	} else if callback.Status == catalystClients.TranscodeStatusCompleted {
 		return r.scheduleTaskStep(task.ID, nextStep, callback)
 	}
