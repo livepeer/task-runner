@@ -415,8 +415,8 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 		task.Status.Phase != api.TaskPhaseWaiting {
 		return fmt.Errorf("task %s is not running", taskId)
 	} else if curr := catalystTaskAttemptID(task); attemptID != "" && attemptID != curr {
-		return fmt.Errorf("outdated catalyst job callback, "+
-			"task has already been retried (callback: %s current: %s)", attemptID, curr)
+		glog.Warningf("Received outdated catalyst job callback, task has already been retried taskId=%s callbackAttempt=%s currentAttempt=%s",
+			task.ID, attemptID, curr)
 	}
 
 	if callback.SourcePlayback != nil {
