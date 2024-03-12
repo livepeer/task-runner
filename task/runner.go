@@ -402,6 +402,10 @@ func (r *runner) getAssetAndOS(assetID string) (*api.Asset, *api.ObjectStore, dr
 	return asset, objectStore, osSession, nil
 }
 
+type InputError struct {
+	error
+}
+
 func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptID string, callback *clients.CatalystCallback) error {
 	taskInfo, task, err := r.getTaskInfo(taskId, "catalysis", nil)
 	if err != nil {
@@ -413,7 +417,7 @@ func (r *runner) HandleCatalysis(ctx context.Context, taskId, nextStep, attemptI
 
 	if task.Status.Phase != api.TaskPhaseRunning &&
 		task.Status.Phase != api.TaskPhaseWaiting {
-		return fmt.Errorf("task %s is not running", taskId)
+		return InputError{fmt.Errorf("task %s is not running", taskId)}
 	}
 	currAttempt := catalystTaskAttemptID(task)
 	isSameAttempt := attemptID == currAttempt
