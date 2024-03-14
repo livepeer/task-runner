@@ -21,7 +21,6 @@ import (
 	"github.com/livepeer/task-runner/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -578,53 +577,48 @@ func (r *runner) CronJobForAssetDeletion(ctx context.Context) error {
 		case <-ticker.C:
 			assets, err := r.lapi.GetDeletingAssets()
 			if err != nil {
-				glog.Errorf("Error deleting expired assets: %v", err)
+				glog.Errorf("Error retrieving assets for deletion: %v", err)
+				continue
 			}
 			for _, asset := range assets {
-				// Delete asset from object store
 				_, _, assetOS, err := r.getAssetAndOS(asset.ID)
-
 				if err != nil {
-					glog.Errorf("Error getting asset and object store: %v", err)
+					glog.Errorf("Error getting asset object store session: %v", err)
 					continue
 				}
 
 				directory := asset.PlaybackID
+				var totalDeleted int
 
-				files, err := assetOS.ListFiles(ctx, directory, "/")
-
+				// Initially list files
+				pi, err := assetOS.ListFiles(ctx, directory, "/")
 				if err != nil {
-					glog.Errorf("Error listing files in directory %v", directory)
+					glog.Errorf("Error listing files for asset %v: %v", asset.ID, err)
+					continue
 				}
 
-				totalFiles := files.Files()
-				accumulator := NewAccumulator()
-
-				const maxRetries = 3
-				const retryInterval = time.Second
-
-				eg := errgroup.Group{}
-
-				for _, file := range totalFiles {
-					filename := file.Name
-					eg.Go(func() error {
-						var err error
-						for i := 0; i < maxRetries; i++ {
-							err = assetOS.DeleteFile(ctx, filename)
-							if err == nil {
-								accumulator.Accumulate(1)
-								return nil
-							}
-							glog.Errorf("Error deleting file %v: %v (retrying...)", filename, err)
-							time.Sleep(retryInterval)
+				for pi != nil {
+					for _, file := range pi.Files() {
+						err := assetOS.DeleteFile(ctx, file.Name)
+						if err != nil {
+							glog.Errorf("Error deleting file %v: %v", file.Name, err)
+							continue
 						}
-						return fmt.Errorf("failed to delete file %v after %d retries", filename, maxRetries)
-					})
+						totalDeleted++
+					}
+
+					if pi.HasNextPage() {
+						pi, err = pi.NextPage()
+						if err != nil {
+							glog.Errorf("Failed to load next page of files for asset %v: %v", asset.ID, err)
+							break
+						}
+					} else {
+						break // No more pages
+					}
 				}
 
-				if err := eg.Wait(); err != nil {
-					glog.Errorf("Error deleting files: %v", err)
-				}
+				glog.Infof("Deleted %v files from asset=%v", totalDeleted, asset.ID)
 
 				if ipfs := asset.AssetSpec.Storage.IPFS; ipfs != nil {
 					err = r.UnpinFromIpfs(ctx, ipfs.CID, "cid")
@@ -638,9 +632,6 @@ func (r *runner) CronJobForAssetDeletion(ctx context.Context) error {
 
 					glog.Infof("Unpinned asset=%v from IPFS", asset.ID)
 				}
-
-				glog.Infof("Deleted %v files from asset=%v", accumulator.size, asset.ID)
-
 			}
 		}
 	}
