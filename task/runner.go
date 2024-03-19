@@ -651,6 +651,9 @@ func humanizeCatalystError(err error) error {
 	if strings.Contains(errMsg, "error probing") {
 		return errInvalidVideo
 	}
+	if strings.Contains(errMsg, "no valid segments in stream to transcode") {
+		return errInvalidVideo
+	}
 
 	// Livepeer pipeline errors
 	if strings.Contains(errMsg, "unsupported input pixel format") {

@@ -88,6 +88,9 @@ func TestHumanizeError(t *testing.T) {
 	err = NewCatalystError("external transcoder error: error creating mediaconvert job: InvalidParameter: 2 validation error(s) found.\n- minimum field value of 32, CreateJobInput.Settings.OutputGroups[0].Outputs[0].VideoDescription.Height.\n- minimum field value of 32, CreateJobInput.Settings.OutputGroups[0].Outputs[1].VideoDescription.Height.\n", false)
 	assert.ErrorIs(humanizeError(err), errInvalidVideo)
 
+	err = NewCatalystError("transcoding failed: no valid segments in stream to transcode", false)
+	assert.ErrorIs(humanizeError(err), errInvalidVideo)
+
 	err = NewCatalystError("error copying input to storage: failed to copy file(s): error copying input file to S3: failed to write to OS URL \"s3+https://storage.googleapis.com/lp-us-catalyst-vod-com/hls/source/bdfgehfe/transfer\": MultipartUpload: upload multipart failed\n\tupload id: ABPnzm6RnhkmNJDt42Vk-cVm7lmNqrPVScIXmjIImSYzxlZ6L0MRhBSn0yfWu6_GNUko9e4\ncaused by: ReadRequestBody: read multipart upload data failed\ncaused by: unexpected EOF", false)
 	assert.ErrorIs(humanizeError(err), errFileInaccessible)
 
