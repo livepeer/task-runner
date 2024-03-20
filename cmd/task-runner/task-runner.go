@@ -195,6 +195,15 @@ func Run(build BuildFlags) {
 		return nil
 	})
 
+	eg.Go(func() error {
+		glog.Info("Starting cron job for deletion...")
+		err := runner.CronJobForAssetDeletion(ctx)
+		if err != nil {
+			return fmt.Errorf("cron job for deletion error: %w", err)
+		}
+		return nil
+	})
+
 	if err := eg.Wait(); err != nil {
 		glog.Fatalf("Fatal error on task-runner: %v", err)
 	}

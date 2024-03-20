@@ -104,6 +104,7 @@ type Runner interface {
 	Start() error
 	HandleCatalysis(ctx context.Context, taskId, nextStep, attemptID string, callback *clients.CatalystCallback) error
 	Shutdown(ctx context.Context) error
+	CronJobForAssetDeletion(ctx context.Context) error
 }
 
 type RunnerOptions struct {
@@ -553,6 +554,97 @@ func (r *runner) Shutdown(ctx context.Context) error {
 		return errors.New("runner not started")
 	}
 	return r.amqp.Shutdown(ctx)
+}
+
+func (r *runner) UnpinFromIpfs(ctx context.Context, cid string, filter string) error {
+	assets, _, err := r.lapi.ListAssets(api.ListOptions{
+		Filters: map[string]interface{}{
+			filter: cid,
+		},
+		AllUsers: true,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if len(assets) == 1 {
+		return r.ipfs.Unpin(ctx, cid)
+	}
+
+	return nil
+}
+
+func (r *runner) CronJobForAssetDeletion(ctx context.Context) error {
+	// Loop every hour to delete assets
+	ticker := time.NewTicker(60 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			assets, err := r.lapi.GetDeletingAssets()
+			if err != nil {
+				glog.Errorf("Error retrieving assets for deletion: %v", err)
+				continue
+			}
+			for _, asset := range assets {
+				_, _, assetOS, err := r.getAssetAndOS(asset.ID)
+				if err != nil {
+					glog.Errorf("Error getting asset object store session: %v", err)
+					continue
+				}
+
+				directory := asset.PlaybackID
+				var totalDeleted int
+
+				// Initially list files
+				pi, err := assetOS.ListFiles(ctx, directory, "/")
+				if err != nil {
+					glog.Errorf("Error listing files for asset %v: %v", asset.ID, err)
+					continue
+				}
+
+				for pi != nil {
+					for _, file := range pi.Files() {
+						err := assetOS.DeleteFile(ctx, file.Name)
+						if err != nil {
+							glog.Errorf("Error deleting file %v: %v", file.Name, err)
+							continue
+						}
+						totalDeleted++
+					}
+
+					if pi.HasNextPage() {
+						pi, err = pi.NextPage()
+						if err != nil {
+							glog.Errorf("Failed to load next page of files for asset %v: %v", asset.ID, err)
+							break
+						}
+					} else {
+						break // No more pages
+					}
+				}
+
+				glog.Infof("Deleted %v files from asset=%v", totalDeleted, asset.ID)
+
+				if ipfs := asset.AssetSpec.Storage.IPFS; ipfs != nil {
+					err = r.UnpinFromIpfs(ctx, ipfs.CID, "cid")
+					if err != nil {
+						glog.Errorf("Error unpinning from IPFS %v", ipfs.CID)
+					}
+					err = r.UnpinFromIpfs(ctx, ipfs.NFTMetadata.CID, "nftMetadataCid")
+					if err != nil {
+						glog.Errorf("Error unpinning metadata from IPFS %v", ipfs.NFTMetadata.CID)
+					}
+
+					glog.Infof("Unpinned asset=%v from IPFS", asset.ID)
+				}
+			}
+		}
+	}
 }
 
 type taskErrInfo struct {
