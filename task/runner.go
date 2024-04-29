@@ -593,7 +593,17 @@ func (r *runner) CronJobForAssetDeletion(ctx context.Context) error {
 }
 
 func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
-	_, _, assetOS, err := r.getAssetAndOS(asset.ID)
+
+	objectStore, err := r.lapi.GetObjectStore(asset.ObjectStoreID)
+	if err != nil {
+		return err
+	}
+	osDriver, err := drivers.ParseOSURL(objectStore.URL, true)
+	if err != nil {
+		return UnretriableError{fmt.Errorf("error parsing object store url=%s: %w", objectStore.URL, err)}
+	}
+	assetOS := osDriver.NewSession("")
+
 	if err != nil {
 		glog.Errorf("Error getting asset object store session: %v", err)
 		return err
