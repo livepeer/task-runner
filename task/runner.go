@@ -610,12 +610,15 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 		return err
 	}
 
+	isErr := false
+
 	for pi != nil {
 		for _, file := range pi.Files() {
 			glog.Infof("Found file %v", file.Name)
 			err := assetOS.DeleteFile(ctx, file.Name)
 			if err != nil {
 				glog.Errorf("Error deleting file %v: %v", file.Name, err)
+				isErr = true
 				continue
 			}
 			glog.Infof("Deleted file %v", file.Name)
@@ -626,6 +629,7 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 			pi, err = pi.NextPage()
 			if err != nil {
 				glog.Errorf("Failed to load next page of files for asset %v: %v", asset.ID, err)
+				isErr = true
 				break
 			}
 		} else {
@@ -648,6 +652,10 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 		}
 
 		glog.Infof("Unpinned asset=%v from IPFS", asset.ID)
+	}
+
+	if isErr {
+		return errors.New("error deleting files")
 	}
 
 	err = r.lapi.FlagAssetAsDeleted(asset.ID)
