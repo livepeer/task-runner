@@ -577,7 +577,7 @@ func (r *runner) UnpinFromIpfs(ctx context.Context, cid string, filter string) e
 
 func (r *runner) CronJobForAssetDeletion(ctx context.Context) error {
 	// Loop every hour to delete assets
-	ticker := time.NewTicker(10 * time.Minute)
+	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
 	glog.Infof("Starting asset deletion cron job")
@@ -619,11 +619,13 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 		return err
 	}
 
-	directory := asset.PlaybackID
+	directory := fmt.Sprintf("%s/", asset.PlaybackID)
 	var totalDeleted int
 
+	glog.Infof("Listing files in directory %v", directory)
+
 	// Initially list files
-	pi, err := assetOS.ListFiles(ctx, directory, "/")
+	pi, err := assetOS.ListFiles(ctx, directory, "")
 	glog.Infof("Found %v files for asset %v", len(pi.Files()), asset.ID)
 	if err != nil {
 		glog.Errorf("Error listing files for asset %v: %v", asset.ID, err)
