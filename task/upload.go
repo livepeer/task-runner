@@ -475,6 +475,11 @@ func processCatalystCallback(tctx *TaskContext, callback *clients.CatalystCallba
 				})
 			}
 		case OutputNameIPFSSourceMP4:
+			if assetSpec.Storage == nil {
+				assetSpec.Storage = &api.AssetStorage{IPFS: &api.AssetIPFS{}}
+			} else if assetSpec.Storage.IPFS == nil {
+				assetSpec.Storage.IPFS = &api.AssetIPFS{}
+			}
 			assetSpec.Storage.IPFS.CID = output.Manifest
 		default:
 			return nil, fmt.Errorf("unknown output name=%q for output=%+v", outName, output)
@@ -552,8 +557,8 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*da
 	}
 	defer contents.Close()
 
-	ipfsSpec := tctx.OutputAsset.Storage.IPFS
-	ipfsRequired := ipfsSpec != nil && ipfsSpec.Spec != nil
+	storage := tctx.OutputAsset.Storage
+	ipfsRequired := storage != nil && storage.IPFS != nil && storage.IPFS.Spec != nil
 	if !ipfsRequired && catalystCopiedSource {
 		glog.Infof("Skipping file download")
 		return &data.UploadTaskOutput{AssetSpec: assetSpec}, nil
@@ -591,7 +596,7 @@ func complementCatalystPipeline(tctx *TaskContext, assetSpec api.AssetSpec) (*da
 	}
 
 	if ipfsRequired {
-		ipfs := *ipfsSpec
+		ipfs := *storage.IPFS
 		if !FlagCatalystSupportsIPFS {
 			// TODO: Remove this branch once we have reliable catalyst IPFS support
 			var (
@@ -724,7 +729,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 		return nil, nil, err
 	}
 	// Add Pinata output location
-	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage.IPFS != nil {
+	if FlagCatalystSupportsIPFS && tctx.OutputAsset.Storage != nil && tctx.OutputAsset.Storage.IPFS != nil {
 		// TODO: This interface is likely going to change so that pinata is just a
 		// `object_store` output
 		outputNames, outputLocations =

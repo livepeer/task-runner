@@ -661,7 +661,8 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 
 	glog.Infof("Deleted %v files from asset=%v", totalDeleted, asset.ID)
 
-	if ipfs := asset.AssetSpec.Storage.IPFS; ipfs != nil {
+	if storage := asset.AssetSpec.Storage; storage != nil && storage.IPFS != nil {
+		ipfs := storage.IPFS
 		err = r.UnpinFromIpfs(ctx, ipfs.CID, "cid")
 		if err != nil {
 			glog.Errorf("Error unpinning from IPFS %v", ipfs.CID)
