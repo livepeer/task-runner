@@ -344,6 +344,9 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *T
 	if err == api.ErrRateLimited {
 		glog.Warningf("Task execution rate limited type=%q id=%s userID=%s", taskType, taskID, taskCtx.UserID)
 		return nil, r.delayTaskStep(ctx, taskID, taskCtx.Step, taskCtx.StepInput)
+	} else if httpErr := (&api.HTTPStatusError{}); errors.As(err, &httpErr) && httpErr.StatusCode == 403 {
+		glog.Warningf("Task execution forbidden type=%q id=%s userID=%s error=%q", taskType, taskID, taskCtx.UserID, httpErr.Message)
+		return nil, fmt.Errorf("task execution forbidden: %w", httpErr)
 	} else if err != nil {
 		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
 		// execute the task anyway
