@@ -328,24 +328,25 @@ func (r *runner) handleTask(ctx context.Context, taskInfo data.TaskInfo) (out *T
 		return nil, UnretriableError{fmt.Errorf("unknown task type=%q", taskType)}
 	}
 
-	isFirstStep := taskCtx.Step == ""
+	step, progress := taskCtx.Step, float64(0)
+	isFirstStep := step == ""
 	if !isFirstStep {
-		glog.Infof("Continuing task type=%q id=%s step=%s inputAssetId=%s outputAssetId=%s", taskType, taskID, taskCtx.Step, taskCtx.InputAssetID, taskCtx.OutputAssetID)
+		progress = taskCtx.Status.Progress
+		glog.Infof("Continuing task type=%q id=%s step=%s inputAssetId=%s outputAssetId=%s progress=%v", taskType, taskID, step, taskCtx.InputAssetID, taskCtx.OutputAssetID, progress)
 	} else {
 		if taskCtx.Status.Phase == api.TaskPhaseRunning {
 			return nil, errors.New("task has already been started before")
 		}
-
-		err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, 0, "")
-		if err == api.ErrRateLimited {
-			glog.Warningf("Task execution rate limited type=%q id=%s userID=%s", taskType, taskID, taskCtx.UserID)
-			return nil, r.delayTaskStep(ctx, taskID, taskCtx.Step, taskCtx.StepInput)
-		} else if err != nil {
-			glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
-			// execute the task anyway
-		}
-
 		glog.Infof(`Starting task type=%q id=%s inputAssetId=%s outputAssetId=%s params="%+v"`, taskType, taskID, taskCtx.InputAssetID, taskCtx.OutputAssetID, taskCtx.Params)
+	}
+
+	err = r.lapi.UpdateTaskStatus(taskID, api.TaskPhaseRunning, progress, step)
+	if err == api.ErrRateLimited {
+		glog.Warningf("Task execution rate limited type=%q id=%s userID=%s", taskType, taskID, taskCtx.UserID)
+		return nil, r.delayTaskStep(ctx, taskID, taskCtx.Step, taskCtx.StepInput)
+	} else if err != nil {
+		glog.Errorf("Error updating task progress type=%q id=%s err=%q unretriable=%v", taskType, taskID, err, IsUnretriable(err))
+		// execute the task anyway
 	}
 
 	return handler(taskCtx)
