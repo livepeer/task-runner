@@ -120,7 +120,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 			Body:        bytes.NewReader(body),
 			ContentType: "application/json",
 		}, &res)
-		glog.Infof("Catalyst upload VOD request: req=%v err=%s res=%s", withoutCredentials(upload), err, string(res))
+		glog.Infof("Catalyst upload VOD request: req=%q err=%s res=%s", withoutCredentials(upload), err, string(res))
 
 		if !isTooManyRequestsErr(err) {
 			return
@@ -140,7 +140,7 @@ func (c *catalyst) UploadVOD(ctx context.Context, upload UploadVODRequest) (err 
 	}
 }
 
-func withoutCredentials(upload UploadVODRequest) UploadVODRequest {
+func withoutCredentials(upload UploadVODRequest) string {
 	res := upload
 	res.Url = RedactURL(upload.Url)
 	res.OutputLocations = []OutputLocation{}
@@ -149,7 +149,11 @@ func withoutCredentials(upload UploadVODRequest) UploadVODRequest {
 		nol.URL = RedactURL(ol.URL)
 		res.OutputLocations = append(res.OutputLocations, nol)
 	}
-	return res
+	jsonBytes, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Sprintf("marshal error: %s", err)
+	}
+	return string(jsonBytes)
 }
 
 func RedactURL(urlStr string) string {
