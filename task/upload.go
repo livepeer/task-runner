@@ -101,10 +101,13 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 			CallbackUrl:           tctx.catalyst.CatalystHookURL(tctx.Task.ID, "finalize", catalystTaskAttemptID(tctx.Task)),
 			OutputLocations:       outputLocations,
 			PipelineStrategy:      p.catalystPipelineStrategy,
-			Profiles:              p.profiles,
 			TargetSegmentSizeSecs: p.targetSegmentSizeSecs,
 			Encryption:            encryption,
 			C2PA:                  p.c2pa,
+		}
+
+		if p.profiles != nil {
+			req.Profiles = &p.profiles
 		}
 
 		if clipStrategy != nil {

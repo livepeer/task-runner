@@ -109,21 +109,15 @@ func TestCatalystRateLimiting(t *testing.T) {
 }
 
 func TestWithoutCredentials(t *testing.T) {
-	require.Equal(t, UploadVODRequest{
-		Url: "s3+https://jv4s7zwfugeb7uccnnl2bwigikka:xxxxx@gateway.storjshare.io/inbucket/source.mp4",
-		OutputLocations: []OutputLocation{
-			{
-				Type: "object_store",
-				URL:  "s3+https://jv4s7zwfugeb7uccnnl2bwigikka:xxxxx@gateway.storjshare.io/outbucket/sourcetest/hls/index.m3u8",
+	require.Equal(t,
+		`{"url":"s3+https://jv4s7zwfugeb7uccnnl2bwigikka:xxxxx@gateway.storjshare.io/inbucket/source.mp4","callback_url":"","output_locations":[{"type":"object_store","url":"s3+https://jv4s7zwfugeb7uccnnl2bwigikka:xxxxx@gateway.storjshare.io/outbucket/sourcetest/hls/index.m3u8"}],"clip_strategy":{}}`,
+		withoutCredentials(UploadVODRequest{
+			Url: "s3+https://jv4s7zwfugeb7uccnnl2bwigikka:j3axkol3vqndxy4vs6mgmv4tzs47kaxazj3uesegybny2q7n74jwq@gateway.storjshare.io/inbucket/source.mp4",
+			OutputLocations: []OutputLocation{
+				{
+					Type: "object_store",
+					URL:  "s3+https://jv4s7zwfugeb7uccnnl2bwigikka:j3axkol3vqndxy4vs6mgmv4tzs47kaxazj3uesegybny2q7n74jwq@gateway.storjshare.io/outbucket/sourcetest/hls/index.m3u8",
+				},
 			},
-		},
-	}, withoutCredentials(UploadVODRequest{
-		Url: "s3+https://jv4s7zwfugeb7uccnnl2bwigikka:j3axkol3vqndxy4vs6mgmv4tzs47kaxazj3uesegybny2q7n74jwq@gateway.storjshare.io/inbucket/source.mp4",
-		OutputLocations: []OutputLocation{
-			{
-				Type: "object_store",
-				URL:  "s3+https://jv4s7zwfugeb7uccnnl2bwigikka:j3axkol3vqndxy4vs6mgmv4tzs47kaxazj3uesegybny2q7n74jwq@gateway.storjshare.io/outbucket/sourcetest/hls/index.m3u8",
-			},
-		},
-	}))
+		}))
 }
