@@ -630,12 +630,11 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 
 	// Initially list files
 	pi, err := assetOS.ListFiles(ctx, directory, "")
-	glog.Infof("Found %v files for asset %v", len(pi.Files()), asset.ID)
 	if err != nil {
 		glog.Errorf("Error listing files for asset %v: %v", asset.ID, err)
 		return err
 	}
-
+	glog.Infof("Found %v files for asset %v", len(pi.Files()), asset.ID)
 	isErr := false
 
 	for pi != nil {
