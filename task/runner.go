@@ -629,7 +629,7 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 	glog.Infof("Listing files in directory %v", directory)
 
 	// Initially list files
-	pi, err := assetOS.ListFiles(ctx, directory, "/")
+	pi, err := assetOS.ListFiles(ctx, directory, "")
 	if err != nil {
 		glog.Errorf("Error listing files for asset %v: %v", asset.ID, err)
 		return err
