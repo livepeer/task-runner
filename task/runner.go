@@ -623,7 +623,7 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 		return err
 	}
 
-	directory := fmt.Sprintf("%s/", asset.PlaybackID)
+	directory := fmt.Sprintf("hls/%s/", asset.PlaybackID)
 	var totalDeleted int
 
 	glog.Infof("Listing files in directory %v", directory)
