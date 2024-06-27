@@ -3,7 +3,11 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"math/rand"
 	"net/http"
+	"net/http/httputil"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -38,6 +42,35 @@ func NewHandler(serverCtx context.Context, opts APIHandlerOptions, runner task.R
 	hookHandler = authorized(opts.Catalyst.Secret, hookHandler)
 	hookHandler = logger(hookHandler)
 	router.Handler("POST", clients.CatalystHookPath(opts.APIRoot, ":id"), hookHandler)
+
+	proxyPath := path.Join(opts.APIRoot, "/proxy/os")
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = "https"
+			req.URL.Host = "gateway.storjshare.io"
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, proxyPath)
+		},
+	}
+	router.NotFound = logger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/") {
+			r.URL.Path = "/" + r.URL.Path
+		}
+		if !strings.HasPrefix(r.URL.Path, proxyPath) {
+			http.NotFound(w, r)
+			return
+		}
+
+		errorChance := float32(0.5)
+		if r.Method != "GET" {
+			errorChance = 0.95
+		}
+		if rand.Float32() < errorChance {
+			glog.Errorf("Random error for path=%s", r.URL.Path)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	}))
 	return router
 }
 

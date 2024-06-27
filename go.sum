@@ -281,8 +281,6 @@ github.com/libp2p/go-netroute v0.2.0 h1:0FpsbsvuSnAhXFnCY0VLFbJOzaK0VnP0r1QT/o4n
 github.com/libp2p/go-openssl v0.1.0 h1:LBkKEcUv6vtZIQLVTegAil8jbNpJErQ9AnT+bWV+Ooo=
 github.com/livepeer/catalyst-api v0.1.2-0.20230925142340-c311569665b4 h1:UfiMdEDGa88yqYD9+i1+ldAex9Kf1+3jbq+wBrmZccM=
 github.com/livepeer/catalyst-api v0.1.2-0.20230925142340-c311569665b4/go.mod h1:Ybiub5AGDrDfvyh1MWdIa551LAwhx/6lSpbQlgb1W1Q=
-github.com/livepeer/go-api-client v0.4.19-0.20240311145302-1abd53df256c h1:KPGkwuKvAbHCADy3hssTCfJVh0wxYMlXVTehEikljCc=
-github.com/livepeer/go-api-client v0.4.19-0.20240311145302-1abd53df256c/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-api-client v0.4.23-0.20240522195759-00d172d35bbb h1:ddTY+V26KtCyGgJZTd51gWbU1GvoDaGnD4ksNzZw14M=
 github.com/livepeer/go-api-client v0.4.23-0.20240522195759-00d172d35bbb/go.mod h1:Jdb+RI7JyzEZOHd1GUuKofwFDKMO/btTa80SdpUpYQw=
 github.com/livepeer/go-tools v0.3.2 h1:5pOUrOmkkGbbcWnpCt2yrSD6cD85G4GcpO4B25NpMJM=
