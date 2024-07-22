@@ -671,10 +671,14 @@ func deleteAsset(asset *api.Asset, r *runner, ctx context.Context) error {
 			glog.Errorf("Error unpinning from IPFS %v", ipfs.CID)
 			return err
 		}
-		err = r.UnpinFromIpfs(ctx, ipfs.NFTMetadata.CID, "nftMetadataCid")
-		if err != nil {
-			glog.Errorf("Error unpinning metadata from IPFS %v", ipfs.NFTMetadata.CID)
-			return err
+		if ipfs.NFTMetadata != nil {
+			err = r.UnpinFromIpfs(ctx, ipfs.NFTMetadata.CID, "nftMetadataCid")
+			if err != nil {
+				glog.Errorf("Error unpinning metadata from IPFS %v", ipfs.NFTMetadata.CID)
+				return err
+			}
+		} else {
+			glog.Errorf("No NFT metadata found for asset=%v", asset.ID)
 		}
 
 		glog.Infof("Unpinned asset=%v from IPFS", asset.ID)
