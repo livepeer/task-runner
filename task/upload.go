@@ -710,7 +710,7 @@ func uploadTaskOutputLocations(tctx *TaskContext) ([]OutputName, []clients.Outpu
 	playbackId := tctx.OutputAsset.PlaybackID
 	outURL := tctx.OutputOSObj.URL
 	var mp4, thumbsEnabled string
-	if isRecording(tctx) {
+	if isRecording(tctx) || tctx.OutputAsset.StaticMp4 {
 		mp4 = OUTPUT_ENABLED
 	} else {
 		mp4 = OUTPUT_ONLY_SHORT
