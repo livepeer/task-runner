@@ -46,6 +46,7 @@ var (
 		"upload":         TaskUpload,
 		"export":         TaskExport,
 		"export-data":    TaskExportData,
+		"delete":         TaskDelete,
 		"transcode-file": TaskTranscodeFile,
 		"clip":           TaskClip,
 	}
