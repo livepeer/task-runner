@@ -61,6 +61,7 @@ type handleUploadVODParams struct {
 	catalystPipelineStrategy pipeline.Strategy
 	clipStrategy             clients.ClipStrategy
 	c2pa                     bool
+	reencode                 bool
 }
 
 func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
@@ -104,6 +105,7 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 			TargetSegmentSizeSecs: p.targetSegmentSizeSecs,
 			Encryption:            encryption,
 			C2PA:                  p.c2pa,
+			Reencode:              p.reencode,
 		}
 
 		if p.profiles != nil {
@@ -261,6 +263,7 @@ func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 		targetSegmentSizeSecs:    params.TargetSegmentSizeSecs,
 		profiles:                 params.Profiles,
 		c2pa:                     params.C2PA,
+		reencode:                 params.Reencode,
 	})
 }
 

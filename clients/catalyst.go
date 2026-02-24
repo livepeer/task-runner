@@ -46,6 +46,7 @@ type UploadVODRequest struct {
 	Encryption            *EncryptionPayload `json:"encryption,omitempty"`
 	ClipStrategy          ClipStrategy       `json:"clip_strategy,omitempty"`
 	C2PA                  bool               `json:"c2pa,omitempty"`
+	Reencode              bool               `json:"reencode_segmentation,omitempty"`
 }
 
 type EncryptionPayload struct {
