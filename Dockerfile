@@ -1,4 +1,4 @@
-FROM	golang:1.19-buster	as	builder
+FROM	golang:1.22-bookworm	as	builder
 
 WORKDIR	/app
 
@@ -15,7 +15,7 @@ COPY	.	.
 
 RUN	make "version=$version"
 
-FROM	debian:buster-slim
+FROM	debian:bookworm-slim
 
 RUN	apt update \
 	&& apt install -yqq ca-certificates \
