@@ -96,8 +96,6 @@ func handleUploadVOD(p handleUploadVODParams) (*TaskHandlerOutput, error) {
 			}
 		}
 
-		glog.Infof("handleUploadVOD params: %+v reencode: %t", p, tctx.Task.Params.TranscodeFile.Reencode)
-
 		req := clients.UploadVODRequest{
 			ExternalID:            tctx.Task.ID,
 			Url:                   inUrl,
@@ -237,7 +235,6 @@ func isRecording(tctx *TaskContext) bool {
 
 func TaskTranscodeFile(tctx *TaskContext) (*TaskHandlerOutput, error) {
 	params := *tctx.Task.Params.TranscodeFile
-	glog.Infof("TaskTranscodeFile params: %+v", params)
 
 	return handleUploadVOD(handleUploadVODParams{
 		tctx:  tctx,

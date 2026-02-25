@@ -372,7 +372,6 @@ func (r *runner) buildTaskContext(ctx context.Context, info data.TaskInfo) (*Tas
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("Building task context for task %+v", task)
 	inputAsset, inputOSObj, inputOS, err := r.getAssetAndOS(task.InputAssetID)
 	if err != nil {
 		return nil, err
