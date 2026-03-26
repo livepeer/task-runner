@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -101,10 +103,19 @@ func (p *pinataClient) PinContent(ctx context.Context, filename, fileContentType
 }
 
 func (p *pinataClient) Unpin(ctx context.Context, cid string) error {
-	return p.DoRequest(ctx, Request{
+	err := p.DoRequest(ctx, Request{
 		Method: "DELETE",
 		URL:    "/pinning/unpin/" + cid,
 	}, nil)
+	if err != nil {
+		var httpErr *HTTPStatusError
+		if errors.As(err, &httpErr) && httpErr.Status == http.StatusBadRequest &&
+			strings.Contains(httpErr.Body, "CURRENT_USER_HAS_NOT_PINNED_CID") {
+			glog.Warningf("IPFS CID %s not pinned by current account, skipping unpin", cid)
+			return nil
+		}
+	}
+	return err
 }
 
 func (p *pinataClient) List(ctx context.Context, pageSize, pageOffset int) (pl *PinList, next int, err error) {
